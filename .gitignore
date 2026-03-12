@@ -22,6 +22,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env
-.env.*
-.DS_Store
+# Environment and Secrets
+**/.env
+**/.env.*
+**/*.local
+**/*.pem
+**/*.key
+**/service-account.json
+
+# OS generated files
+**/.DS_Store
+**/.DS_Store?
+**/._*
+**/.Spotlight-V100
+**/.Trashes
+**/ehthumbs.db
+**/Thumbs.db
