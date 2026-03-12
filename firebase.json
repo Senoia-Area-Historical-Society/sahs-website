@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "sahs-website-public",
     "public": "dist",
     "ignore": [
       "firebase.json",
