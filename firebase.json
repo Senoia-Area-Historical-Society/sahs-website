@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "Senoia Area Historical Society",
+    "site": "sahs-archives",
     "public": "dist",
     "ignore": [
       "firebase.json",
