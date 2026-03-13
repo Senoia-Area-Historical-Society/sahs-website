@@ -23,7 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .firebase/
-.firebaserc
 
 # Environment and Secrets
 **/.env
