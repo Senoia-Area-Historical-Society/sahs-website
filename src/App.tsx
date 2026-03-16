@@ -13,6 +13,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import News from './pages/News';
 import NewsDetail from './pages/NewsDetail';
 import Support from './pages/Support';
+import Supporters from './pages/Supporters';
 import MeetingRoom from './pages/MeetingRoom';
 import StripeSuccess from './pages/StripeSuccess';
 import StripeCancel from './pages/StripeCancel';
@@ -21,6 +22,7 @@ import SponsorApplication from './pages/SponsorApplication';
 import HistoricalPlaces from './pages/HistoricalPlaces';
 import HistoricalPlaceDetail from './pages/HistoricalPlaceDetail';
 import Media from './pages/Media';
+import PastEvents from './pages/PastEvents';
 import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 
@@ -43,6 +45,7 @@ function App() {
           <Route path="/news" element={<News />} />
           <Route path="/news/:slug" element={<NewsDetail />} />
           <Route path="/support-sahs" element={<Support />} />
+          <Route path="/supporters" element={<Supporters />} />
           <Route path="/support-sahs/success" element={<StripeSuccess />} />
           <Route path="/support-sahs/cancel" element={<StripeCancel />} />
           <Route path="/meeting-room" element={<MeetingRoom />} />
@@ -51,6 +54,7 @@ function App() {
           <Route path="/historic-structures-and-places" element={<HistoricalPlaces />} />
           <Route path="/historic-structures-and-places/:slug" element={<HistoricalPlaceDetail />} />
           <Route path="/media" element={<Media />} />
+          <Route path="/past-sahs-events" element={<PastEvents />} />
           
           {/* Status Pages */}
           <Route path="/401" element={<Unauthorized />} />
