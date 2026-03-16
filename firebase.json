@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "sahs-archives",
+    "site": "sahs-website-public",
     "public": "dist",
     "ignore": [
       "firebase.json",
