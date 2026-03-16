@@ -12,6 +12,12 @@ import Contact from './pages/Contact';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import News from './pages/News';
 import NewsDetail from './pages/NewsDetail';
+import Support from './pages/Support';
+import MeetingRoom from './pages/MeetingRoom';
+import StripeSuccess from './pages/StripeSuccess';
+import StripeCancel from './pages/StripeCancel';
+import VendorApplication from './pages/VendorApplication';
+import SponsorApplication from './pages/SponsorApplication';
 import HistoricalPlaces from './pages/HistoricalPlaces';
 import HistoricalPlaceDetail from './pages/HistoricalPlaceDetail';
 import Media from './pages/Media';
@@ -36,6 +42,12 @@ function App() {
           {/* Dynamic Content Views */}
           <Route path="/news" element={<News />} />
           <Route path="/news/:slug" element={<NewsDetail />} />
+          <Route path="/support-sahs" element={<Support />} />
+          <Route path="/support-sahs/success" element={<StripeSuccess />} />
+          <Route path="/support-sahs/cancel" element={<StripeCancel />} />
+          <Route path="/meeting-room" element={<MeetingRoom />} />
+          <Route path="/vendor-application-form" element={<VendorApplication />} />
+          <Route path="/sponsor-application-form" element={<SponsorApplication />} />
           <Route path="/historic-structures-and-places" element={<HistoricalPlaces />} />
           <Route path="/historic-structures-and-places/:slug" element={<HistoricalPlaceDetail />} />
           <Route path="/media" element={<Media />} />

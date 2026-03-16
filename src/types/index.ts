@@ -78,6 +78,24 @@ export interface OrganizationEntity {
   logoUrl?: string; 
   sponsoredEvents?: string[]; 
 
+  // Common display fields for rendering
+  image?: string;
+  title?: string;
+  
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
+}
+
+export interface Booking {
+  id: string;
+  date: string; // ISO Date YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  organization: string;
+  contactName: string;
+  email: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  purpose: string;
+  
+  submittedAt: string;
 }

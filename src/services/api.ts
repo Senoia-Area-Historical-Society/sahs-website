@@ -1,12 +1,13 @@
-import { collection, getDocs, query, orderBy, limit, where } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import type { Post, Gallery, HistoricalPlace, OrganizationEntity } from '../types/index';
+import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking } from '../types/index';
 
 // Helpers to transform Firestore docs safely
 const toPost = (doc: any): Post => ({ id: doc.id, ...doc.data() } as Post);
 const toGallery = (doc: any): Gallery => ({ id: doc.id, ...doc.data() } as Gallery);
 const toHistoricalPlace = (doc: any): HistoricalPlace => ({ id: doc.id, ...doc.data() } as HistoricalPlace);
 const toOrganizationEntity = (doc: any): OrganizationEntity => ({ id: doc.id, ...doc.data() } as OrganizationEntity);
+const toBooking = (doc: any): Booking => ({ id: doc.id, ...doc.data() } as Booking);
 
 export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
   try {
@@ -92,5 +93,50 @@ export async function getCorporateSponsors(): Promise<OrganizationEntity[]> {
   } catch (err) {
     console.error('Error fetching Corporate Sponsors:', err);
     return [];
+  }
+}
+
+export async function submitApplication(type: 'vendor' | 'sponsor', data: any): Promise<void> {
+  try {
+    const colRef = collection(db, 'submissions');
+    await addDoc(colRef, {
+      type,
+      ...data,
+      status: 'pending',
+      submittedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error(`Error submitting ${type} application:`, err);
+    throw err;
+  }
+}
+
+export async function getBookings(startDate: string, endDate: string): Promise<Booking[]> {
+  try {
+    const q = query(
+      collection(db, 'bookings'),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate),
+      where('status', '==', 'confirmed')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(toBooking);
+  } catch (err) {
+    console.error('Error fetching bookings:', err);
+    return [];
+  }
+}
+
+export async function submitBookingRequest(data: Omit<Booking, 'id' | 'status' | 'submittedAt'>): Promise<void> {
+  try {
+    const colRef = collection(db, 'bookings');
+    await addDoc(colRef, {
+      ...data,
+      status: 'pending',
+      submittedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Error submitting booking request:', err);
+    throw err;
   }
 }
