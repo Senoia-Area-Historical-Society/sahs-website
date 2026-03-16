@@ -22,7 +22,6 @@ export default function Supporters() {
 
   // Filter sponsors by level
   const corporateSponsors = sponsors.filter(s => s.sponsorshipLevel === 'Corporate');
-  const otherSponsors = sponsors.filter(s => s.sponsorshipLevel !== 'Corporate');
 
   const partners = [
     { name: "Newnan Coweta County Historical Society", url: "http://newnancowetahistoricalsociety.com/" },

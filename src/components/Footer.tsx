@@ -34,6 +34,7 @@ export default function Footer() {
             <li><Link to="/museum" className="hover:text-white transition-colors">SAHS Museum</Link></li>
             <li><Link to="/meeting-room" className="hover:text-white transition-colors">Meeting Room Booking</Link></li>
             <li><Link to="/past-sahs-events" className="hover:text-white transition-colors">Past Events Archive</Link></li>
+            <li><a href="https://archives.senoiahistory.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Digital Archives</a></li>
             <li><Link to="/supporters" className="hover:text-white transition-colors">Our Supporters</Link></li>
           </ul>
         </div>

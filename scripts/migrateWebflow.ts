@@ -5,10 +5,18 @@ import { Post, Gallery, HistoricalPlace, OrganizationEntity } from '../src/types
 
 dotenv.config();
 
-// Intialize Firebase Admin using Application Default Credentials
+// Initialize Firebase Admin using Application Default Credentials
 // In a CI environment this depends on SA keys or Workload Identity Federation
-initializeApp();
-const db = getFirestore();
+try {
+  initializeApp({
+    projectId: 'sahs-archives'
+  });
+} catch (e) {
+  console.error("Firebase Admin initialization failed. If running locally, please ensure you have a service account key or are logged in via gcloud.");
+  console.error("You can set GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json");
+  process.exit(1);
+}
+const db = getFirestore('sahs-archives');
 
 // Webflow Configuration
 const WEBFLOW_TOKEN = process.env.WEBFLOW_TOKEN;
