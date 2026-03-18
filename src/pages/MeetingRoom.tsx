@@ -34,7 +34,7 @@ export default function MeetingRoom() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const { register, handleSubmit, reset } = useForm<BookingFormData>();
+  const { register, handleSubmit } = useForm<BookingFormData>();
 
   useEffect(() => {
     async function loadBookings() {

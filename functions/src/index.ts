@@ -11,7 +11,7 @@ const db = admin.firestore();
 // Use environment variables for sensitive data in production
 // For now, these would need to be set or mocked
 const CALENDAR_ID = 'c_188962a8uva3ijbpl6cdtc9621g6m@resource.calendar.google.com';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5174';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5175';
 
 const getStripe = () => {
     const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_mock';

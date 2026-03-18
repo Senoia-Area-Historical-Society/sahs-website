@@ -29,7 +29,7 @@ export default function BookingsAdmin() {
     }
   };
 
-  const handleStatusUpdate = async (id: string, newStatus: 'confirmed' | 'cancelled') => {
+  const handleStatusUpdate = async (id: string, newStatus: 'pending' | 'confirmed' | 'cancelled') => {
     try {
       await updateBookingStatus(id, newStatus);
       // Refresh list locally
