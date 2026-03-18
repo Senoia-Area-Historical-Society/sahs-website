@@ -2,32 +2,32 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { google } from 'googleapis';
 import Stripe from 'stripe';
-import * as cors from 'cors';
+import cors from 'cors';
+import * as path from 'path';
 
 admin.initializeApp();
 const db = admin.firestore();
 
 // Use environment variables for sensitive data in production
 // For now, these would need to be set or mocked
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_mock';
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
 const CALENDAR_ID = 'c_188962a8uva3ijbpl6cdtc9621g6m@resource.calendar.google.com';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5174';
 
-const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: '2024-04-10',
-});
+const getStripe = () => {
+    const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_mock';
+    return new Stripe(STRIPE_SECRET_KEY, {
+        apiVersion: '2024-04-10',
+    });
+};
 
 // Configure Google Auth for Calendar API
 // In production, use a service account key JSON file
-// const credentials = require('./service-account.json');
+const credentials = require(path.resolve(__dirname, '../src/service-account.json'));
 const getCalendarAuth = () => {
-    // Mock for now or would need actual SA credentials
-    // return new google.auth.GoogleAuth({
-    //     credentials,
-    //     scopes: ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly'],
-    // });
-    return null; // Replace with actual Auth
+    return new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly'],
+    });
 };
 
 const corsHandler = cors({ origin: true });
@@ -70,7 +70,7 @@ export const checkCalendarAvailability = functions.https.onRequest((req, res) =>
 });
 
 // 2. Create Stripe Checkout Session
-export const createBookingCheckoutSession = functions.https.onRequest((req, res) => {
+export const createBookingCheckoutSession = functions.runWith({ secrets: ['STRIPE_SECRET_KEY'] }).https.onRequest((req, res) => {
     corsHandler(req, res, async () => {
         try {
             if (req.method !== 'POST') {
@@ -93,6 +93,7 @@ export const createBookingCheckoutSession = functions.https.onRequest((req, res)
                 submittedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
+            const stripe = getStripe();
             const session = await stripe.checkout.sessions.create({
                 payment_method_types: ['card'],
                 line_items: [
@@ -127,12 +128,14 @@ export const createBookingCheckoutSession = functions.https.onRequest((req, res)
 });
 
 // 3. Stripe Webhook Handler
-export const stripeWebhook = functions.https.onRequest(async (req, res) => {
+export const stripeWebhook = functions.runWith({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] }).https.onRequest(async (req, res) => {
     const sig = req.headers['stripe-signature'];
+    const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
 
     let event;
 
     try {
+        const stripe = getStripe();
         event = stripe.webhooks.constructEvent(req.rawBody, sig as string, STRIPE_WEBHOOK_SECRET);
     } catch (err: any) {
         res.status(400).send(`Webhook Error: ${err.message}`);
