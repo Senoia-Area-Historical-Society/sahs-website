@@ -57,15 +57,20 @@ export default function MeetingRoom() {
   const onSubmit = async (data: BookingFormData) => {
     setIsSubmitting(true);
     try {
-      await submitBookingRequest({
+      const response = await submitBookingRequest({
         ...data,
         date: format(selectedDate, 'yyyy-MM-dd'),
       });
-      setIsSuccess(true);
-      reset();
+      
+      // Redirect to Stripe checkout
+      if (response.url) {
+        window.location.href = response.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
     } catch (err) {
+      console.error(err);
       alert("Failed to submit booking request. Please try again.");
-    } finally {
       setIsSubmitting(false);
     }
   };

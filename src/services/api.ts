@@ -1,4 +1,4 @@
-import { collection, getDocs, query, orderBy, limit, where, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking } from '../types/index';
 
@@ -127,16 +127,50 @@ export async function getBookings(startDate: string, endDate: string): Promise<B
   }
 }
 
-export async function submitBookingRequest(data: Omit<Booking, 'id' | 'status' | 'submittedAt'>): Promise<void> {
+export async function getAllBookings(): Promise<Booking[]> {
   try {
-    const colRef = collection(db, 'bookings');
-    await addDoc(colRef, {
-      ...data,
-      status: 'pending',
-      submittedAt: new Date().toISOString()
-    });
+    const q = query(
+      collection(db, 'bookings'),
+      orderBy('submittedAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(toBooking);
   } catch (err) {
-    console.error('Error submitting booking request:', err);
+    console.error('Error fetching all bookings:', err);
+    return [];
+  }
+}
+
+export async function updateBookingStatus(id: string, status: 'pending' | 'confirmed' | 'cancelled'): Promise<void> {
+  try {
+    const docRef = doc(db, 'bookings', id);
+    await updateDoc(docRef, { status });
+  } catch (err) {
+    console.error('Error updating booking status:', err);
+    throw err;
+  }
+}
+
+export async function submitBookingRequest(data: Omit<Booking, 'id' | 'status' | 'submittedAt'>): Promise<{ url: string }> {
+  try {
+    // In production, this URL should come from env variables
+    const functionUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1/createBookingCheckoutSession';
+    
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+         throw new Error(`Cloud function returned ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error('Error creating checkout session:', err);
     throw err;
   }
 }
