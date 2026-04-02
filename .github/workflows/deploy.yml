@@ -24,9 +24,7 @@ jobs:
           cache: 'npm'
           
       - name: Install Dependencies
-        run: |
-          npm ci
-          npm ci --prefix functions
+        run: npm ci
         
       - name: Build
         run: npm run build
@@ -42,8 +40,11 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
 
-      - name: Create Service Account Key
-        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > functions/src/service-account.json
+      - name: Install Functions Dependencies & Configure Env
+        run: |
+          cd functions
+          npm ci
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > functions/src/service-account.json
 
       # 🔑 Authenticate to Google Cloud using OIDC
       - id: 'auth'
