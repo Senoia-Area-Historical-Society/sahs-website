@@ -24,7 +24,9 @@ jobs:
           cache: 'npm'
           
       - name: Install Dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm ci --prefix functions
         
       - name: Build
         run: npm run build
@@ -36,7 +38,12 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
-#          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+
+      - name: Create Service Account Key
+        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > functions/src/service-account.json
 
       # 🔑 Authenticate to Google Cloud using OIDC
       - id: 'auth'
@@ -49,7 +56,7 @@ jobs:
           export_environment_variables: true
 
       # 🚀 Deploy to Firebase using the authenticated environment
-      - name: Deploy to Firebase Hosting
-        run: npx firebase-tools deploy --only hosting --project sahs-archives
+      - name: Deploy to Firebase Hosting and Functions
+        run: npx firebase-tools deploy --only hosting,functions --project sahs-archives
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
