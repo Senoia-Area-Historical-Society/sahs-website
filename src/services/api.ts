@@ -174,3 +174,51 @@ export async function submitBookingRequest(data: Omit<Booking, 'id' | 'status' |
     throw err;
   }
 }
+
+export async function submitMembershipRequest(data: { email: string; level: string; quantity: number; userId?: string }): Promise<{ url: string }> {
+  try {
+    const baseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1';
+    const functionUrl = `${baseUrl}/createMembershipCheckoutSession`;
+    
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+         throw new Error(`Cloud function returned ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error('Error creating membership checkout session:', err);
+    throw err;
+  }
+}
+
+export async function submitTicketRequest(data: { eventId: string; title: string; price: number; quantity: number; email: string }): Promise<{ url: string }> {
+  try {
+    const baseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1';
+    const functionUrl = `${baseUrl}/createTicketCheckoutSession`;
+    
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+         throw new Error(`Cloud function returned ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error('Error creating ticket checkout session:', err);
+    throw err;
+  }
+}
