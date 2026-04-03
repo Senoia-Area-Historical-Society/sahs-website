@@ -44,7 +44,7 @@ jobs:
         run: |
           cd functions
           npm ci
-          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > functions/src/service-account.json
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > src/service-account.json
 
       # 🔑 Authenticate to Google Cloud using OIDC
       - id: 'auth'
