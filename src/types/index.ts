@@ -16,9 +16,42 @@ export interface Post {
   location?: string; 
   sponsorIds?: string[]; 
   
+  // Ticketing fields
+  ticketPrice?: number; // in cents
+  capacity?: number;
+  ticketsSold?: number;
+  
   // System Fields
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
+}
+
+export interface Membership {
+  id: string;
+  userId: string;
+  email: string;
+  level: 'individual' | 'family' | 'senior' | 'patron' | 'corporate';
+  status: 'active' | 'expired' | 'pending';
+  expirationDate: string; // ISO Date
+  quantity: number;
+  autoRenew: boolean;
+  stripeSubscriptionId?: string;
+  
+  updatedAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  eventId: string;
+  userId?: string;
+  email: string;
+  quantity: number;
+  totalAmount: number;
+  status: 'paid' | 'cancelled';
+  confirmationNumber: string;
+  qrCode?: string;
+  
+  purchasedAt: string;
 }
 
 export interface Gallery {
