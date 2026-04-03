@@ -222,3 +222,31 @@ export async function submitTicketRequest(data: { eventId: string; title: string
     throw err;
   }
 }
+
+export async function getMemberships(): Promise<Membership[]> {
+  try {
+    const q = query(
+      collection(db, 'memberships'),
+      orderBy('updatedAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Membership));
+  } catch (err) {
+    console.error('Error fetching memberships:', err);
+    return [];
+  }
+}
+
+export async function getTickets(): Promise<Ticket[]> {
+  try {
+    const q = query(
+      collection(db, 'tickets'),
+      orderBy('purchasedAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
+  } catch (err) {
+    console.error('Error fetching tickets:', err);
+    return [];
+  }
+}

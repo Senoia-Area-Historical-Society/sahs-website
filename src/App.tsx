@@ -32,6 +32,8 @@ import Unauthorized from './pages/Unauthorized';
 // Admin Pages
 import Login from './pages/admin/Login';
 import BookingsAdmin from './pages/admin/BookingsAdmin';
+import MembershipsAdmin from './pages/admin/MembershipsAdmin';
+import TicketsAdmin from './pages/admin/TicketsAdmin';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isAdmin, loading } = useAuth();
@@ -69,6 +71,16 @@ function App() {
           <Route path="/admin/bookings" element={
             <ProtectedRoute>
               <BookingsAdmin />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/memberships" element={
+            <ProtectedRoute>
+              <MembershipsAdmin />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/tickets" element={
+            <ProtectedRoute>
+              <TicketsAdmin />
             </ProtectedRoute>
           } />
 
