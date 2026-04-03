@@ -127,7 +127,111 @@ export const createBookingCheckoutSession = functions.runWith({ secrets: ['STRIP
     });
 });
 
-// 3. Stripe Webhook Handler
+// 3. Create Membership Checkout Session
+export const createMembershipCheckoutSession = functions.runWith({ secrets: ['STRIPE_SECRET_KEY'] }).https.onRequest((req, res) => {
+    corsHandler(req, res, async () => {
+        try {
+            if (req.method !== 'POST') {
+                res.status(405).send('Method Not Allowed');
+                return;
+            }
+
+            const { email, level, quantity = 1, userId } = req.body;
+            const stripe = getStripe();
+            
+            // Define prices based on levels (in cents)
+            const priceMap = {
+                individual: 3500,
+                senior: 2500,
+                family: 5000,
+                patron: 10000,
+                corporate: 25000
+            };
+
+            const unitAmount = priceMap[level as keyof typeof priceMap];
+            if (!unitAmount) {
+                res.status(400).send({ error: "Invalid membership level" });
+                return;
+            }
+
+            const session = await stripe.checkout.sessions.create({
+                payment_method_types: ['card'],
+                line_items: [{
+                    price_data: {
+                        currency: 'usd',
+                        product_data: { 
+                            name: `SAHS Membership - ${level.charAt(0).toUpperCase() + level.slice(1)}`,
+                            description: `Membership dues for Senoia Area Historical Society`
+                        },
+                        unit_amount: unitAmount,
+                    },
+                    quantity: quantity,
+                }],
+                mode: 'payment',
+                success_url: `${FRONTEND_URL}/support-sahs/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${FRONTEND_URL}/support-sahs/cancel`,
+                customer_email: email,
+                metadata: {
+                    type: 'membership',
+                    level,
+                    quantity: quantity.toString(),
+                    userId: userId || ''
+                }
+            });
+
+            res.json({ url: session.url });
+        } catch (error) {
+            console.error('Error creating membership checkout session:', error);
+            res.status(500).send({ error: "Failed to create membership checkout session" });
+        }
+    });
+});
+
+// 4. Create Ticket Checkout Session
+export const createTicketCheckoutSession = functions.runWith({ secrets: ['STRIPE_SECRET_KEY'] }).https.onRequest((req, res) => {
+    corsHandler(req, res, async () => {
+        try {
+            if (req.method !== 'POST') {
+                res.status(405).send('Method Not Allowed');
+                return;
+            }
+
+            const { eventId, title, price, quantity, email } = req.body;
+            const stripe = getStripe();
+
+            const session = await stripe.checkout.sessions.create({
+                payment_method_types: ['card'],
+                line_items: [{
+                    price_data: {
+                        currency: 'usd',
+                        product_data: { 
+                            name: `Tickets: ${title}`,
+                            description: `Event tickets for Senoia Area Historical Society`
+                        },
+                        unit_amount: price,
+                    },
+                    quantity,
+                }],
+                mode: 'payment',
+                success_url: `${FRONTEND_URL}/news/${eventId}/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${FRONTEND_URL}/news/${eventId}/cancel`,
+                customer_email: email,
+                metadata: {
+                    type: 'ticket',
+                    eventId,
+                    quantity: quantity.toString()
+                }
+            });
+
+            res.json({ url: session.url });
+        } catch (error) {
+            console.error('Error creating ticket checkout session:', error);
+            res.status(500).send({ error: "Failed to create ticket checkout session" });
+        }
+    });
+});
+
+// 5. Stripe Webhook Handler
 export const stripeWebhook = functions.runWith({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] }).https.onRequest(async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
@@ -144,19 +248,54 @@ export const stripeWebhook = functions.runWith({ secrets: ['STRIPE_SECRET_KEY', 
 
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object as Stripe.Checkout.Session;
-        const bookingId = session.metadata?.bookingId;
+        const type = session.metadata?.type;
 
-        if (bookingId) {
+        if (type === 'membership') {
             try {
-                // Update booking to confirmed
-                await db.collection('bookings').doc(bookingId).update({
-                    status: 'confirmed',
-                    paymentIntentId: session.payment_intent as string,
+                await db.collection('memberships').add({
+                    email: session.customer_email,
+                    level: session.metadata?.level,
+                    quantity: parseInt(session.metadata?.quantity || '1'),
+                    status: 'active',
+                    // Default to 1 year from now
+                    expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                    paymentId: session.id,
+                    userId: session.metadata?.userId || null,
+                    updatedAt: new Date().toISOString()
                 });
-                
-                // Note: The onBookingConfirmed trigger will handle syncing to Calendar
+                console.log(`Membership created for ${session.customer_email}`);
             } catch (err) {
-                 console.error('Error updating booking status:', err);
+                console.error('Error creating membership record:', err);
+            }
+        } else if (type === 'ticket') {
+            try {
+                const confirmationNumber = Math.random().toString(36).substring(2, 10).toUpperCase();
+                await db.collection('tickets').add({
+                    eventId: session.metadata?.eventId,
+                    email: session.customer_email,
+                    quantity: parseInt(session.metadata?.quantity || '1'),
+                    status: 'paid',
+                    confirmationNumber,
+                    purchasedAt: new Date().toISOString()
+                });
+                console.log(`Ticket record created for ${session.customer_email}, Confirmation: ${confirmationNumber}`);
+                
+                // TODO: Trigger confirmation email
+            } catch (err) {
+                console.error('Error creating ticket record:', err);
+            }
+        } else {
+            // Default booking logic (backwards compatibility)
+            const bookingId = session.metadata?.bookingId;
+            if (bookingId) {
+                try {
+                    await db.collection('bookings').doc(bookingId).update({
+                        status: 'confirmed',
+                        paymentIntentId: session.payment_intent as string,
+                    });
+                } catch (err) {
+                    console.error('Error updating booking status:', err);
+                }
             }
         }
     }
