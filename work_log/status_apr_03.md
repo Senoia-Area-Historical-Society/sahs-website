@@ -20,6 +20,7 @@
     - Updated `/news/:slug` (Event Detail) to show a "Purchase Tickets" section for events with a price.
 - **Admin Dashboards:**
     - Built `/admin/memberships` and `/admin/tickets` views to allow the board to monitor revenue and verify attendees.
+    - Implemented a unified `AdminHeader` component with navigation links to easily switch between Bookings, Memberships, and Tickets.
 
 ### 3. Emulator & Local Testing Fixes
 - **Resolved Emulator Crash:** Fixed a `MODULE_NOT_FOUND` error that caused emulators to shut down when the `service-account.json` file was missing locally. Added a try-catch fallback to Application Default Credentials.
