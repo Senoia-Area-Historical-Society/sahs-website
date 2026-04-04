@@ -5,41 +5,66 @@ import {
   signInWithPopup, 
   signOut
 } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
+import { auth, googleProvider, db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+  isCurator: boolean;
+  isSAHSUser: boolean;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-// We define a hardcoded list of allowed admin emails or domains for simplicity
-// In a full production app, this should involve custom claims or a database lookup
-const ALLOWED_ADMIN_EMAILS = [
-    'admin@senoiahistory.com', // Replace with actual admin emails
-    'jermdw@gmail.com'         // Example test email
+// Hardcoded permanent admins
+const PERMANENT_ADMINS = [
+    'catnolan@senoiahistory.com',
+    'jeremywarren@senoiahistory.com'
 ];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isCurator, setIsCurator] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      
-      // Determine if the user is an admin
-      if (currentUser?.email && ALLOWED_ADMIN_EMAILS.includes(currentUser.email)) {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser && currentUser.email) {
+        const email = currentUser.email.toLowerCase();
+        
+        // 1. Check permanent admins
+        if (PERMANENT_ADMINS.includes(email)) {
           setIsAdmin(true);
+          setIsCurator(false);
+        } else {
+          // 2. Check Firestore overrides
+          try {
+            const roleDoc = await getDoc(doc(db, 'user_roles', email));
+            if (roleDoc.exists()) {
+              const role = roleDoc.data().role;
+              setIsAdmin(role === 'admin');
+              setIsCurator(role === 'curator');
+            } else {
+              setIsAdmin(false);
+              setIsCurator(false);
+            }
+          } catch (error) {
+            console.error('Error fetching user role:', error);
+            setIsAdmin(false);
+            setIsCurator(false);
+          }
+        }
       } else {
-          setIsAdmin(false);
+        setIsAdmin(false);
+        setIsCurator(false);
       }
-
+      
+      setUser(currentUser);
       setLoading(false);
     });
 
@@ -48,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = async () => {
     try {
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Error signing in with Google", error);
@@ -63,8 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const isSAHSUser = isAdmin || isCurator;
+
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isCurator, isSAHSUser, loginWithGoogle, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

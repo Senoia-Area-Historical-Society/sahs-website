@@ -25,6 +25,7 @@
 - **Resolved Emulator Crash:** Fixed a `MODULE_NOT_FOUND` error that caused emulators to shut down when the `service-account.json` file was missing locally. Added a try-catch fallback to Application Default Credentials.
 - **Fixed Missing Rules Error:** Created `firestore.rules` and `storage.rules` files and updated `firebase.json` to reference them. This resolves the "Cannot start the Storage emulator without rules file" error.
 - **Refactored to Functions v2:** Migrated all Cloud Functions from v1 to the **Firebase Functions v2 API**. This resolves compatibility issues with the latest `firebase-functions` library and ensures better analysis performance in the emulator.
+- **Restored Admin Access:** Ported the robust `AuthContext` logic from the `archive-app`, ensuring that hardcoded permanent admins (`jeremywarren@senoiahistory.com` and `catnolan@senoiahistory.com`) and Firestore-defined `user_roles` are correctly recognized. This resolves the "Access Denied" error in the Curator Portal.
 - **Backend Verification:** Successfully tested the `createMembershipCheckoutSession` function locally via `curl`. It now correctly generates Stripe checkout URLs.
 - **Data Seeding:** Created a `scripts/seed_test_data.ts` utility to populate the local Firestore emulator with sample membership and ticket records for dashboard testing.
 
