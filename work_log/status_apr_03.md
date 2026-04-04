@@ -23,6 +23,7 @@
 
 ### 3. Emulator & Local Testing Fixes
 - **Resolved Emulator Crash:** Fixed a `MODULE_NOT_FOUND` error that caused emulators to shut down when the `service-account.json` file was missing locally. Added a try-catch fallback to Application Default Credentials.
+- **Fixed Missing Rules Error:** Created `firestore.rules` and `storage.rules` files and updated `firebase.json` to reference them. This resolves the "Cannot start the Storage emulator without rules file" error.
 - **Backend Verification:** Successfully tested the `createMembershipCheckoutSession` function locally via `curl`. It now correctly generates Stripe checkout URLs.
 - **Data Seeding:** Created a `scripts/seed_test_data.ts` utility to populate the local Firestore emulator with sample membership and ticket records for dashboard testing.
 
