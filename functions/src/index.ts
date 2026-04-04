@@ -21,13 +21,24 @@ const getStripe = () => {
 };
 
 // Configure Google Auth for Calendar API
-// In production, use a service account key JSON file
-const credentials = require(path.resolve(__dirname, '../src/service-account.json'));
+// In production (CI), this is injected as a file. Locally, we handle its absence gracefully.
+let credentials: any = null;
+try {
+    credentials = require(path.resolve(__dirname, '../src/service-account.json'));
+} catch (error) {
+    console.warn('Google Service Account key file not found. Calendar integration will rely on environment credentials.');
+}
+
 const getCalendarAuth = () => {
-    return new google.auth.GoogleAuth({
-        credentials,
+    const authOptions: any = {
         scopes: ['https://www.googleapis.com/auth/calendar.events', 'https://www.googleapis.com/auth/calendar.readonly'],
-    });
+    };
+    
+    if (credentials) {
+        authOptions.credentials = credentials;
+    }
+
+    return new google.auth.GoogleAuth(authOptions);
 };
 
 const corsHandler = cors({ origin: true });

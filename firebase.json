@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "sahs-website-public",
+    "target": "public",
     "public": "dist",
     "ignore": [
       "firebase.json",
@@ -17,7 +17,7 @@
   "functions": [
     {
       "source": "functions",
-      "codebase": "default",
+      "codebase": "website",
       "ignore": [
         "node_modules",
         ".git",
