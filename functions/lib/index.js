@@ -27,16 +27,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.onBookingConfirmed = exports.stripeWebhook = exports.createTicketCheckoutSession = exports.createMembershipCheckoutSession = exports.createBookingCheckoutSession = exports.checkCalendarAvailability = void 0;
-const functions = __importStar(require("firebase-functions"));
+const https_1 = require("firebase-functions/v2/https");
+const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
 const googleapis_1 = require("googleapis");
 const stripe_1 = __importDefault(require("stripe"));
-const cors_1 = __importDefault(require("cors"));
 const path = __importStar(require("path"));
 admin.initializeApp();
 const db = admin.firestore();
 // Use environment variables for sensitive data in production
-// For now, these would need to be set or mocked
 const CALENDAR_ID = 'c_188962a8uva3ijbpl6cdtc9621g6m@resource.calendar.google.com';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://senoiahistory.com';
 const getStripe = () => {
@@ -46,7 +45,6 @@ const getStripe = () => {
     });
 };
 // Configure Google Auth for Calendar API
-// In production (CI), this is injected as a file. Locally, we handle its absence gracefully.
 let credentials = null;
 try {
     credentials = require(path.resolve(__dirname, '../src/service-account.json'));
@@ -63,192 +61,178 @@ const getCalendarAuth = () => {
     }
     return new googleapis_1.google.auth.GoogleAuth(authOptions);
 };
-const corsHandler = (0, cors_1.default)({ origin: true });
 // 1. Check Calendar Availability
-exports.checkCalendarAvailability = functions.https.onRequest((req, res) => {
-    corsHandler(req, res, async () => {
-        var _a, _b;
-        try {
-            const { timeMin, timeMax } = req.body;
-            if (!timeMin || !timeMax) {
-                res.status(400).send({ error: "Missing timeMin or timeMax" });
-                return;
-            }
-            const auth = getCalendarAuth();
-            if (!auth) {
-                // Mocking response if no auth is setup yet
-                res.json({ busy: [] });
-                return;
-            }
-            const calendar = googleapis_1.google.calendar({ version: 'v3', auth });
-            const response = await calendar.freebusy.query({
-                requestBody: {
-                    timeMin,
-                    timeMax,
-                    items: [{ id: CALENDAR_ID }]
-                }
-            });
-            const busy = ((_b = (_a = response.data.calendars) === null || _a === void 0 ? void 0 : _a[CALENDAR_ID]) === null || _b === void 0 ? void 0 : _b.busy) || [];
-            res.json({ busy });
+exports.checkCalendarAvailability = (0, https_1.onRequest)({ cors: true }, async (req, res) => {
+    var _a, _b;
+    try {
+        const { timeMin, timeMax } = req.body;
+        if (!timeMin || !timeMax) {
+            res.status(400).send({ error: "Missing timeMin or timeMax" });
+            return;
         }
-        catch (error) {
-            console.error('Error checking availability:', error);
-            res.status(500).send({ error: "Failed to check availability" });
-        }
-    });
+        const auth = getCalendarAuth();
+        const calendar = googleapis_1.google.calendar({ version: 'v3', auth });
+        const response = await calendar.freebusy.query({
+            requestBody: {
+                timeMin,
+                timeMax,
+                items: [{ id: CALENDAR_ID }]
+            }
+        });
+        const busy = ((_b = (_a = response.data.calendars) === null || _a === void 0 ? void 0 : _a[CALENDAR_ID]) === null || _b === void 0 ? void 0 : _b.busy) || [];
+        res.json({ busy });
+    }
+    catch (error) {
+        console.error('Error checking availability:', error);
+        res.status(500).send({ error: "Failed to check availability" });
+    }
 });
-// 2. Create Stripe Checkout Session
-exports.createBookingCheckoutSession = functions.runWith({ secrets: ['STRIPE_SECRET_KEY'] }).https.onRequest((req, res) => {
-    corsHandler(req, res, async () => {
-        try {
-            if (req.method !== 'POST') {
-                res.status(405).send('Method Not Allowed');
-                return;
-            }
-            const { organization, contactName, email, date, startTime, endTime, purpose } = req.body;
-            // Create a pending booking in Firestore BEFORE checkout so we have an ID
-            const bookingRef = await db.collection('bookings').add({
-                organization,
-                contactName,
-                email,
-                date,
-                startTime,
-                endTime,
-                purpose,
-                status: 'pending',
-                submittedAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            const stripe = getStripe();
-            const session = await stripe.checkout.sessions.create({
-                payment_method_types: ['card'],
-                line_items: [
-                    {
-                        price_data: {
-                            currency: 'usd',
-                            product_data: {
-                                name: 'Meeting Room Booking',
-                                description: `Booking for ${organization} on ${date} from ${startTime} to ${endTime}`,
-                            },
-                            unit_amount: 5000, // $50.00 mock price
+// 2. Create Stripe Checkout Session for Room Booking
+exports.createBookingCheckoutSession = (0, https_1.onRequest)({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
+    try {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+        const { organization, contactName, email, date, startTime, endTime, purpose } = req.body;
+        // Create a pending booking in Firestore BEFORE checkout so we have an ID
+        const bookingRef = await db.collection('bookings').add({
+            organization,
+            contactName,
+            email,
+            date,
+            startTime,
+            endTime,
+            purpose,
+            status: 'pending',
+            submittedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'usd',
+                        product_data: {
+                            name: 'Meeting Room Booking',
+                            description: `Booking for ${organization} on ${date} from ${startTime} to ${endTime}`,
                         },
-                        quantity: 1,
+                        unit_amount: 5000, // $50.00 mock price
                     },
-                ],
-                mode: 'payment',
-                success_url: `${FRONTEND_URL}/meeting-room/success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${FRONTEND_URL}/meeting-room/cancel`,
-                client_reference_id: bookingRef.id,
-                customer_email: email,
-                metadata: {
-                    bookingId: bookingRef.id
-                }
-            });
-            res.json({ url: session.url });
-        }
-        catch (error) {
-            console.error('Error creating checkout session:', error);
-            res.status(500).send({ error: "Failed to create checkout session" });
-        }
-    });
+                    quantity: 1,
+                },
+            ],
+            mode: 'payment',
+            success_url: `${FRONTEND_URL}/meeting-room/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${FRONTEND_URL}/meeting-room/cancel`,
+            client_reference_id: bookingRef.id,
+            customer_email: email,
+            metadata: {
+                bookingId: bookingRef.id
+            }
+        });
+        res.json({ url: session.url });
+    }
+    catch (error) {
+        console.error('Error creating checkout session:', error);
+        res.status(500).send({ error: "Failed to create checkout session" });
+    }
 });
 // 3. Create Membership Checkout Session
-exports.createMembershipCheckoutSession = functions.runWith({ secrets: ['STRIPE_SECRET_KEY'] }).https.onRequest((req, res) => {
-    corsHandler(req, res, async () => {
-        try {
-            if (req.method !== 'POST') {
-                res.status(405).send('Method Not Allowed');
-                return;
-            }
-            const { email, level, quantity = 1, userId } = req.body;
-            const stripe = getStripe();
-            // Define prices based on levels (in cents)
-            const priceMap = {
-                individual: 3500,
-                senior: 2500,
-                family: 5000,
-                patron: 10000,
-                corporate: 25000
-            };
-            const unitAmount = priceMap[level];
-            if (!unitAmount) {
-                res.status(400).send({ error: "Invalid membership level" });
-                return;
-            }
-            const session = await stripe.checkout.sessions.create({
-                payment_method_types: ['card'],
-                line_items: [{
-                        price_data: {
-                            currency: 'usd',
-                            product_data: {
-                                name: `SAHS Membership - ${level.charAt(0).toUpperCase() + level.slice(1)}`,
-                                description: `Membership dues for Senoia Area Historical Society`
-                            },
-                            unit_amount: unitAmount,
+exports.createMembershipCheckoutSession = (0, https_1.onRequest)({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
+    try {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+        const { email, level, quantity = 1, userId } = req.body;
+        const stripe = getStripe();
+        // Define prices based on levels (in cents)
+        const priceMap = {
+            senior: 2500,
+            individual: 3500,
+            family: 5000,
+            patron: 10000,
+            corporate: 25000
+        };
+        const unitAmount = priceMap[level];
+        if (!unitAmount) {
+            res.status(400).send({ error: "Invalid membership level" });
+            return;
+        }
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                    price_data: {
+                        currency: 'usd',
+                        product_data: {
+                            name: `SAHS Membership - ${level.charAt(0).toUpperCase() + level.slice(1)}`,
+                            description: `Membership dues for Senoia Area Historical Society`
                         },
-                        quantity: quantity,
-                    }],
-                mode: 'payment',
-                success_url: `${FRONTEND_URL}/support-sahs/success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${FRONTEND_URL}/support-sahs/cancel`,
-                customer_email: email,
-                metadata: {
-                    type: 'membership',
-                    level,
-                    quantity: quantity.toString(),
-                    userId: userId || ''
-                }
-            });
-            res.json({ url: session.url });
-        }
-        catch (error) {
-            console.error('Error creating membership checkout session:', error);
-            res.status(500).send({ error: "Failed to create membership checkout session" });
-        }
-    });
+                        unit_amount: unitAmount,
+                    },
+                    quantity: quantity,
+                }],
+            mode: 'payment',
+            success_url: `${FRONTEND_URL}/support-sahs/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${FRONTEND_URL}/support-sahs/cancel`,
+            customer_email: email,
+            metadata: {
+                type: 'membership',
+                level,
+                quantity: quantity.toString(),
+                userId: userId || ''
+            }
+        });
+        res.json({ url: session.url });
+    }
+    catch (error) {
+        console.error('Error creating membership checkout session:', error);
+        res.status(500).send({ error: "Failed to create membership checkout session" });
+    }
 });
 // 4. Create Ticket Checkout Session
-exports.createTicketCheckoutSession = functions.runWith({ secrets: ['STRIPE_SECRET_KEY'] }).https.onRequest((req, res) => {
-    corsHandler(req, res, async () => {
-        try {
-            if (req.method !== 'POST') {
-                res.status(405).send('Method Not Allowed');
-                return;
-            }
-            const { eventId, title, price, quantity, email } = req.body;
-            const stripe = getStripe();
-            const session = await stripe.checkout.sessions.create({
-                payment_method_types: ['card'],
-                line_items: [{
-                        price_data: {
-                            currency: 'usd',
-                            product_data: {
-                                name: `Tickets: ${title}`,
-                                description: `Event tickets for Senoia Area Historical Society`
-                            },
-                            unit_amount: price,
+exports.createTicketCheckoutSession = (0, https_1.onRequest)({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
+    try {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+        const { eventId, title, price, quantity, email } = req.body;
+        const stripe = getStripe();
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                    price_data: {
+                        currency: 'usd',
+                        product_data: {
+                            name: `Tickets: ${title}`,
+                            description: `Event tickets for Senoia Area Historical Society`
                         },
-                        quantity,
-                    }],
-                mode: 'payment',
-                success_url: `${FRONTEND_URL}/news/${eventId}/success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${FRONTEND_URL}/news/${eventId}/cancel`,
-                customer_email: email,
-                metadata: {
-                    type: 'ticket',
-                    eventId,
-                    quantity: quantity.toString()
-                }
-            });
-            res.json({ url: session.url });
-        }
-        catch (error) {
-            console.error('Error creating ticket checkout session:', error);
-            res.status(500).send({ error: "Failed to create ticket checkout session" });
-        }
-    });
+                        unit_amount: price,
+                    },
+                    quantity,
+                }],
+            mode: 'payment',
+            success_url: `${FRONTEND_URL}/news/${eventId}/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${FRONTEND_URL}/news/${eventId}/cancel`,
+            customer_email: email,
+            metadata: {
+                type: 'ticket',
+                eventId,
+                quantity: quantity.toString()
+            }
+        });
+        res.json({ url: session.url });
+    }
+    catch (error) {
+        console.error('Error creating ticket checkout session:', error);
+        res.status(500).send({ error: "Failed to create ticket checkout session" });
+    }
 });
 // 5. Stripe Webhook Handler
-exports.stripeWebhook = functions.runWith({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] }).https.onRequest(async (req, res) => {
+exports.stripeWebhook = (0, https_1.onRequest)({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] }, async (req, res) => {
     var _a, _b, _c, _d, _e, _f, _g;
     const sig = req.headers['stripe-signature'];
     const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
@@ -271,13 +255,11 @@ exports.stripeWebhook = functions.runWith({ secrets: ['STRIPE_SECRET_KEY', 'STRI
                     level: (_b = session.metadata) === null || _b === void 0 ? void 0 : _b.level,
                     quantity: parseInt(((_c = session.metadata) === null || _c === void 0 ? void 0 : _c.quantity) || '1'),
                     status: 'active',
-                    // Default to 1 year from now
                     expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                     paymentId: session.id,
                     userId: ((_d = session.metadata) === null || _d === void 0 ? void 0 : _d.userId) || null,
                     updatedAt: new Date().toISOString()
                 });
-                console.log(`Membership created for ${session.customer_email}`);
             }
             catch (err) {
                 console.error('Error creating membership record:', err);
@@ -294,15 +276,13 @@ exports.stripeWebhook = functions.runWith({ secrets: ['STRIPE_SECRET_KEY', 'STRI
                     confirmationNumber,
                     purchasedAt: new Date().toISOString()
                 });
-                console.log(`Ticket record created for ${session.customer_email}, Confirmation: ${confirmationNumber}`);
-                // TODO: Trigger confirmation email
             }
             catch (err) {
                 console.error('Error creating ticket record:', err);
             }
         }
         else {
-            // Default booking logic (backwards compatibility)
+            // Default booking logic
             const bookingId = (_g = session.metadata) === null || _g === void 0 ? void 0 : _g.bookingId;
             if (bookingId) {
                 try {
@@ -319,26 +299,20 @@ exports.stripeWebhook = functions.runWith({ secrets: ['STRIPE_SECRET_KEY', 'STRI
     }
     res.json({ received: true });
 });
-// 4. Sync Confirmed Bookings to Google Calendar
-exports.onBookingConfirmed = functions.firestore
-    .document('bookings/{bookingId}')
-    .onUpdate(async (change, context) => {
-    const newValue = change.after.data();
-    const previousValue = change.before.data();
-    // Only trigger if status changed to 'confirmed'
+// 6. Sync Confirmed Bookings to Google Calendar
+exports.onBookingConfirmed = (0, firestore_1.onDocumentUpdated)('bookings/{bookingId}', async (event) => {
+    var _a, _b, _c;
+    const newValue = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after.data();
+    const previousValue = (_b = event.data) === null || _b === void 0 ? void 0 : _b.before.data();
+    if (!newValue || !previousValue)
+        return;
     if (newValue.status === 'confirmed' && previousValue.status !== 'confirmed') {
         const auth = getCalendarAuth();
-        if (!auth) {
-            console.log('Skipping Calendar sync - no auth configured');
-            return null;
-        }
         try {
             const calendar = googleapis_1.google.calendar({ version: 'v3', auth });
-            // Convert date, startTime, endTime to ISO Strings for Calendar API
-            // Assuming date is YYYY-MM-DD and time is HH:mm
             const startDateTime = new Date(`${newValue.date}T${newValue.startTime}:00`).toISOString();
             const endDateTime = new Date(`${newValue.date}T${newValue.endTime}:00`).toISOString();
-            const event = {
+            const calendarEvent = {
                 summary: `Meeting Room Booking: ${newValue.organization}`,
                 description: `Contact: ${newValue.contactName} (${newValue.email})\nPurpose: ${newValue.purpose}`,
                 start: {
@@ -352,20 +326,15 @@ exports.onBookingConfirmed = functions.firestore
             };
             const response = await calendar.events.insert({
                 calendarId: CALENDAR_ID,
-                requestBody: event,
+                requestBody: calendarEvent,
             });
-            console.log('Event created:', response.data.htmlLink);
-            // Save the Google Calendar Event ID back to the booking
-            await change.after.ref.update({
+            await ((_c = event.data) === null || _c === void 0 ? void 0 : _c.after.ref.update({
                 googleCalendarEventId: response.data.id
-            });
-            return null;
+            }));
         }
         catch (error) {
             console.error('Error syncing to Calendar:', error);
-            return null;
         }
     }
-    return null;
 });
 //# sourceMappingURL=index.js.map
