@@ -43,21 +43,9 @@
     "database": {
       "port": 9000
     },
-    "pubsub": {
-      "port": 8085
-    },
     "storage": {
       "port": 9199
     },
-    "eventarc": {
-      "port": 9299
-    },
-    "dataconnect": {
-      "port": 9399,
-      "dataDir": "dataconnect/.dataconnect/pgliteData"
-    },
-    "tasks": {
-      "port": 9499
     },
     "ui": {
       "enabled": true
