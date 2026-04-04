@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getTickets } from '../../services/api';
 import type { Ticket } from '../../types';
-import { Shield, Ticket as TicketIcon, Mail, Hash, Calendar, Loader2 } from 'lucide-react';
+import { Ticket as TicketIcon, Mail, Hash, Calendar, Loader2 } from 'lucide-react';
+import AdminHeader from './AdminHeader';
 
 export default function TicketsAdmin() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -22,14 +23,13 @@ export default function TicketsAdmin() {
   }, []);
 
   return (
-    <div className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
-      <div className="max-w-7xl mx-auto">
+    <div className="bg-cream min-h-screen font-serif text-charcoal flex flex-col">
+      <AdminHeader />
+
+      <main className="flex-grow p-8 max-w-7xl mx-auto w-full">
         <header className="mb-12 border-b border-tan pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-              <Shield className="text-tan" />
-              Event Ticketing
-            </h1>
+            <h1 className="text-4xl font-bold mb-2">Event Ticketing</h1>
             <p className="text-lg text-charcoal/60 font-sans">
               Monitor ticket sales and verify confirmation numbers.
             </p>
@@ -94,7 +94,7 @@ export default function TicketsAdmin() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

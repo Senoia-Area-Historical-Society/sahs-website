@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import { getAllBookings, updateBookingStatus } from '../../services/api';
 import type { Booking } from '../../types';
 import { format, parseISO } from 'date-fns';
-import { Calendar, Clock, User, Building, Mail, FileText, CheckCircle, XCircle, LogOut } from 'lucide-react';
+import { Calendar, Clock, User, Building, Mail, FileText, CheckCircle, XCircle } from 'lucide-react';
+import AdminHeader from './AdminHeader';
 
 export default function BookingsAdmin() {
-  const { user, logout } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
@@ -51,26 +50,7 @@ export default function BookingsAdmin() {
 
   return (
     <div className="min-h-screen bg-cream font-serif text-charcoal flex flex-col">
-      {/* Admin Header */}
-      <header className="bg-white border-b border-tan-light px-8 py-4 flex justify-between items-center shadow-sm">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-charcoal">SAHS Curator Portal</h1>
-          <p className="text-sm font-sans text-charcoal/60">Meeting Room Bookings</p>
-        </div>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 font-sans text-sm text-charcoal/80">
-            <User size={16} />
-            <span>{user?.email}</span>
-          </div>
-          <button 
-            onClick={logout}
-            className="flex items-center gap-2 text-sm font-sans text-red-600 hover:text-red-800 transition-colors"
-          >
-            <LogOut size={16} />
-            Sign Out
-          </button>
-        </div>
-      </header>
+      <AdminHeader />
 
       {/* Main Content */}
       <main className="flex-grow p-8 max-w-7xl mx-auto w-full">
