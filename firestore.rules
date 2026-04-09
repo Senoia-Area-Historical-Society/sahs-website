@@ -1,8 +1,54 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper function for admin/curator roles
+    // This restricts management to verified SAHS users
+    function isSAHSUser() {
+      let email = request.auth.token.email.lower();
+      return request.auth != null && (
+        email == 'catnolan@senoiahistory.com' || 
+        email == 'jeremywarren@senoiahistory.com' ||
+        exists(/databases/$(database)/documents/user_roles/$(email)) &&
+        get(/databases/$(database)/documents/user_roles/$(email)).data.role in ['admin', 'curator']
+      );
+    }
+
+    // Public Content: Anyone can read, only Admins can write
+    match /posts/{doc} { allow read: if true; allow write: if isSAHSUser(); }
+    match /galleries/{doc} { allow read: if true; allow write: if isSAHSUser(); }
+    match /historical_places/{doc} { allow read: if true; allow write: if isSAHSUser(); }
+    match /organization_entities/{doc} { allow read: if true; allow write: if isSAHSUser(); }
+
+    // Submissions: Public can ONLY create (useful for forms)
+    match /submissions/{doc} {
+      allow create: if true;
+      allow read, update, delete: if isSAHSUser();
+    }
+
+    // Bookings: Public can read CONFIRMED ones to see the calendar.
+    // Creation is handled by Cloud Functions.
+    match /bookings/{doc} {
+      allow read: if resource.data.status == 'confirmed' || isSAHSUser();
+      allow write: if isSAHSUser();
+    }
+
+    // Sensitive Data: Strictly SAHS authorized users only
+    match /memberships/{doc} { allow read, write: if isSAHSUser(); }
+    match /tickets/{doc} { allow read, write: if isSAHSUser(); }
+
+    // User Roles: Super-Admin access only
+    match /user_roles/{email} {
+      allow read: if isSAHSUser();
+      allow write: if request.auth != null && (
+        request.auth.token.email.lower() == 'catnolan@senoiahistory.com' ||
+        request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com'
+      );
+    }
+
+    // Default deny: Block all other access
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

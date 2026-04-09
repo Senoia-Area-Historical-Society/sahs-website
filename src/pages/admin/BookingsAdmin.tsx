@@ -38,6 +38,12 @@ export default function BookingsAdmin() {
     }
   };
 
+  const formatSubmittedAt = (val: any) => {
+    if (!val) return 'N/A';
+    const date = val.toDate ? val.toDate() : new Date(val);
+    return format(date, 'PP p');
+  };
+
   const filteredBookings = bookings.filter(b => b.status === activeTab);
 
   if (loading) {
@@ -95,7 +101,12 @@ export default function BookingsAdmin() {
                   {/* Column 1: Date & Time */}
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-xs font-bold font-sans uppercase tracking-widest text-charcoal/50 mb-1">Date & Time</h4>
+                      <div className="flex items-center justify-between mb-1">
+                        <h4 className="text-xs font-bold font-sans uppercase tracking-widest text-charcoal/50">Date & Time</h4>
+                        {booking.paymentIntentId && (
+                          <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Paid</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 text-lg font-bold">
                         <Calendar size={18} className="text-tan" />
                         {format(parseISO(booking.date), 'MMM do, yyyy')}
@@ -109,7 +120,7 @@ export default function BookingsAdmin() {
                       <div>
                         <h4 className="text-xs font-bold font-sans uppercase tracking-widest text-charcoal/50 mb-1">Requested On</h4>
                         <p className="text-sm font-sans text-charcoal/70">
-                          {format(new Date(booking.submittedAt), 'PP p')}
+                          {formatSubmittedAt(booking.submittedAt)}
                         </p>
                       </div>
                     )}

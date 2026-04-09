@@ -1,6 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
 import Stripe from 'stripe';
 import * as path from 'path';
@@ -88,7 +89,7 @@ export const createBookingCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET
             endTime,
             purpose,
             status: 'pending',
-            submittedAt: admin.firestore.FieldValue.serverTimestamp()
+            submittedAt: FieldValue.serverTimestamp()
         });
 
         const stripe = getStripe();
@@ -207,8 +208,8 @@ export const createTicketCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_
                 quantity,
             }],
             mode: 'payment',
-            success_url: `${FRONTEND_URL}/news/${eventId}/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${FRONTEND_URL}/news/${eventId}/cancel`,
+            success_url: `${FRONTEND_URL}/support-sahs/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${FRONTEND_URL}/support-sahs/cancel`,
             customer_email: email,
             metadata: {
                 type: 'ticket',
@@ -278,7 +279,6 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
             if (bookingId) {
                 try {
                     await db.collection('bookings').doc(bookingId).update({
-                        status: 'confirmed',
                         paymentIntentId: session.payment_intent as string,
                     });
                 } catch (err) {

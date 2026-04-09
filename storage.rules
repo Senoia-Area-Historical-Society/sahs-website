@@ -1,8 +1,22 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    
+    // Helper function for admin/curator roles
+    // Hardcoded emails for SAHS curators and administrators
+    function isSAHSUser() {
+      let email = request.auth.token.email.lower();
+      return request.auth != null && (
+        email == 'catnolan@senoiahistory.com' || 
+        email == 'jeremywarren@senoiahistory.com'
+      );
+    }
+
+    // Public content (historical photos, website images, etc.)
+    // Anyone can read, only SAHS administrators can upload/edit
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isSAHSUser();
     }
   }
 }

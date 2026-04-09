@@ -129,6 +129,7 @@ export interface Booking {
   email: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   purpose: string;
+  paymentIntentId?: string;
   
-  submittedAt: string;
+  submittedAt: any;
 }

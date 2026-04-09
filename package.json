@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "migrate": "tsx scripts/migrateWebflow.ts"
+    "migrate": "tsx scripts/migrateWebflow.ts",
+    "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit",
+    "seed:event": "node scripts/seed_july4_event.cjs"
   },
   "dependencies": {
     "date-fns": "^4.1.0",

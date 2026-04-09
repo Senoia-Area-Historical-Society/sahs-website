@@ -30,6 +30,7 @@ exports.onBookingConfirmed = exports.stripeWebhook = exports.createTicketCheckou
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
+const firestore_2 = require("firebase-admin/firestore");
 const googleapis_1 = require("googleapis");
 const stripe_1 = __importDefault(require("stripe"));
 const path = __importStar(require("path"));
@@ -105,7 +106,7 @@ exports.createBookingCheckoutSession = (0, https_1.onRequest)({ secrets: ['STRIP
             endTime,
             purpose,
             status: 'pending',
-            submittedAt: admin.firestore.FieldValue.serverTimestamp()
+            submittedAt: firestore_2.FieldValue.serverTimestamp()
         });
         const stripe = getStripe();
         const session = await stripe.checkout.sessions.create({
@@ -215,8 +216,8 @@ exports.createTicketCheckoutSession = (0, https_1.onRequest)({ secrets: ['STRIPE
                     quantity,
                 }],
             mode: 'payment',
-            success_url: `${FRONTEND_URL}/news/${eventId}/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${FRONTEND_URL}/news/${eventId}/cancel`,
+            success_url: `${FRONTEND_URL}/support-sahs/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${FRONTEND_URL}/support-sahs/cancel`,
             customer_email: email,
             metadata: {
                 type: 'ticket',
@@ -287,7 +288,6 @@ exports.stripeWebhook = (0, https_1.onRequest)({ secrets: ['STRIPE_SECRET_KEY', 
             if (bookingId) {
                 try {
                     await db.collection('bookings').doc(bookingId).update({
-                        status: 'confirmed',
                         paymentIntentId: session.payment_intent,
                     });
                 }
