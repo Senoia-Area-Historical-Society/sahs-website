@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getTickets } from '../../services/api';
 import type { Ticket } from '../../types';
-import { Ticket as TicketIcon, Mail, Hash, Calendar, Loader2, User, CreditCard } from 'lucide-react';
+import { Ticket as TicketIcon, Hash, Calendar, Loader2, User, CreditCard } from 'lucide-react';
 import AdminHeader from './AdminHeader';
 import { format } from 'date-fns';
 

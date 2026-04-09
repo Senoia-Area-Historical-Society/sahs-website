@@ -1,6 +1,6 @@
 import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking } from '../types/index';
+import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking, Membership, Ticket } from '../types/index';
 
 // Helpers to transform Firestore docs safely
 const toPost = (doc: any): Post => ({ id: doc.id, ...doc.data() } as Post);
