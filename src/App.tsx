@@ -34,6 +34,8 @@ import Login from './pages/admin/Login';
 import BookingsAdmin from './pages/admin/BookingsAdmin';
 import MembershipsAdmin from './pages/admin/MembershipsAdmin';
 import TicketsAdmin from './pages/admin/TicketsAdmin';
+import ContentAdmin from './pages/admin/ContentAdmin';
+import WikiAdmin from './pages/admin/WikiAdmin';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isAdmin, loading } = useAuth();
@@ -81,6 +83,16 @@ function App() {
           <Route path="/admin/tickets" element={
             <ProtectedRoute>
               <TicketsAdmin />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/content" element={
+            <ProtectedRoute>
+              <ContentAdmin />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/wiki" element={
+            <ProtectedRoute>
+              <WikiAdmin />
             </ProtectedRoute>
           } />
 

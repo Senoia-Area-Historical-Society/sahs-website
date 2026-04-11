@@ -36,6 +36,7 @@ service cloud.firestore {
     // Sensitive Data: Strictly SAHS authorized users only
     match /memberships/{doc} { allow read, write: if isSAHSUser(); }
     match /tickets/{doc} { allow read, write: if isSAHSUser(); }
+    match /wiki/{doc} { allow read, write: if isSAHSUser(); }
 
     // User Roles: Super-Admin access only
     match /user_roles/{email} {

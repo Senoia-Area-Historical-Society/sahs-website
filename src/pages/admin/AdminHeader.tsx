@@ -1,12 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar, Users, Ticket, LogOut, Shield } from 'lucide-react';
+import { Calendar, Users, Ticket, LogOut, Shield, FileText, BookOpen } from 'lucide-react';
 
 export default function AdminHeader() {
   const { user, logout } = useAuth();
   const location = useLocation();
 
   const navItems = [
+    { label: 'Content', path: '/admin/content', icon: FileText },
+    { label: 'Wiki', path: '/admin/wiki', icon: BookOpen },
     { label: 'Bookings', path: '/admin/bookings', icon: Calendar },
     { label: 'Memberships', path: '/admin/memberships', icon: Users },
     { label: 'Tickets', path: '/admin/tickets', icon: Ticket },
