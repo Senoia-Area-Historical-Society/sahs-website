@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getEvents } from '../services/api';
+import { getPastEvents } from '../services/api';
 import type { Post } from '../types';
 
 export default function PastEvents() {
@@ -9,7 +9,7 @@ export default function PastEvents() {
   useEffect(() => {
     async function loadEvents() {
       try {
-        const data = await getEvents(50); // Fetch more for the archive
+        const data = await getPastEvents(50); // Fetch more for the archive
         setEvents(data);
       } catch (err) {
         console.error("Failed to load past events", err);

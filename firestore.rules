@@ -4,28 +4,29 @@ service cloud.firestore {
 
     // Helper function for admin/curator/editor roles
     function isAdmin() {
-      let email = request.auth.token.email.lower();
       return request.auth != null && (
-        email == 'catnolan@senoiahistory.com' || 
-        email == 'jeremywarren@senoiahistory.com' ||
-        (exists(/databases/$(database)/documents/user_roles/$(email)) &&
-         get(/databases/$(database)/documents/user_roles/$(email)).data.role == 'admin')
+        request.auth.token.email.lower() == 'catnolan@senoiahistory.com' || 
+        request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com' ||
+        (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
+         get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'admin')
       );
     }
 
     function isCurator() {
-      let email = request.auth.token.email.lower();
-      return isAdmin() || (request.auth != null &&
-        exists(/databases/$(database)/documents/user_roles/$(email)) &&
-        get(/databases/$(database)/documents/user_roles/$(email)).data.role == 'curator'
+      return request.auth != null && (
+        isAdmin() || (
+          exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
+          get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'curator'
+        )
       );
     }
 
     function isEditor() {
-      let email = request.auth.token.email.lower();
-      return isCurator() || (request.auth != null &&
-        exists(/databases/$(database)/documents/user_roles/$(email)) &&
-        get(/databases/$(database)/documents/user_roles/$(email)).data.role == 'editor'
+      return request.auth != null && (
+        isCurator() || (
+          exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
+          get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'editor'
+        )
       );
     }
 
@@ -57,8 +58,8 @@ service cloud.firestore {
 
     // User Roles: Admins access only
     match /user_roles/{email} {
-      allow read: if isEditor();
-      allow write: if isAdmin();
+      allow read: if request.auth != null && isEditor();
+      allow write: if request.auth != null && isAdmin();
     }
 
     // Default deny: Block all other access

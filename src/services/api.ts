@@ -45,7 +45,6 @@ export async function getEvents(maxItems: number = 20): Promise<Post[]> {
     now.setHours(0, 0, 0, 0); // Include events happening today
     
     // Querying eventDate >= now automatically filters out non-events (since they lack eventDate)
-    // and only requires a single-field index on eventDate.
     const q = query(
       collection(db, 'posts'),
       where('eventDate', '>=', now),
@@ -57,6 +56,26 @@ export async function getEvents(maxItems: number = 20): Promise<Post[]> {
     return allPosts.filter(post => post.status === 'published' && post.type === 'event').slice(0, maxItems);
   } catch (err) {
     console.error('Error fetching Events:', err);
+    return [];
+  }
+}
+
+export async function getPastEvents(maxItems: number = 50): Promise<Post[]> {
+  try {
+    const now = new Date();
+    
+    // Querying all posts with eventDate to find past ones
+    const q = query(
+      collection(db, 'posts'),
+      where('eventDate', '<', now),
+      orderBy('eventDate', 'desc'),
+      limit(maxItems * 2)
+    );
+    const snapshot = await getDocs(q);
+    const allPosts = snapshot.docs.map(toPost);
+    return allPosts.filter(post => post.status === 'published' && post.type === 'event').slice(0, maxItems);
+  } catch (err) {
+    console.error('Error fetching Past Events:', err);
     return [];
   }
 }

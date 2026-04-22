@@ -11,7 +11,7 @@ export default function News() {
     async function loadContent() {
       try {
         const [newsData, eventsData] = await Promise.all([
-          getNewsPosts(),
+          getNewsPosts(200),
           getEvents()
         ]);
         setNews(newsData);
