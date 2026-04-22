@@ -2,49 +2,63 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function for admin/curator roles
-    // This restricts management to verified SAHS users
-    function isSAHSUser() {
+    // Helper function for admin/curator/editor roles
+    function isAdmin() {
       let email = request.auth.token.email.lower();
       return request.auth != null && (
         email == 'catnolan@senoiahistory.com' || 
         email == 'jeremywarren@senoiahistory.com' ||
-        exists(/databases/$(database)/documents/user_roles/$(email)) &&
-        get(/databases/$(database)/documents/user_roles/$(email)).data.role in ['admin', 'curator']
+        (exists(/databases/$(database)/documents/user_roles/$(email)) &&
+         get(/databases/$(database)/documents/user_roles/$(email)).data.role == 'admin')
       );
     }
 
-    // Public Content: Anyone can read, only Admins can write
-    match /posts/{doc} { allow read: if true; allow write: if isSAHSUser(); }
-    match /galleries/{doc} { allow read: if true; allow write: if isSAHSUser(); }
-    match /historical_places/{doc} { allow read: if true; allow write: if isSAHSUser(); }
-    match /organization_entities/{doc} { allow read: if true; allow write: if isSAHSUser(); }
+    function isCurator() {
+      let email = request.auth.token.email.lower();
+      return isAdmin() || (request.auth != null &&
+        exists(/databases/$(database)/documents/user_roles/$(email)) &&
+        get(/databases/$(database)/documents/user_roles/$(email)).data.role == 'curator'
+      );
+    }
+
+    function isEditor() {
+      let email = request.auth.token.email.lower();
+      return isCurator() || (request.auth != null &&
+        exists(/databases/$(database)/documents/user_roles/$(email)) &&
+        get(/databases/$(database)/documents/user_roles/$(email)).data.role == 'editor'
+      );
+    }
+
+    // Public Content: Anyone can read, Editors/Curators/Admins can write
+    match /posts/{doc} { allow read: if true; allow write: if isEditor(); }
+    match /galleries/{doc} { allow read: if true; allow write: if isEditor(); }
+    match /historical_places/{doc} { allow read: if true; allow write: if isEditor(); }
+    match /organization_entities/{doc} { allow read: if true; allow write: if isEditor(); }
 
     // Submissions: Public can ONLY create (useful for forms)
     match /submissions/{doc} {
       allow create: if true;
-      allow read, update, delete: if isSAHSUser();
+      allow read, update, delete: if isCurator();
     }
 
     // Bookings: Public can read CONFIRMED ones to see the calendar.
     // Creation is handled by Cloud Functions.
     match /bookings/{doc} {
-      allow read: if resource.data.status == 'confirmed' || isSAHSUser();
-      allow write: if isSAHSUser();
+      allow read: if resource.data.status == 'confirmed' || isCurator();
+      allow write: if isCurator();
     }
 
-    // Sensitive Data: Strictly SAHS authorized users only
-    match /memberships/{doc} { allow read, write: if isSAHSUser(); }
-    match /tickets/{doc} { allow read, write: if isSAHSUser(); }
-    match /wiki/{doc} { allow read, write: if isSAHSUser(); }
+    // Sensitive Data: Strictly Curators/Admins only
+    match /memberships/{doc} { allow read, write: if isCurator(); }
+    match /tickets/{doc} { allow read, write: if isCurator(); }
+    
+    // Internal Knowledge Base
+    match /wiki/{doc} { allow read, write: if isEditor(); }
 
-    // User Roles: Super-Admin access only
+    // User Roles: Admins access only
     match /user_roles/{email} {
-      allow read: if isSAHSUser();
-      allow write: if request.auth != null && (
-        request.auth.token.email.lower() == 'catnolan@senoiahistory.com' ||
-        request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com'
-      );
+      allow read: if isEditor();
+      allow write: if isAdmin();
     }
 
     // Default deny: Block all other access

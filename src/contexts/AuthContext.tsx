@@ -13,6 +13,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isCurator: boolean;
+  isEditor: boolean;
   isSAHSUser: boolean;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
@@ -32,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCurator, setIsCurator] = useState(false);
 
+  const [isEditor, setIsEditor] = useState(false);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser && currentUser.email) {
@@ -41,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (PERMANENT_ADMINS.includes(email)) {
           setIsAdmin(true);
           setIsCurator(false);
+          setIsEditor(false);
         } else {
           // 2. Check Firestore overrides
           try {
@@ -49,19 +53,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const role = roleDoc.data().role;
               setIsAdmin(role === 'admin');
               setIsCurator(role === 'curator');
+              setIsEditor(role === 'editor');
             } else {
               setIsAdmin(false);
               setIsCurator(false);
+              setIsEditor(false);
             }
           } catch (error) {
             console.error('Error fetching user role:', error);
             setIsAdmin(false);
             setIsCurator(false);
+            setIsEditor(false);
           }
         }
       } else {
         setIsAdmin(false);
         setIsCurator(false);
+        setIsEditor(false);
       }
       
       setUser(currentUser);
@@ -89,10 +97,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isSAHSUser = isAdmin || isCurator;
+  const isSAHSUser = isAdmin || isCurator || isEditor;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, isCurator, isSAHSUser, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isCurator, isEditor, isSAHSUser, loginWithGoogle, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );

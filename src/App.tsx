@@ -37,15 +37,17 @@ import TicketsAdmin from './pages/admin/TicketsAdmin';
 import ContentAdmin from './pages/admin/ContentAdmin';
 import WikiAdmin from './pages/admin/WikiAdmin';
 
+import UsersAdmin from './pages/admin/UsersAdmin';
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isSAHSUser, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return <div className="min-h-screen bg-cream flex justify-center items-center font-serif text-charcoal/60">Verifying access...</div>;
   }
 
-  if (!user || !isAdmin) {
+  if (!user || !isSAHSUser) {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
@@ -70,6 +72,11 @@ function App() {
         <Routes>
           {/* Admin Routes (No Header/Footer, strictly protected) */}
           <Route path="/admin/login" element={<Login />} />
+          <Route path="/admin/users" element={
+            <ProtectedRoute>
+              <UsersAdmin />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/bookings" element={
             <ProtectedRoute>
               <BookingsAdmin />

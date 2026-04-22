@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import RichTextEditor from '../../components/admin/RichTextEditor';
-import { Pencil, Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { Pencil, Archive, Plus, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Post {
@@ -13,10 +13,11 @@ interface Post {
   content: string;
   author: string;
   category: 'Blog' | 'News' | 'Event';
-  status: 'draft' | 'published';
+  status: 'draft' | 'published' | 'archived';
   eventStartDate?: string;
   eventEndDate?: string;
   eventLocation?: string;
+  publishDate?: any;
   createdAt: any;
   updatedAt: any;
 }
@@ -32,7 +33,14 @@ export default function ContentAdmin() {
     try {
       const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
-      const fetchedPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+      const fetchedPosts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let category = data.category;
+        if (!category) {
+          category = data.type === 'event' ? 'Event' : 'News';
+        }
+        return { id: doc.id, ...data, category } as Post;
+      });
       setPosts(fetchedPosts);
     } catch (err) {
       console.error("Error fetching posts:", err);
@@ -53,13 +61,27 @@ export default function ContentAdmin() {
     }
 
     try {
-      const postData = {
+      const isEvent = editingPost.category === 'Event';
+      const postData: any = {
         ...editingPost,
+        type: isEvent ? 'event' : 'news',
         slug: editingPost.slug || editingPost.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         author: editingPost.author || user?.email || 'Admin',
         status: editingPost.status || 'draft',
         updatedAt: serverTimestamp(),
       };
+
+      if (!editingPost.id) {
+        postData.createdAt = serverTimestamp();
+        postData.publishDate = serverTimestamp();
+      } else if (editingPost.status === 'published' && !editingPost.publishDate) {
+        postData.publishDate = serverTimestamp();
+      }
+
+      if (isEvent && editingPost.eventStartDate) {
+        postData.eventDate = new Date(editingPost.eventStartDate);
+        postData.location = editingPost.eventLocation || '';
+      }
 
       if (editingPost.id) {
         await updateDoc(doc(db, 'posts', editingPost.id), postData);
@@ -78,10 +100,16 @@ export default function ContentAdmin() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this post?")) {
-      await deleteDoc(doc(db, 'posts', id));
+  const handleArchive = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'posts', id), {
+        status: 'archived',
+        updatedAt: serverTimestamp()
+      });
       fetchPosts();
+    } catch (err) {
+      console.error("Error archiving post:", err);
+      alert("Failed to archive post.");
     }
   };
 
@@ -132,7 +160,6 @@ export default function ContentAdmin() {
                     <label className="block text-sm font-bold text-charcoal mb-1">Start Date</label>
                     <input
                       type="datetime-local"
-                      required
                       value={editingPost.eventStartDate || ''}
                       onChange={e => setEditingPost({...editingPost, eventStartDate: e.target.value})}
                       className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
@@ -142,7 +169,6 @@ export default function ContentAdmin() {
                     <label className="block text-sm font-bold text-charcoal mb-1">End Date</label>
                     <input
                       type="datetime-local"
-                      required
                       value={editingPost.eventEndDate || ''}
                       onChange={e => setEditingPost({...editingPost, eventEndDate: e.target.value})}
                       className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
@@ -152,7 +178,6 @@ export default function ContentAdmin() {
                     <label className="block text-sm font-bold text-charcoal mb-1">Location</label>
                     <input
                       type="text"
-                      required
                       value={editingPost.eventLocation || ''}
                       onChange={e => setEditingPost({...editingPost, eventLocation: e.target.value})}
                       className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
@@ -170,6 +195,7 @@ export default function ContentAdmin() {
                 >
                   <option value="draft">Draft</option>
                   <option value="published">Published</option>
+                  <option value="archived">Archived</option>
                 </select>
               </div>
 
@@ -231,7 +257,9 @@ export default function ContentAdmin() {
                         <td className="p-4 text-sm text-charcoal/80">{post.category}</td>
                         <td className="p-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            post.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                            post.status === 'published' ? 'bg-green-100 text-green-800' : 
+                            post.status === 'archived' ? 'bg-gray-100 text-gray-800' :
+                            'bg-yellow-100 text-yellow-800'
                           }`}>
                             {post.status}
                           </span>
@@ -240,8 +268,8 @@ export default function ContentAdmin() {
                           <button onClick={() => setEditingPost(post)} className="text-charcoal/60 hover:text-tan transition-colors">
                             <Pencil size={18} />
                           </button>
-                          <button onClick={() => handleDelete(post.id)} className="text-charcoal/60 hover:text-red-600 transition-colors">
-                            <Trash2 size={18} />
+                          <button title="Archive Post" onClick={() => handleArchive(post.id)} className="text-charcoal/60 hover:text-red-600 transition-colors">
+                            <Archive size={18} />
                           </button>
                         </td>
                       </tr>

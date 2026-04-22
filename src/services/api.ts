@@ -11,30 +11,50 @@ const toBooking = (doc: any): Booking => ({ id: doc.id, ...doc.data() } as Booki
 
 export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
   try {
+    // Querying all posts ordered by publishDate to avoid complex composite index requirements.
+    // We will filter in memory for news and past events.
     const q = query(
       collection(db, 'posts'),
-      where('type', '==', 'news'),
       orderBy('publishDate', 'desc'),
-      limit(maxItems)
+      limit(maxItems * 4) // Fetch extra to account for filtering
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(toPost);
+    const allPosts = snapshot.docs.map(toPost);
+    const now = new Date();
+    
+    return allPosts.filter(post => {
+      if (post.status !== 'published') return false;
+      
+      if (post.type === 'event') {
+        // Only include past events
+        if (!post.eventDate) return false;
+        return post.eventDate.toDate() < now;
+      }
+      
+      return post.type === 'news';
+    }).slice(0, maxItems);
   } catch (err) {
-    console.error('Error fetching News posts:', err);
+    console.error('Error fetching News & Past Events:', err);
     return [];
   }
 }
 
 export async function getEvents(maxItems: number = 20): Promise<Post[]> {
   try {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Include events happening today
+    
+    // Querying eventDate >= now automatically filters out non-events (since they lack eventDate)
+    // and only requires a single-field index on eventDate.
     const q = query(
       collection(db, 'posts'),
-      where('type', '==', 'event'),
-      orderBy('eventDate', 'desc'),
-      limit(maxItems)
+      where('eventDate', '>=', now),
+      orderBy('eventDate', 'asc'),
+      limit(maxItems * 2)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(toPost);
+    const allPosts = snapshot.docs.map(toPost);
+    return allPosts.filter(post => post.status === 'published' && post.type === 'event').slice(0, maxItems);
   } catch (err) {
     console.error('Error fetching Events:', err);
     return [];

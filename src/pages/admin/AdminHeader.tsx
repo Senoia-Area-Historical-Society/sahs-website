@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Users, Ticket, LogOut, Shield, FileText, BookOpen } from 'lucide-react';
 
 export default function AdminHeader() {
-  const { user, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const location = useLocation();
 
   const navItems = [
@@ -13,6 +13,10 @@ export default function AdminHeader() {
     { label: 'Memberships', path: '/admin/memberships', icon: Users },
     { label: 'Tickets', path: '/admin/tickets', icon: Ticket },
   ];
+
+  if (isAdmin) {
+    navItems.push({ label: 'Users', path: '/admin/users', icon: Shield });
+  }
 
   return (
     <header className="bg-white border-b border-tan-light px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50">

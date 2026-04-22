@@ -71,7 +71,7 @@ export default function News() {
 
             {/* Latest News Column */}
             <div className="lg:col-span-2 space-y-8">
-              <h2 className="text-2xl font-bold border-b border-tan pb-2">Latest Announcements</h2>
+              <h2 className="text-2xl font-bold border-b border-tan pb-2">News & Past Events</h2>
               {news.length === 0 ? (
                 <p className="text-sm font-sans italic text-charcoal/70">Check back soon for latest news.</p>
               ) : (
@@ -93,7 +93,7 @@ export default function News() {
                         </div>
                         <h3 className="text-xl font-bold mb-3">{item.title}</h3>
                         <p className="text-gray-600 font-sans text-sm mb-4 line-clamp-3 flex-grow">
-                          {item.excerpt || item.content.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'}
+                          {item.excerpt || item.content?.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'}
                         </p>
                         <div className="mt-auto">
                            <a href={`/news/${item.slug}`} className="text-charcoal font-bold font-sans text-sm uppercase tracking-wide hover:text-tan transition-colors">

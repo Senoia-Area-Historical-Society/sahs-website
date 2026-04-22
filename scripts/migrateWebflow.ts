@@ -16,7 +16,7 @@ try {
   console.error("You can set GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json");
   process.exit(1);
 }
-const db = getFirestore('sahs-archives');
+const db = getFirestore();
 
 // Webflow Configuration
 const WEBFLOW_TOKEN = process.env.WEBFLOW_TOKEN;
@@ -85,6 +85,7 @@ async function migratePosts() {
       mainImage: safeString(fieldData['main-image']?.url),
       galleryImages: safeArray(fieldData['image-gallery']).map((img: any) => img.url),
       location: safeString(fieldData['google-maps-location']),
+      status: 'published',
       createdAt: item.createdOn ? Timestamp.fromDate(new Date(item.createdOn)) : Timestamp.now(),
       updatedAt: item.lastUpdated ? Timestamp.fromDate(new Date(item.lastUpdated)) : null
     };

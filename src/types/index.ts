@@ -6,6 +6,7 @@ export interface Post {
   type: 'news' | 'event';
   title: string; 
   slug: string;
+  status: 'draft' | 'published' | 'archived';
   publishDate: Timestamp | null; 
   eventDate?: Timestamp | null;
   content: string; 
