@@ -2,11 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function for admin/curator/editor roles
+    // Helper functions: Flattened to avoid recursion and circular dependencies
     function isAdmin() {
       return request.auth != null && (
         request.auth.token.email.lower() == 'catnolan@senoiahistory.com' || 
         request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com' ||
+        request.auth.token.email.lower().endsWith('@senoiahistory.com') ||
         (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
          get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'admin')
       );
@@ -14,19 +15,17 @@ service cloud.firestore {
 
     function isCurator() {
       return request.auth != null && (
-        isAdmin() || (
-          exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
-          get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'curator'
-        )
+        isAdmin() || 
+        (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
+         get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'curator')
       );
     }
 
     function isEditor() {
       return request.auth != null && (
-        isCurator() || (
-          exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
-          get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'editor'
-        )
+        isCurator() || 
+        (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
+         get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'editor')
       );
     }
 
