@@ -235,9 +235,17 @@ export const listStripeSubscriptions = onRequest({ secrets: ['STRIPE_SECRET_KEY'
 
         const stripe = getStripe();
         
+        // 1. Fetch all products to have a name mapping
+        const productsList = await stripe.products.list({ limit: 100, active: true });
+        const productNameMap: Record<string, string> = {};
+        productsList.data.forEach(p => {
+            productNameMap[p.id] = p.name;
+        });
+
+        // 2. Fetch subscriptions
         const subscriptions = await stripe.subscriptions.list({
             status: 'all', // Fetch all statuses (active, past_due, canceled, etc.)
-            expand: ['data.customer', 'data.plan.product'],
+            expand: ['data.customer'],
             limit: 100,
         });
 
@@ -245,13 +253,16 @@ export const listStripeSubscriptions = onRequest({ secrets: ['STRIPE_SECRET_KEY'
             const customer = sub.customer as Stripe.Customer;
             const item = sub.items.data[0];
             const plan = item.plan;
-            const product = plan.product as Stripe.Product;
+            const productId = typeof plan.product === 'string' ? plan.product : (plan.product as any).id;
+
+            // Resolve level name from map, then plan nickname, then ID
+            const level = productNameMap[productId] || plan.nickname || 'Unknown Level';
 
             return {
                 id: sub.id,
                 email: customer.email || 'No Email',
                 customerName: customer.name || 'Unknown',
-                level: product?.name || 'Unknown Level',
+                level: level,
                 status: sub.status,
                 expirationDate: new Date(sub.current_period_end * 1000).toISOString(),
                 createdAt: new Date(sub.created * 1000).toISOString(),
