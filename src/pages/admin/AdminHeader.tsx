@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Calendar, Users, Ticket, LogOut, Shield, FileText, BookOpen, HandHeart } from 'lucide-react';
 
 export default function AdminHeader() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isCurator, isEditor, logout } = useAuth();
   const location = useLocation();
 
   const navItems = [
@@ -52,8 +52,11 @@ export default function AdminHeader() {
       </div>
 
       <div className="flex items-center gap-6">
-        <div className="hidden sm:flex items-center gap-2 font-sans text-xs text-charcoal/60 border-r border-tan/20 pr-6 uppercase tracking-widest font-bold">
-          <span>{user?.email}</span>
+        <div className="hidden sm:flex flex-col items-end gap-0.5 border-r border-tan/20 pr-6">
+          <span className="font-sans text-[10px] text-charcoal/40 uppercase tracking-widest font-black leading-none">
+            {isAdmin ? 'System Admin' : isCurator ? 'Curator' : isEditor ? 'Editor' : 'SAHS Staff'}
+          </span>
+          <span className="font-sans text-[11px] text-charcoal/60 uppercase tracking-widest font-bold leading-none">{user?.email}</span>
         </div>
         <button 
           onClick={logout}

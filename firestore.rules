@@ -79,12 +79,15 @@ service cloud.firestore {
       }
     }
 
-    // Mail (Trigger Email extension): deny all client access; extension service account bypasses rules
-    match /mail/{doc} { allow read, write: if false; }
+    // Mail (Trigger Email extension): allow creation for all (even public for signups); deny read/update
+    match /mail/{doc} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
 
-    // User Roles: Admins access only
+    // User Roles: Admins access only, but allow users to read their own role to avoid rule recursion
     match /user_roles/{email} {
-      allow read: if request.auth != null && isEditor();
+      allow read: if request.auth != null && (request.auth.token.email.lower() == email || isAdmin());
       allow write: if request.auth != null && isAdmin();
     }
 

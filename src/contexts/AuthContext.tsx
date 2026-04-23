@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 1. Check permanent admins
         if (PERMANENT_ADMINS.includes(email)) {
           setIsAdmin(true);
-          setIsCurator(false);
-          setIsEditor(false);
+          setIsCurator(true);
+          setIsEditor(true);
         } else {
           // 2. Check Firestore overrides
           try {
@@ -52,8 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (roleDoc.exists()) {
               const role = roleDoc.data().role;
               setIsAdmin(role === 'admin');
-              setIsCurator(role === 'curator');
-              setIsEditor(role === 'editor');
+              setIsCurator(role === 'admin' || role === 'curator');
+              setIsEditor(role === 'admin' || role === 'curator' || role === 'editor');
             } else {
               setIsAdmin(false);
               setIsCurator(false);
