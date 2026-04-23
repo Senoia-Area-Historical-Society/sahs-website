@@ -29,16 +29,18 @@ export interface Post {
 
 export interface Membership {
   id: string;
-  userId: string;
+  userId?: string;
   email: string;
-  level: 'individual' | 'family' | 'senior' | 'patron' | 'corporate';
-  status: 'active' | 'expired' | 'pending';
+  customerName?: string;
+  level: string;
+  status: string;
   expirationDate: string; // ISO Date
+  createdAt?: string; // ISO Date
   quantity: number;
-  autoRenew: boolean;
+  autoRenew?: boolean;
   stripeSubscriptionId?: string;
   
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface Ticket {

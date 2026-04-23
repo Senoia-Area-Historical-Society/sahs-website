@@ -264,14 +264,23 @@ export async function submitTicketRequest(data: { eventId: string; title: string
 
 export async function getMemberships(): Promise<Membership[]> {
   try {
-    const q = query(
-      collection(db, 'memberships'),
-      orderBy('updatedAt', 'desc')
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Membership));
+    const functionsBaseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1';
+    const functionUrl = `${functionsBaseUrl}/listStripeSubscriptions`;
+    
+    const response = await fetch(functionUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Cloud function returned ${response.status}`);
+    }
+
+    return await response.json();
   } catch (err) {
-    console.error('Error fetching memberships:', err);
+    console.error('Error fetching memberships from Stripe:', err);
     return [];
   }
 }

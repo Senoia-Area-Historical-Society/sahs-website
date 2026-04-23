@@ -70,7 +70,7 @@ export const checkCalendarAvailability = onRequest({ cors: true }, async (req, r
 });
 
 // 2. Create Stripe Checkout Session for Room Booking
-export const createBookingCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
+export const createBookingCheckoutSession = onRequest({ cors: true }, async (req, res) => {
     try {
         if (req.method !== 'POST') {
              res.status(405).send('Method Not Allowed');
@@ -126,7 +126,7 @@ export const createBookingCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET
 });
 
 // 3. Create Membership Checkout Session
-export const createMembershipCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
+export const createMembershipCheckoutSession = onRequest({ cors: true }, async (req, res) => {
     try {
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
@@ -184,7 +184,7 @@ export const createMembershipCheckoutSession = onRequest({ secrets: ['STRIPE_SEC
 });
 
 // 4. Create Ticket Checkout Session
-export const createTicketCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
+export const createTicketCheckoutSession = onRequest({ cors: true }, async (req, res) => {
     try {
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
@@ -225,8 +225,49 @@ export const createTicketCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_
     }
 });
 
-// 5. Stripe Webhook Handler
-export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] }, async (req, res) => {
+// 5. List all memberships from Stripe
+export const listStripeSubscriptions = onRequest({ cors: true }, async (req, res) => {
+    try {
+        if (req.method !== 'GET' && req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+
+        const stripe = getStripe();
+        const subscriptions = await stripe.subscriptions.list({
+            status: 'all',
+            limit: 100,
+            expand: ['data.customer', 'data.plan.product']
+        });
+
+        const formattedMemberships = subscriptions.data.map(sub => {
+            const customer = sub.customer as Stripe.Customer;
+            const item = sub.items.data[0];
+            const plan = item.plan;
+            const product = plan.product as Stripe.Product;
+
+            return {
+                id: sub.id,
+                email: customer.email || 'No Email',
+                customerName: customer.name || 'Unknown',
+                level: product?.name || 'Unknown Level',
+                status: sub.status,
+                expirationDate: new Date(sub.current_period_end * 1000).toISOString(),
+                createdAt: new Date(sub.created * 1000).toISOString(),
+                stripeSubscriptionId: sub.id,
+                quantity: item.quantity || 1,
+            };
+        });
+
+        res.json(formattedMemberships);
+    } catch (error) {
+        console.error('Error listing stripe subscriptions:', error);
+        res.status(500).send({ error: "Failed to list memberships" });
+    }
+});
+
+// 6. Stripe Webhook Handler
+export const stripeWebhook = onRequest({ }, async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
 
