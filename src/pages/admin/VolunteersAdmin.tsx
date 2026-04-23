@@ -138,31 +138,31 @@ export default function VolunteersAdmin() {
       if (sheetId) {
         await updateVolunteerSheet(sheetId, {
           title: editingSheet.title,
-          description: editingSheet.description,
-          eventPostId: editingSheet.eventPostId,
-          eventDate: editingSheet.eventDate,
-          eventLocation: editingSheet.eventLocation,
+          description: editingSheet.description ?? null,
+          eventPostId: editingSheet.eventPostId ?? null,
+          eventDate: editingSheet.eventDate ?? null,
+          eventLocation: editingSheet.eventLocation ?? null,
           status: editingSheet.status as VolunteerSheet['status'],
         });
       } else {
         sheetId = await createVolunteerSheet({
           title: editingSheet.title!,
-          description: editingSheet.description,
-          eventPostId: editingSheet.eventPostId,
-          eventDate: editingSheet.eventDate,
-          eventLocation: editingSheet.eventLocation,
+          description: editingSheet.description ?? null,
+          eventPostId: editingSheet.eventPostId ?? null,
+          eventDate: editingSheet.eventDate ?? null,
+          eventLocation: editingSheet.eventLocation ?? null,
           status: (editingSheet.status as VolunteerSheet['status']) || 'draft',
           createdBy: user?.email || 'admin',
         });
       }
       // Save slots
       for (const slot of slots) {
-        const { _key, ...slotData } = slot;
         await saveVolunteerSlot(sheetId!, {
-          ...slotData,
           id: slot.id,
           sheetId: sheetId!,
           label: slot.label || '',
+          timeNote: slot.timeNote ?? null,
+          shiftDuration: slot.shiftDuration ?? null,
           capacity: Number(slot.capacity) || 1,
           filledCount: slot.filledCount || 0,
           sortOrder: slot.sortOrder || 0,

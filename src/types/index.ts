@@ -144,10 +144,10 @@ export interface Booking {
 export interface VolunteerSheet {
   id: string;
   title: string;                    // e.g., "Fall Festival 2025 Volunteers"
-  description?: string;             // Plain-text intro shown on public page
-  eventPostId?: string;             // Optional ref to a posts/{id} Event doc
+  description?: string | null;      // Plain-text intro shown on public page
+  eventPostId?: string | null;      // Optional ref to a posts/{id} Event doc
   eventDate?: Timestamp | null;     // Denormalized from linked event
-  eventLocation?: string;           // Denormalized from linked event
+  eventLocation?: string | null;    // Denormalized from linked event
   status: 'draft' | 'active' | 'closed';
   shareToken: string;               // Random URL-safe token for public link
   createdBy: string;                // Admin email
@@ -159,8 +159,8 @@ export interface VolunteerSlot {
   id: string;
   sheetId: string;                  // Parent sheet ID (denormalized for convenience)
   label: string;                    // e.g., "Set up tables", "Greet guests"
-  timeNote?: string;                // e.g., "8:00 AM – 10:00 AM"
-  shiftDuration?: string;           // e.g., "2 hours", "30 min"
+  timeNote?: string | null;         // e.g., "8:00 AM – 10:00 AM"
+  shiftDuration?: string | null;    // e.g., "2 hours", "30 min"
   capacity: number;                 // Max volunteers for this slot
   filledCount: number;              // Maintained via Firestore transaction on signup
   sortOrder: number;
@@ -170,12 +170,12 @@ export interface VolunteerRegistration {
   id: string;
   slotId: string;                   // Which slot they signed up for
   slotLabel: string;                // Denormalized for display
-  slotTimeNote?: string;            // Denormalized for confirmation email
+  slotTimeNote?: string | null;     // Denormalized for confirmation email
   firstName: string;
   lastName: string;
   email: string;
-  phone?: string;
-  notes?: string;                   // Optional message from volunteer
+  phone?: string | null;
+  notes?: string | null;            // Optional message from volunteer
   status: 'confirmed' | 'cancelled';
   signedUpAt: Timestamp | null;
 }

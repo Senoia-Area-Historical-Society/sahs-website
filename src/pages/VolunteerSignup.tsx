@@ -48,8 +48,8 @@ export default function VolunteerSignup() {
         firstName: form.firstName,
         lastName: form.lastName,
         email: form.email,
-        phone: form.phone || undefined,
-        notes: form.notes || undefined,
+        phone: form.phone || null,
+        notes: form.notes || null,
       });
       setSuccessSlot(slot.id);
       setExpandedSlot(null);
