@@ -69,10 +69,24 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Redirect logic for admin subdomain
+function HostnameRedirect() {
+  const { pathname } = useLocation();
+  const hostname = window.location.hostname;
+  
+  // If we're on the admin subdomain and at the root path, redirect to admin content
+  if (hostname.startsWith('admin.') && pathname === '/') {
+    return <Navigate to="/admin/content" replace />;
+  }
+  
+  return null;
+}
+
 function App() {
   return (
     <AuthProvider>
       <div className="flex flex-col min-h-screen bg-cream selection:bg-tan selection:text-white">
+        <HostnameRedirect />
         <Routes>
           {/* Admin Routes (No Header/Footer, strictly protected) */}
           <Route path="/admin/login" element={<Login />} />
