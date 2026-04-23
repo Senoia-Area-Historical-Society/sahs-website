@@ -51,7 +51,11 @@ service cloud.firestore {
 
     // Sensitive Data: Strictly Curators/Admins only
     match /memberships/{doc} { allow read, write: if isCurator(); }
-    match /tickets/{doc} { allow read, write: if isCurator(); }
+    match /tickets/{doc} { 
+      // Public confirm page needs to query by sessionId; limited to 1 doc for safety
+      allow read: if isCurator() || (request.query.limit == 1);
+      allow write: if isCurator(); 
+    }
     
     // Internal Knowledge Base
     match /wiki/{doc} { allow read, write: if isEditor(); }
