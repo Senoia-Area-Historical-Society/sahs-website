@@ -56,7 +56,15 @@ export default function AdminHeader() {
           <span className="font-sans text-[10px] text-charcoal/40 uppercase tracking-widest font-black leading-none">
             {isAdmin ? 'System Admin' : isCurator ? 'Curator' : isEditor ? 'Editor' : 'SAHS Staff'}
           </span>
-          <span className="font-sans text-[11px] text-charcoal/60 uppercase tracking-widest font-bold leading-none">{user?.email}</span>
+          <div className="flex items-center gap-2">
+            {user?.photoURL ? (
+              <img src={user.photoURL} alt={user.displayName || ''} className="w-6 h-6 rounded-full border border-tan/20 shadow-sm" />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-tan/10 border border-tan/20 flex items-center justify-center text-[10px] font-black text-tan uppercase tracking-tighter">
+                {user?.displayName ? user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2) : user?.email?.[0].toUpperCase()}
+              </div>
+            )}
+          </div>
         </div>
         <button 
           onClick={logout}
