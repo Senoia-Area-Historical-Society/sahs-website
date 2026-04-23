@@ -234,10 +234,11 @@ export const listStripeSubscriptions = onRequest({ secrets: ['STRIPE_SECRET_KEY'
         }
 
         const stripe = getStripe();
+        
         const subscriptions = await stripe.subscriptions.list({
-            status: 'all',
+            status: 'all', // Fetch all statuses (active, past_due, canceled, etc.)
+            expand: ['data.customer', 'data.plan.product'],
             limit: 100,
-            expand: ['data.customer', 'data.plan.product']
         });
 
         const formattedMemberships = subscriptions.data.map(sub => {
