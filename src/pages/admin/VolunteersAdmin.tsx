@@ -170,9 +170,13 @@ export default function VolunteersAdmin() {
       }
       await fetchSheets();
       setView('list');
-    } catch (err) {
-      console.error(err);
-      alert('Failed to save. Please try again.');
+    } catch (err: any) {
+      console.error("Save error details:", err);
+      // Log more context to help troubleshoot
+      if (err.code) console.error("Error code:", err.code);
+      if (err.message) console.error("Error message:", err.message);
+      
+      alert(`Failed to save: ${err.message || 'Unknown error'}. Please check your connection and try again.`);
     } finally {
       setSaving(false);
     }

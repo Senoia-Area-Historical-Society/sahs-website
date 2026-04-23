@@ -1,4 +1,4 @@
-import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking, Membership, Ticket, VolunteerSheet, VolunteerSlot, VolunteerRegistration } from '../types/index';
 
@@ -328,12 +328,7 @@ export async function getTickets(): Promise<Ticket[]> {
 
 /** Generate a random URL-safe token for volunteer sheet share links */
 function generateShareToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < 12; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+  return Math.random().toString(36).substring(2, 10);
 }
 
 /** Fetch all volunteer sheets (admin view) */
@@ -368,26 +363,37 @@ export async function getVolunteerSheetByToken(token: string): Promise<Volunteer
 
 /** Create a new volunteer sheet */
 export async function createVolunteerSheet(
-  data: Omit<VolunteerSheet, 'id' | 'shareToken' | 'createdAt' | 'updatedAt'>
+  sheet: Omit<VolunteerSheet, 'id' | 'createdAt' | 'shareToken' | 'updatedAt'>
 ): Promise<string> {
-  const docRef = await addDoc(collection(db, 'volunteer_sheets'), {
-    ...data,
+  const payload = {
+    ...sheet,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
     shareToken: generateShareToken(),
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
+  };
+  
+  // Final safety check to remove any accidental undefineds
+  Object.keys(payload).forEach(key => {
+    if ((payload as any)[key] === undefined) delete (payload as any)[key];
   });
+
+  const docRef = await addDoc(collection(db, 'volunteer_sheets'), payload);
   return docRef.id;
 }
 
 /** Update an existing volunteer sheet */
-export async function updateVolunteerSheet(
-  id: string,
-  data: Partial<Omit<VolunteerSheet, 'id' | 'shareToken' | 'createdAt'>>
-): Promise<void> {
-  await updateDoc(doc(db, 'volunteer_sheets', id), {
-    ...data,
-    updatedAt: Timestamp.now(),
+export async function updateVolunteerSheet(id: string, sheet: Partial<VolunteerSheet>): Promise<void> {
+  const payload: any = {
+    ...sheet,
+    updatedAt: serverTimestamp(),
+  };
+  
+  // Final safety check to remove any accidental undefineds
+  Object.keys(payload).forEach(key => {
+    if (payload[key] === undefined) delete payload[key];
   });
+
+  await updateDoc(doc(db, 'volunteer_sheets', id), payload);
 }
 
 /** Fetch all slots for a given sheet (ordered by sortOrder) */
@@ -406,17 +412,24 @@ export async function getVolunteerSlots(sheetId: string): Promise<VolunteerSlot[
 }
 
 /** Create or update a slot */
-export async function saveVolunteerSlot(
-  sheetId: string,
-  slot: Omit<VolunteerSlot, 'id'> & { id?: string }
-): Promise<void> {
+export async function saveVolunteerSlot(sheetId: string, slot: Partial<VolunteerSlot> & { id?: string }): Promise<void> {
   const { id, ...data } = slot;
-  if (id) {
-    await updateDoc(doc(db, 'volunteer_sheets', sheetId, 'slots', id), data);
+  const payload: any = { ...data };
+  
+  // Remove fields that should not be in the document
+  delete payload.id;
+  
+  // Final safety check to remove any accidental undefineds
+  Object.keys(payload).forEach(key => {
+    if (payload[key] === undefined) delete payload[key];
+  });
+
+  if (id && id !== '') {
+    await updateDoc(doc(db, 'volunteer_sheets', sheetId, 'slots', id), payload);
   } else {
     await addDoc(collection(db, 'volunteer_sheets', sheetId, 'slots'), {
-      ...data,
-      filledCount: 0,
+      ...payload,
+      filledCount: payload.filledCount || 0,
     });
   }
 }
