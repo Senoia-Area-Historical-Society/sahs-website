@@ -31,6 +31,14 @@
         { "fieldPath": "type", "order": "ASCENDING" },
         { "fieldPath": "sortPosition", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "volunteer_sheets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "eventDate", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

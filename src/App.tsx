@@ -28,6 +28,7 @@ import Media from './pages/Media';
 import PastEvents from './pages/PastEvents';
 import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
+import VolunteerSignup from './pages/VolunteerSignup';
 
 // Admin Pages
 import Login from './pages/admin/Login';
@@ -36,6 +37,7 @@ import MembershipsAdmin from './pages/admin/MembershipsAdmin';
 import TicketsAdmin from './pages/admin/TicketsAdmin';
 import ContentAdmin from './pages/admin/ContentAdmin';
 import WikiAdmin from './pages/admin/WikiAdmin';
+import VolunteersAdmin from './pages/admin/VolunteersAdmin';
 
 import UsersAdmin from './pages/admin/UsersAdmin';
 
@@ -102,6 +104,11 @@ function App() {
               <WikiAdmin />
             </ProtectedRoute>
           } />
+          <Route path="/admin/volunteers" element={
+            <ProtectedRoute>
+              <VolunteersAdmin />
+            </ProtectedRoute>
+          } />
 
           {/* Public Routes */}
           <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
@@ -128,6 +135,7 @@ function App() {
           <Route path="/historic-structures-and-places/:slug" element={<PublicLayout><HistoricalPlaceDetail /></PublicLayout>} />
           <Route path="/media" element={<PublicLayout><Media /></PublicLayout>} />
           <Route path="/past-sahs-events" element={<PublicLayout><PastEvents /></PublicLayout>} />
+          <Route path="/volunteer/:token" element={<PublicLayout><VolunteerSignup /></PublicLayout>} />
           
           {/* Status Pages */}
           <Route path="/401" element={<PublicLayout><Unauthorized /></PublicLayout>} />

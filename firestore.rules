@@ -56,6 +56,28 @@ service cloud.firestore {
     // Internal Knowledge Base
     match /wiki/{doc} { allow read, write: if isEditor(); }
 
+    // Volunteer Management
+    // Sheets: public reads active ones; editors create/manage all
+    match /volunteer_sheets/{sheetId} {
+      allow read: if resource.data.status == 'active' || isEditor();
+      allow create, update, delete: if isEditor();
+
+      // Slots: public can read if parent sheet is active; editors manage
+      match /slots/{slotId} {
+        allow read: if get(/databases/$(database)/documents/volunteer_sheets/$(sheetId)).data.status == 'active' || isEditor();
+        allow write: if isEditor();
+      }
+
+      // Registrations: anyone can create (anonymous signup); curators manage
+      match /registrations/{regId} {
+        allow create: if true;
+        allow read, update, delete: if isCurator();
+      }
+    }
+
+    // Mail (Trigger Email extension): deny all client access; extension service account bypasses rules
+    match /mail/{doc} { allow read, write: if false; }
+
     // User Roles: Admins access only
     match /user_roles/{email} {
       allow read: if request.auth != null && isEditor();

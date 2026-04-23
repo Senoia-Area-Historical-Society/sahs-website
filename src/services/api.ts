@@ -1,6 +1,6 @@
-import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking, Membership, Ticket } from '../types/index';
+import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking, Membership, Ticket, VolunteerSheet, VolunteerSlot, VolunteerRegistration } from '../types/index';
 
 // Helpers to transform Firestore docs safely
 const toPost = (doc: any): Post => ({ id: doc.id, ...doc.data() } as Post);
@@ -302,4 +302,219 @@ export async function getTickets(): Promise<Ticket[]> {
     console.error('Error fetching tickets:', err);
     return [];
   }
+}
+
+// ── Volunteer Management ──────────────────────────────────────────────────────
+
+/** Generate a random URL-safe token for volunteer sheet share links */
+function generateShareToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < 12; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+/** Fetch all volunteer sheets (admin view) */
+export async function getVolunteerSheets(): Promise<VolunteerSheet[]> {
+  try {
+    const q = query(collection(db, 'volunteer_sheets'), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerSheet));
+  } catch (err) {
+    console.error('Error fetching volunteer sheets:', err);
+    return [];
+  }
+}
+
+/** Fetch a single active sheet by its public share token */
+export async function getVolunteerSheetByToken(token: string): Promise<VolunteerSheet | null> {
+  try {
+    const q = query(
+      collection(db, 'volunteer_sheets'),
+      where('shareToken', '==', token),
+      limit(1)
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    const d = snapshot.docs[0];
+    return { id: d.id, ...d.data() } as VolunteerSheet;
+  } catch (err) {
+    console.error('Error fetching volunteer sheet by token:', err);
+    return null;
+  }
+}
+
+/** Create a new volunteer sheet */
+export async function createVolunteerSheet(
+  data: Omit<VolunteerSheet, 'id' | 'shareToken' | 'createdAt' | 'updatedAt'>
+): Promise<string> {
+  const docRef = await addDoc(collection(db, 'volunteer_sheets'), {
+    ...data,
+    shareToken: generateShareToken(),
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  return docRef.id;
+}
+
+/** Update an existing volunteer sheet */
+export async function updateVolunteerSheet(
+  id: string,
+  data: Partial<Omit<VolunteerSheet, 'id' | 'shareToken' | 'createdAt'>>
+): Promise<void> {
+  await updateDoc(doc(db, 'volunteer_sheets', id), {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+/** Fetch all slots for a given sheet (ordered by sortOrder) */
+export async function getVolunteerSlots(sheetId: string): Promise<VolunteerSlot[]> {
+  try {
+    const q = query(
+      collection(db, 'volunteer_sheets', sheetId, 'slots'),
+      orderBy('sortOrder', 'asc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerSlot));
+  } catch (err) {
+    console.error('Error fetching volunteer slots:', err);
+    return [];
+  }
+}
+
+/** Create or update a slot */
+export async function saveVolunteerSlot(
+  sheetId: string,
+  slot: Omit<VolunteerSlot, 'id'> & { id?: string }
+): Promise<void> {
+  const { id, ...data } = slot;
+  if (id) {
+    await updateDoc(doc(db, 'volunteer_sheets', sheetId, 'slots', id), data);
+  } else {
+    await addDoc(collection(db, 'volunteer_sheets', sheetId, 'slots'), {
+      ...data,
+      filledCount: 0,
+    });
+  }
+}
+
+/** Delete a slot */
+export async function deleteVolunteerSlot(sheetId: string, slotId: string): Promise<void> {
+  await deleteDoc(doc(db, 'volunteer_sheets', sheetId, 'slots', slotId));
+}
+
+/** Public signup — transactionally checks capacity, creates registration, sends confirmation email */
+export async function submitVolunteerSignup(
+  sheetId: string,
+  data: Omit<VolunteerRegistration, 'id' | 'status' | 'signedUpAt'>
+): Promise<void> {
+  const slotRef = doc(db, 'volunteer_sheets', sheetId, 'slots', data.slotId);
+  const registrationsRef = collection(db, 'volunteer_sheets', sheetId, 'registrations');
+  const mailRef = collection(db, 'mail');
+
+  await runTransaction(db, async (tx) => {
+    const slotSnap = await tx.get(slotRef);
+    if (!slotSnap.exists()) throw new Error('Slot not found.');
+
+    const slot = slotSnap.data() as VolunteerSlot;
+    if (slot.filledCount >= slot.capacity) {
+      throw new Error('This slot is full. Please choose another.');
+    }
+
+    // Create registration
+    const regRef = doc(registrationsRef);
+    tx.set(regRef, {
+      ...data,
+      status: 'confirmed',
+      signedUpAt: Timestamp.now(),
+    });
+
+    // Increment filled count
+    tx.update(slotRef, { filledCount: slot.filledCount + 1 });
+  });
+
+  // After successful transaction, trigger confirmation email via Firebase extension
+  try {
+    const sheetSnap = await getDoc(doc(db, 'volunteer_sheets', sheetId));
+    const sheet = sheetSnap.data() as VolunteerSheet;
+    const slotSnap = await getDoc(slotRef);
+    const slot = slotSnap.data() as VolunteerSlot;
+
+    const eventDateStr = sheet.eventDate
+      ? sheet.eventDate.toDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+      : '';
+
+    await addDoc(mailRef, {
+      to: data.email,
+      message: {
+        subject: `You're signed up! – ${sheet.title}`,
+        html: `
+          <div style="font-family: Georgia, serif; max-width: 560px; margin: 0 auto; color: #2c2c2c;">
+            <h2 style="color: #8B6914;">Senoia Area Historical Society</h2>
+            <p>Hi ${data.firstName},</p>
+            <p>Thank you for volunteering for <strong>${sheet.title}</strong>! Here are your signup details:</p>
+            <table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
+              <tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Role</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${data.slotLabel}</td></tr>
+              ${data.slotTimeNote ? `<tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Time</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${data.slotTimeNote}</td></tr>` : ''}
+              ${slot.shiftDuration ? `<tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Duration</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${slot.shiftDuration}</td></tr>` : ''}
+              ${eventDateStr ? `<tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Date</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${eventDateStr}</td></tr>` : ''}
+              ${sheet.eventLocation ? `<tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Location</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${sheet.eventLocation}</td></tr>` : ''}
+            </table>
+            <p>We look forward to seeing you there! If you have any questions, please contact us at <a href="mailto:info@senoiahistory.com">info@senoiahistory.com</a>.</p>
+            <p style="color: #888; font-size: 13px; margin-top: 32px;">Senoia Area Historical Society &bull; Senoia, GA</p>
+          </div>
+        `,
+      },
+    });
+  } catch (emailErr) {
+    // Don't fail the signup if the email write fails
+    console.warn('Confirmation email could not be queued:', emailErr);
+  }
+}
+
+/** Fetch all registrations for a sheet (admin) */
+export async function getRegistrations(sheetId: string): Promise<VolunteerRegistration[]> {
+  try {
+    const q = query(
+      collection(db, 'volunteer_sheets', sheetId, 'registrations'),
+      orderBy('signedUpAt', 'asc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerRegistration));
+  } catch (err) {
+    console.error('Error fetching registrations:', err);
+    return [];
+  }
+}
+
+/** Cancel a registration (admin) */
+export async function updateRegistrationStatus(
+  sheetId: string,
+  regId: string,
+  status: 'confirmed' | 'cancelled'
+): Promise<void> {
+  const regRef = doc(db, 'volunteer_sheets', sheetId, 'registrations', regId);
+
+  // If cancelling, decrement filledCount on the slot
+  if (status === 'cancelled') {
+    const regSnap = await getDoc(regRef);
+    if (regSnap.exists()) {
+      const reg = regSnap.data() as VolunteerRegistration;
+      const slotDocRef = doc(db, 'volunteer_sheets', sheetId, 'slots', reg.slotId);
+      await runTransaction(db, async (tx) => {
+        const slotSnap = await tx.get(slotDocRef);
+        if (slotSnap.exists()) {
+          const currentCount = slotSnap.data().filledCount || 0;
+          tx.update(slotDocRef, { filledCount: Math.max(0, currentCount - 1) });
+        }
+        tx.update(regRef, { status: 'cancelled' });
+      });
+      return;
+    }
+  }
+
+  await updateDoc(regRef, { status });
 }
