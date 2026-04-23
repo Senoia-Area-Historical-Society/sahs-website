@@ -46,14 +46,16 @@ export interface Membership {
 export interface Ticket {
   id: string;
   eventId: string;
+  eventTitle: string;       // Denormalized event name stored at purchase time
+  customerName?: string;    // Buyer's full name
   userId?: string;
   email: string;
   quantity: number;
-  totalAmount: number;
+  totalAmount: number;      // In cents, from session.amount_total
   status: 'paid' | 'cancelled';
   confirmationNumber: string;
-  qrCode?: string;
-  
+  qrCode?: string;          // Base64 data URI PNG of QR code
+  stripeSessionId?: string; // For TicketSuccess page lookup
   purchasedAt: string;
 }
 

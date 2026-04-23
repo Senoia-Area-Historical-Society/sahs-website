@@ -238,7 +238,7 @@ export async function submitMembershipRequest(data: { email: string; level: stri
   }
 }
 
-export async function submitTicketRequest(data: { eventId: string; title: string; price: number; quantity: number; email: string }): Promise<{ url: string }> {
+export async function submitTicketRequest(data: { eventId: string; title: string; price: number; quantity: number; email: string; customerName?: string; slug?: string }): Promise<{ url: string }> {
   try {
     const baseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1';
     const functionUrl = `${baseUrl}/createTicketCheckoutSession`;
@@ -260,6 +260,26 @@ export async function submitTicketRequest(data: { eventId: string; title: string
     console.error('Error creating ticket checkout session:', err);
     throw err;
   }
+}
+
+export async function getTicketBySessionId(sessionId: string): Promise<import('../types').Ticket | null> {
+  try {
+    const { collection: col, query: q, where: w, getDocs: gd, limit: lim } = await import('firebase/firestore');
+    const { db: firestoreDb } = await import('../lib/firebase');
+    const snap = await gd(q(col(firestoreDb, 'tickets'), w('stripeSessionId', '==', sessionId), lim(1)));
+    if (snap.empty) return null;
+    const d = snap.docs[0];
+    return { id: d.id, ...d.data() } as import('../types').Ticket;
+  } catch (err) {
+    console.error('Error fetching ticket by session:', err);
+    return null;
+  }
+}
+
+export async function verifyTicketConfirmation(confirmationNumber: string): Promise<{ valid: boolean; reason?: string; ticket?: any }> {
+  const baseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1';
+  const res = await fetch(`${baseUrl}/verifyTicket?confirmationNumber=${encodeURIComponent(confirmationNumber.trim())}`);
+  return res.json();
 }
 
 export async function getMemberships(): Promise<Membership[]> {
@@ -449,6 +469,8 @@ export async function submitVolunteerSignup(
 
     await addDoc(mailRef, {
       to: data.email,
+      from: 'Senoia Area Historical Society <volunteers@senoiahistory.com>',
+      replyTo: 'info@senoiahistory.com',
       message: {
         subject: `You're signed up! – ${sheet.title}`,
         html: `

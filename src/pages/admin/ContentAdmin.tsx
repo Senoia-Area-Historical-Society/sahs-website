@@ -3,7 +3,7 @@ import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, or
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import RichTextEditor from '../../components/admin/RichTextEditor';
-import { Pencil, Archive, Plus, ArrowLeft } from 'lucide-react';
+import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Post {
@@ -20,6 +20,14 @@ interface Post {
   publishDate?: any;
   createdAt: any;
   updatedAt: any;
+  // Ticketing fields (stored in Firestore)
+  ticketPrice?: number | null;
+  capacity?: number | null;
+  ticketsSold?: number;
+  // Editor-only ephemeral fields (stripped before save)
+  _enableTicketing?: boolean;
+  _ticketPriceDisplay?: string;
+  [key: string]: any;
 }
 
 export default function ContentAdmin() {
@@ -81,6 +89,23 @@ export default function ContentAdmin() {
       if (isEvent && editingPost.eventStartDate) {
         postData.eventDate = new Date(editingPost.eventStartDate);
         postData.location = editingPost.eventLocation || '';
+      }
+
+      // Ticketing config — convert display price ($) to cents for Stripe
+      if (isEvent) {
+        const enableTicketing = editingPost._enableTicketing;
+        if (enableTicketing && editingPost._ticketPriceDisplay) {
+          postData.ticketPrice = Math.round(parseFloat(editingPost._ticketPriceDisplay) * 100);
+          postData.capacity = parseInt(String(editingPost.capacity)) || null;
+        } else if (!enableTicketing) {
+          postData.ticketPrice = null;
+          postData.capacity = null;
+        }
+        // Never overwrite ticketsSold from the editor
+        delete postData.ticketsSold;
+        // Clean up display-only fields
+        delete postData._enableTicketing;
+        delete postData._ticketPriceDisplay;
       }
 
       if (editingPost.id) {
@@ -155,35 +180,105 @@ export default function ContentAdmin() {
               </div>
 
               {editingPost.category === 'Event' && (
-                <div className="bg-tan/10 p-4 rounded-md grid grid-cols-1 md:grid-cols-3 gap-4">
-                   <div>
-                    <label className="block text-sm font-bold text-charcoal mb-1">Start Date</label>
-                    <input
-                      type="datetime-local"
-                      value={editingPost.eventStartDate || ''}
-                      onChange={e => setEditingPost({...editingPost, eventStartDate: e.target.value})}
-                      className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
-                    />
+                <>
+                  {/* Event Details */}
+                  <div className="bg-tan/10 p-4 rounded-md">
+                    <p className="text-xs font-bold text-charcoal/50 uppercase tracking-wider mb-3">Event Details</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-charcoal mb-1">Start Date</label>
+                        <input
+                          type="datetime-local"
+                          value={editingPost.eventStartDate || ''}
+                          onChange={e => setEditingPost({...editingPost, eventStartDate: e.target.value})}
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-charcoal mb-1">End Date</label>
+                        <input
+                          type="datetime-local"
+                          value={editingPost.eventEndDate || ''}
+                          onChange={e => setEditingPost({...editingPost, eventEndDate: e.target.value})}
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-charcoal mb-1">Location</label>
+                        <input
+                          type="text"
+                          value={editingPost.eventLocation || ''}
+                          onChange={e => setEditingPost({...editingPost, eventLocation: e.target.value})}
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-charcoal mb-1">End Date</label>
-                    <input
-                      type="datetime-local"
-                      value={editingPost.eventEndDate || ''}
-                      onChange={e => setEditingPost({...editingPost, eventEndDate: e.target.value})}
-                      className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
-                    />
+
+                  {/* Ticketing Panel */}
+                  <div className="bg-white border border-tan-light rounded-lg p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <TicketIcon size={16} className="text-tan" />
+                        <p className="text-sm font-bold text-charcoal uppercase tracking-wider">Ticketing</p>
+                      </div>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <span className="text-sm text-charcoal/60">{editingPost._enableTicketing ? 'Enabled' : 'Disabled'}</span>
+                        <div
+                          onClick={() => setEditingPost(p => p ? ({ ...p, _enableTicketing: !p._enableTicketing }) : p)}
+                          className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                            editingPost._enableTicketing ? 'bg-tan' : 'bg-charcoal/20'
+                          }`}
+                        >
+                          <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                            editingPost._enableTicketing ? 'translate-x-5' : 'translate-x-0'
+                          }`} />
+                        </div>
+                      </label>
+                    </div>
+
+                    {editingPost._enableTicketing && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-1">Ticket Price ($)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/50 text-sm">$</span>
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              required
+                              value={editingPost._ticketPriceDisplay || (editingPost.ticketPrice ? (editingPost.ticketPrice / 100).toFixed(2) : '')}
+                              onChange={e => setEditingPost(p => ({ ...p, _ticketPriceDisplay: e.target.value }))}
+                              placeholder="0.00"
+                              className="w-full pl-7 pr-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-1">Max Capacity</label>
+                          <input
+                            type="number"
+                            min="1"
+                            required
+                            value={editingPost.capacity || ''}
+                            onChange={e => setEditingPost(p => ({ ...p, capacity: parseInt(e.target.value) || undefined }))}
+                            placeholder="e.g. 100"
+                            className="w-full px-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-1">Tickets Sold</label>
+                          <div className="px-3 py-2 bg-cream border border-tan-light/50 rounded-md text-sm text-charcoal/70">
+                            {editingPost.ticketsSold ?? 0}
+                            {editingPost.capacity ? ` / ${editingPost.capacity}` : ''}
+                            <span className="ml-2 text-xs text-charcoal/40">(read-only)</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-charcoal mb-1">Location</label>
-                    <input
-                      type="text"
-                      value={editingPost.eventLocation || ''}
-                      onChange={e => setEditingPost({...editingPost, eventLocation: e.target.value})}
-                      className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
-                    />
-                  </div>
-                </div>
+                </>
               )}
 
               <div>
