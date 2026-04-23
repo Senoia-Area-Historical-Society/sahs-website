@@ -70,7 +70,7 @@ export const checkCalendarAvailability = onRequest({ cors: true }, async (req, r
 });
 
 // 2. Create Stripe Checkout Session for Room Booking
-export const createBookingCheckoutSession = onRequest({ cors: true }, async (req, res) => {
+export const createBookingCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
     try {
         if (req.method !== 'POST') {
              res.status(405).send('Method Not Allowed');
@@ -126,7 +126,7 @@ export const createBookingCheckoutSession = onRequest({ cors: true }, async (req
 });
 
 // 3. Create Membership Checkout Session
-export const createMembershipCheckoutSession = onRequest({ cors: true }, async (req, res) => {
+export const createMembershipCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
     try {
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
@@ -184,7 +184,7 @@ export const createMembershipCheckoutSession = onRequest({ cors: true }, async (
 });
 
 // 4. Create Ticket Checkout Session
-export const createTicketCheckoutSession = onRequest({ cors: true }, async (req, res) => {
+export const createTicketCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
     try {
         if (req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
@@ -226,7 +226,7 @@ export const createTicketCheckoutSession = onRequest({ cors: true }, async (req,
 });
 
 // 5. List all memberships from Stripe
-export const listStripeSubscriptions = onRequest({ cors: true }, async (req, res) => {
+export const listStripeSubscriptions = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
     try {
         if (req.method !== 'GET' && req.method !== 'POST') {
             res.status(405).send('Method Not Allowed');
@@ -267,7 +267,7 @@ export const listStripeSubscriptions = onRequest({ cors: true }, async (req, res
 });
 
 // 6. Stripe Webhook Handler
-export const stripeWebhook = onRequest({ }, async (req, res) => {
+export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] }, async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
 

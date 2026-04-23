@@ -264,7 +264,12 @@ export async function submitTicketRequest(data: { eventId: string; title: string
 
 export async function getMemberships(): Promise<Membership[]> {
   try {
-    const functionsBaseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1';
+    const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+    const functionsBaseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 
+      (isProd 
+        ? 'https://us-central1-sahs-archives.cloudfunctions.net' 
+        : 'http://127.0.0.1:5001/sahs-archives/us-central1');
+    
     const functionUrl = `${functionsBaseUrl}/listStripeSubscriptions`;
     
     const response = await fetch(functionUrl, {
