@@ -247,6 +247,7 @@ export default function ContentAdmin() {
                       <th className="p-4 font-sans font-bold text-xs uppercase tracking-wider text-charcoal/60">Title</th>
                       <th className="p-4 font-sans font-bold text-xs uppercase tracking-wider text-charcoal/60">Category</th>
                       <th className="p-4 font-sans font-bold text-xs uppercase tracking-wider text-charcoal/60">Status</th>
+                      <th className="p-4 font-sans font-bold text-xs uppercase tracking-wider text-charcoal/60">Last Modified</th>
                       <th className="p-4 font-sans font-bold text-xs uppercase tracking-wider text-charcoal/60 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -263,6 +264,10 @@ export default function ContentAdmin() {
                           }`}>
                             {post.status}
                           </span>
+                        </td>
+                        <td className="p-4 text-xs text-charcoal/60">
+                          {post.author || 'Admin'}<br/>
+                          {post.updatedAt?.toDate().toLocaleDateString() || post.createdAt?.toDate().toLocaleDateString() || 'N/A'}
                         </td>
                         <td className="p-4 flex gap-3 justify-end">
                           <button onClick={() => setEditingPost(post)} className="text-charcoal/60 hover:text-tan transition-colors">
