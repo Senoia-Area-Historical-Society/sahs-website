@@ -24,7 +24,7 @@ export default function AdminHeader() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-charcoal flex items-center gap-2">
             <Shield className="text-tan" size={24} />
-            SAHS Curator Portal
+            SAHS Admin Portal
           </h1>
         </div>
         
