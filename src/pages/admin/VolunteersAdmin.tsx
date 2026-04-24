@@ -5,7 +5,7 @@ import AdminHeader from './AdminHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Plus, ArrowLeft, Pencil, Users, Copy, Check, X, Trash2,
-  ChevronUp, ChevronDown, Link as LinkIcon, Eye
+  ChevronUp, ChevronDown, Link as LinkIcon, Eye, ExternalLink
 } from 'lucide-react';
 import {
   getVolunteerSheets, createVolunteerSheet, updateVolunteerSheet,
@@ -472,6 +472,15 @@ export default function VolunteersAdmin() {
                           className="text-charcoal/50 hover:text-tan transition-colors">
                           {copiedId === sheet.id ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
                         </button>
+                        <a 
+                          href={`${window.location.origin}/volunteer/${sheet.shareToken}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          title="Open public signup page"
+                          className="text-charcoal/50 hover:text-tan transition-colors"
+                        >
+                          <ExternalLink size={18} />
+                        </a>
                         <button onClick={() => openRoster(sheet)} title="View volunteer roster" className="text-charcoal/50 hover:text-tan transition-colors">
                           <Eye size={18} />
                         </button>
