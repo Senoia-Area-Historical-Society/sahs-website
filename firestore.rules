@@ -84,10 +84,17 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
-    // User Roles: Admins access only, but allow users to read their own role to avoid rule recursion
+    // User Roles: Allow users to read their own role WITHOUT calling isAdmin() to avoid recursion
     match /user_roles/{email} {
-      allow read: if request.auth != null && (request.auth.token.email.lower() == email || isAdmin());
-      allow write: if request.auth != null && isAdmin();
+      allow read: if request.auth != null && (
+        request.auth.token.email.lower() == email.lower() || 
+        request.auth.token.email.lower() == 'catnolan@senoiahistory.com' || 
+        request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com'
+      );
+      allow write: if request.auth != null && (
+        request.auth.token.email.lower() == 'catnolan@senoiahistory.com' || 
+        request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com'
+      );
     }
 
     // Default deny: Block all other access
