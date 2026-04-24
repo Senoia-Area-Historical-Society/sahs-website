@@ -3,9 +3,12 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import TextAlign from '@tiptap/extension-text-align';
+import Youtube from '@tiptap/extension-youtube';
+import { Iframe } from './extensions/Iframe';
 import { 
   Bold, Italic, Heading1, Heading2, Heading3, 
-  List, ListOrdered, Quote, Image as ImageIcon, Link as LinkIcon, Undo, Redo, AlignLeft, AlignCenter, AlignRight
+  List, ListOrdered, Quote, Image as ImageIcon, Link as LinkIcon, Undo, Redo, AlignLeft, AlignCenter, AlignRight,
+  Video, CodeXml
 } from 'lucide-react';
 import { uploadFile } from '../../services/storage';
 
@@ -14,6 +17,27 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
   storagePath?: string;
 }
+
+interface ToolbarButtonProps {
+  onClick: () => void;
+  isActive?: boolean;
+  disabled?: boolean;
+  children: React.ReactNode;
+}
+
+const ToolbarButton = ({ onClick, isActive, disabled, children }: ToolbarButtonProps) => (
+  <button
+    type="button"
+    onMouseDown={(e) => e.preventDefault()} // Prevent losing focus
+    onClick={onClick}
+    disabled={disabled}
+    className={`p-2 rounded hover:bg-tan/10 transition-colors ${
+      isActive ? 'text-tan bg-tan/10' : 'text-charcoal/70'
+    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+  >
+    {children}
+  </button>
+);
 
 export default function RichTextEditor({ value, onChange, storagePath = 'content_images' }: RichTextEditorProps) {
   const editor = useEditor({
@@ -26,17 +50,30 @@ export default function RichTextEditor({ value, onChange, storagePath = 'content
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
+      Youtube.configure({
+        width: 640,
+        height: 480,
+      }),
+      Iframe,
     ],
     content: value,
+    immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
     editorProps: {
       attributes: {
-        className: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[300px] border border-tan/30 p-4 rounded-b-md',
+        className: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[300px] border border-tan/30 p-4 rounded-b-md w-full max-w-none',
       },
     },
   });
+
+  // Sync content from prop if it changes externally
+  useEffect(() => {
+    if (editor && value !== editor.getHTML()) {
+      editor.commands.setContent(value, false);
+    }
+  }, [value, editor]);
 
   if (!editor) {
     return null;
@@ -77,16 +114,31 @@ export default function RichTextEditor({ value, onChange, storagePath = 'content
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
   }
 
-  const ToolbarButton = ({ onClick, isActive, disabled, children }: any) => (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`p-2 rounded hover:bg-tan/10 transition-colors ${isActive ? 'text-tan bg-tan/10' : 'text-charcoal/70'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-    >
-      {children}
-    </button>
-  );
+  const addYoutube = () => {
+    const url = window.prompt('Enter YouTube URL')
+
+    if (url) {
+      editor.commands.setYoutubeVideo({
+        src: url,
+        width: 640,
+        height: 480,
+      })
+    }
+  }
+
+  const addEmbed = () => {
+    const input = window.prompt('Paste an iframe embed code or URL (e.g. Google Maps, Calendly, etc.)')
+    if (!input) return
+
+    let src = input
+    // If user pasted a full iframe tag, extract the src
+    const match = input.match(/src="([^"]+)"/)
+    if (match) {
+      src = match[1]
+    }
+
+    editor.chain().focus().setIframe({ src }).run()
+  }
 
   return (
     <div className="w-full flex flex-col">
@@ -156,6 +208,12 @@ export default function RichTextEditor({ value, onChange, storagePath = 'content
         </ToolbarButton>
         <ToolbarButton onClick={handleImageUpload}>
           <ImageIcon size={18} />
+        </ToolbarButton>
+        <ToolbarButton onClick={addYoutube}>
+          <Video size={18} />
+        </ToolbarButton>
+        <ToolbarButton onClick={addEmbed}>
+          <CodeXml size={18} />
         </ToolbarButton>
 
       </div>

@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
+import RichTextEditor from '../../components/admin/RichTextEditor';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Plus, ArrowLeft, Pencil, Users, Copy, Check, X, Trash2,
-  ChevronUp, ChevronDown, Link as LinkIcon, Eye, ExternalLink
+  ChevronUp, ChevronDown, Link as LinkIcon, Eye
 } from 'lucide-react';
 import {
   getVolunteerSheets, createVolunteerSheet, updateVolunteerSheet,
@@ -334,9 +335,10 @@ export default function VolunteersAdmin() {
               </div>
               <div>
                 <label className="block text-sm font-bold text-charcoal mb-1">Description</label>
-                <textarea rows={3} value={editingSheet?.description || ''} onChange={e => setEditingSheet(s => ({ ...s, description: e.target.value }))}
-                  placeholder="Brief description shown to volunteers on the public signup page..."
-                  className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 resize-none" />
+                <RichTextEditor 
+                  value={editingSheet?.description || ''} 
+                  onChange={content => setEditingSheet(s => ({ ...s, description: content }))}
+                />
               </div>
               <div>
                 <label className="block text-sm font-bold text-charcoal mb-1 flex items-center gap-1">
