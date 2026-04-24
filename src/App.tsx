@@ -30,6 +30,7 @@ import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 import VolunteerSignup from './pages/VolunteerSignup';
 import TicketSuccess from './pages/TicketSuccess';
+import BoxOffice from './pages/BoxOffice';
 
 // Admin Pages
 import Login from './pages/admin/Login';
@@ -143,6 +144,7 @@ function App() {
           {/* Dynamic Content Views */}
           <Route path="/news" element={<PublicLayout><News /></PublicLayout>} />
           <Route path="/news/:slug" element={<PublicLayout><NewsDetail /></PublicLayout>} />
+          <Route path="/box-office" element={<PublicLayout><BoxOffice /></PublicLayout>} />
           <Route path="/support-sahs" element={<PublicLayout><Support /></PublicLayout>} />
           <Route path="/supporters" element={<PublicLayout><Supporters /></PublicLayout>} />
           <Route path="/support-sahs/success" element={<PublicLayout><StripeSuccess /></PublicLayout>} />

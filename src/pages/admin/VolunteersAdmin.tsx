@@ -6,7 +6,7 @@ import RichTextEditor from '../../components/admin/RichTextEditor';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Plus, ArrowLeft, Pencil, Users, Copy, Check, X, Trash2,
-  ChevronUp, ChevronDown, Link as LinkIcon, Eye
+  ChevronUp, ChevronDown, Link as LinkIcon, Eye, ExternalLink
 } from 'lucide-react';
 import {
   getVolunteerSheets, createVolunteerSheet, updateVolunteerSheet,

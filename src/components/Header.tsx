@@ -13,6 +13,7 @@ export default function Header() {
           <nav className="hidden md:flex space-x-8">
             <Link to="/about-sahs" className="text-charcoal hover:text-tan transition-colors px-3 py-2 text-sm font-medium uppercase tracking-wider">About</Link>
             <Link to="/news" className="text-charcoal hover:text-tan transition-colors px-3 py-2 text-sm font-medium uppercase tracking-wider">News</Link>
+            <Link to="/box-office" className="text-charcoal hover:text-tan transition-colors px-3 py-2 text-sm font-bold text-tan uppercase tracking-wider">Box Office</Link>
             <Link to="/past-sahs-events" className="text-charcoal hover:text-tan transition-colors px-3 py-2 text-sm font-medium uppercase tracking-wider">Events</Link>
             <Link to="/support-sahs" className="text-charcoal hover:text-tan transition-colors px-3 py-2 text-sm font-medium uppercase tracking-wider">Support</Link>
             <Link to="/historic-structures-and-places" className="text-charcoal hover:text-tan transition-colors px-3 py-2 text-sm font-medium uppercase tracking-wider">Places</Link>
