@@ -11,31 +11,32 @@ const toBooking = (doc: any): Booking => ({ id: doc.id, ...doc.data() } as Booki
 
 export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
   try {
-    // Querying all posts ordered by publishDate to avoid complex composite index requirements.
-    // We will filter in memory for news and past events.
+    // Fetch all published posts once to avoid missing documents due to Firestore's requirement that
+    // any field used in orderBy/where-range must exist. Imported posts may lack fields.
     const q = query(
       collection(db, 'posts'),
-      orderBy('publishDate', 'desc'),
-      limit(maxItems * 4) // Fetch extra to account for filtering
+      where('status', '==', 'published')
     );
     const snapshot = await getDocs(q);
     const allPosts = snapshot.docs.map(toPost);
     const now = new Date();
     
-    return allPosts.filter(post => {
-      if (post.status !== 'published') return false;
-      
-      if (post.type === 'event') {
-        // If it has an event date, only include it if it's in the past
-        if (post.eventDate) {
+    return allPosts
+      .filter(post => {
+        if (post.type === 'event') {
+          // Include events if they are in the past OR if they are missing an event date
+          if (!post.eventDate) return true;
           return post.eventDate.toDate() < now;
         }
-        // If it's an event but missing a date, include it in News & Past Events
-        return true;
-      }
-      
-      return post.type === 'news';
-    }).slice(0, maxItems);
+        return post.type === 'news';
+      })
+      .sort((a, b) => {
+        // Sort descending by publishDate, falling back to createdAt
+        const dateA = a.publishDate?.toMillis() || a.createdAt?.toMillis() || 0;
+        const dateB = b.publishDate?.toMillis() || b.createdAt?.toMillis() || 0;
+        return dateB - dateA;
+      })
+      .slice(0, maxItems);
   } catch (err) {
     console.error('Error fetching News & Past Events:', err);
     return [];
@@ -44,39 +45,50 @@ export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
 
 export async function getEvents(maxItems: number = 20): Promise<Post[]> {
   try {
+    const q = query(
+      collection(db, 'posts'),
+      where('status', '==', 'published'),
+      where('type', '==', 'event')
+    );
+    const snapshot = await getDocs(q);
+    const allEvents = snapshot.docs.map(toPost);
     const now = new Date();
     now.setHours(0, 0, 0, 0); // Include events happening today
     
-    // Querying eventDate >= now automatically filters out non-events (since they lack eventDate)
-    const q = query(
-      collection(db, 'posts'),
-      where('eventDate', '>=', now),
-      orderBy('eventDate', 'asc'),
-      limit(maxItems * 2)
-    );
-    const snapshot = await getDocs(q);
-    const allPosts = snapshot.docs.map(toPost);
-    return allPosts.filter(post => post.status === 'published' && post.type === 'event').slice(0, maxItems);
+    return allEvents
+      .filter(post => post.eventDate && post.eventDate.toDate() >= now)
+      .sort((a, b) => {
+        const dateA = a.eventDate?.toMillis() || 0;
+        const dateB = b.eventDate?.toMillis() || 0;
+        return dateA - dateB;
+      })
+      .slice(0, maxItems);
   } catch (err) {
-    console.error('Error fetching Events:', err);
+    console.error('Error fetching Upcoming Events:', err);
     return [];
   }
 }
 
 export async function getPastEvents(maxItems: number = 50): Promise<Post[]> {
   try {
-    const now = new Date();
-    
-    // Querying all posts with eventDate to find past ones
     const q = query(
       collection(db, 'posts'),
-      where('eventDate', '<', now),
-      orderBy('eventDate', 'desc'),
-      limit(maxItems * 2)
+      where('status', '==', 'published'),
+      where('type', '==', 'event')
     );
     const snapshot = await getDocs(q);
-    const allPosts = snapshot.docs.map(toPost);
-    return allPosts.filter(post => post.status === 'published' && post.type === 'event').slice(0, maxItems);
+    const allEvents = snapshot.docs.map(toPost);
+    const now = new Date();
+    
+    return allEvents
+      .filter(post => !post.eventDate || post.eventDate.toDate() < now)
+      .sort((a, b) => {
+        // Sort descending by eventDate, falling back to publishDate
+        const dateA = a.eventDate?.toMillis() || a.publishDate?.toMillis() || a.createdAt?.toMillis() || 0;
+        const dateB = b.eventDate?.toMillis() || b.publishDate?.toMillis() || b.createdAt?.toMillis() || 0;
+        return dateB - dateA;
+      })
+      .slice(0, maxItems);
   } catch (err) {
     console.error('Error fetching Past Events:', err);
     return [];
