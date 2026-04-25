@@ -7,7 +7,7 @@ service cloud.firestore {
       return request.auth != null && (
         request.auth.token.email.lower() == 'catnolan@senoiahistory.com' || 
         request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com' ||
-        request.auth.token.email.lower().endsWith('@senoiahistory.com') ||
+        request.auth.token.email.lower().matches('.*@senoiahistory\\.com$') ||
         (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
          get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'admin')
       );
