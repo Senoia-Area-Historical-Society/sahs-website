@@ -26,9 +26,12 @@ export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
       if (post.status !== 'published') return false;
       
       if (post.type === 'event') {
-        // Only include past events
-        if (!post.eventDate) return false;
-        return post.eventDate.toDate() < now;
+        // If it has an event date, only include it if it's in the past
+        if (post.eventDate) {
+          return post.eventDate.toDate() < now;
+        }
+        // If it's an event but missing a date, include it in News & Past Events
+        return true;
       }
       
       return post.type === 'news';
