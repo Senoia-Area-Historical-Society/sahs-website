@@ -45,3 +45,5 @@ dist-ssr
 # Firebase Emulator Data
 emulator-data/
 
+# gemini-cli Conductor extension
+conductor/
