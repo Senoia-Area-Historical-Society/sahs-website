@@ -91,6 +91,9 @@ async function migratePosts() {
     };
 
     await db.collection('posts').doc(item.id).set(post, { merge: true });
+
+    // Migration script no longer needs to generate dub.co shortlinks.
+    // They are natively supported by the custom firebase function.
   }
   console.log(`Migrated ${newsItems.length} core posts.`);
 }

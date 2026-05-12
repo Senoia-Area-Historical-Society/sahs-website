@@ -7,6 +7,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Calendar, MapPin } from 'lucide-react';
 import TicketPurchaseWidget from '../components/public/TicketPurchaseWidget';
 
+import SocialShare from '../components/public/SocialShare';
+
 // ── Main NewsDetail Page ───────────────────────────────────────────────────
 export default function NewsDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -61,7 +63,7 @@ export default function NewsDetail() {
           <span className="mr-2">←</span> Back to News &amp; Events
         </Link>
 
-        <header className="mb-12">
+        <header className="mb-8">
           {formattedDate && (
             <div className="text-sm font-sans text-tan font-semibold tracking-wider uppercase mb-4">
               {post.type === 'event' ? `Event Date: ${formattedDate}` : `Published: ${formattedDate}`}
@@ -73,7 +75,15 @@ export default function NewsDetail() {
               <div className="flex items-center gap-2"><Calendar size={18} className="text-tan" /><span>{formattedDate}</span></div>
             )}
             {post.location && (
-              <div className="flex items-center gap-2"><MapPin size={18} className="text-tan" /><span>{post.location}</span></div>
+              <a 
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(post.location)}`} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="flex items-center gap-2 hover:text-tan-dark transition-colors group"
+              >
+                <MapPin size={18} className="text-tan group-hover:text-tan-dark transition-colors" />
+                <span className="underline underline-offset-4 decoration-tan/30 group-hover:decoration-tan-dark">{post.location}</span>
+              </a>
             )}
           </div>
           {post.mainImage && (
@@ -82,6 +92,8 @@ export default function NewsDetail() {
             </div>
           )}
         </header>
+        
+        <SocialShare slug={post.slug} title={post.title} />
 
         {post.type === 'event' && post.ticketPrice && (
           <div className="mb-12">

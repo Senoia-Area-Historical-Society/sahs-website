@@ -9,7 +9,8 @@ import {
   FileText, 
   BookOpen, 
   HandHeart,
-  ChevronDown
+  ChevronDown,
+  Link as LinkIcon
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -38,6 +39,7 @@ export default function AdminHeader() {
       items: [
         { label: 'Site Content', path: '/admin/content', icon: FileText, description: 'Manage news, events, and pages' },
         { label: 'Wiki', path: '/admin/wiki', icon: BookOpen, description: 'Internal knowledge base' },
+        { label: 'Short Links', path: '/admin/shortlinks', icon: LinkIcon, description: 'Manage custom URLs' },
       ]
     },
     {

@@ -43,7 +43,7 @@ import VolunteersAdmin from './pages/admin/VolunteersAdmin';
 import TicketScanner from './pages/admin/TicketScanner';
 
 import UsersAdmin from './pages/admin/UsersAdmin';
-
+import ShortLinksAdmin from './pages/admin/ShortLinksAdmin';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isSAHSUser, loading } = useAuth();
   const location = useLocation();
@@ -129,6 +129,11 @@ function App() {
           <Route path="/admin/tickets/scan" element={
             <ProtectedRoute>
               <TicketScanner />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/shortlinks" element={
+            <ProtectedRoute>
+              <ShortLinksAdmin />
             </ProtectedRoute>
           } />
 

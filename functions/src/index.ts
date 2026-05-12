@@ -382,3 +382,38 @@ export const onBookingConfirmed = onDocumentUpdated('bookings/{bookingId}', asyn
         }
     }
 });
+
+// 9. Shortlink Redirect
+export const shortlinkRedirect = onRequest({ cors: true }, async (req, res) => {
+    try {
+        const slug = req.path.substring(1); // removes the leading slash
+        
+        if (!slug) {
+            res.redirect(301, FRONTEND_URL);
+            return;
+        }
+
+        // 1. Check custom shortlinks collection
+        const shortlinkSnap = await db.collection('shortlinks').doc(slug).get();
+        if (shortlinkSnap.exists) {
+            const data = shortlinkSnap.data();
+            if (data && data.url) {
+                res.redirect(301, data.url);
+                return;
+            }
+        }
+
+        // 2. Fallback to posts collection
+        const postsSnap = await db.collection('posts').where('slug', '==', slug).limit(1).get();
+        if (!postsSnap.empty) {
+            res.redirect(301, `${FRONTEND_URL}/news/${slug}`);
+            return;
+        }
+
+        // 3. If neither found, redirect to homepage
+        res.redirect(301, FRONTEND_URL);
+    } catch (error) {
+        console.error('Error redirecting shortlink:', error);
+        res.redirect(301, FRONTEND_URL);
+    }
+});

@@ -179,3 +179,11 @@ export interface VolunteerRegistration {
   status: 'confirmed' | 'cancelled';
   signedUpAt: Timestamp | null;
 }
+
+export interface ShortLink {
+  id: string;
+  slug: string;
+  targetUrl: string;
+  createdAt: Timestamp | null;
+  updatedAt: Timestamp | null;
+}
