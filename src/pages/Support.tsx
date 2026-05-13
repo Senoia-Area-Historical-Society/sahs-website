@@ -142,13 +142,15 @@ export default function Support() {
               Your financial contributions directly support our museum operations, preservation projects, and community programs. Every gift helps us keep Senoia's history alive.
             </p>
             <div className="mt-auto space-y-4">
-              <button 
+              <a 
+                href="https://donate.stripe.com/aEU1602kYegp3UQfZ0"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-full border-2 border-tan text-tan px-6 py-4 rounded-md uppercase tracking-widest font-bold hover:bg-tan/5 transition-colors flex items-center justify-center gap-2"
-                onClick={() => alert("General donation flow coming soon. Please use membership levels for now.")}
               >
                 <CreditCard size={20} />
                 Donate via Stripe
-              </button>
+              </a>
               <p className="text-sm text-charcoal/60 font-sans text-center mt-4">
                 The Senoia Area Historical Society is a 501(c)(3) non-profit organization.
               </p>

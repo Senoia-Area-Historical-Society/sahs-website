@@ -24,7 +24,7 @@
     },
     {
       "target": "shortlinks",
-      "public": "dist",
+      "public": "hosting-shortlinks",
       "rewrites": [
         {
           "source": "**",

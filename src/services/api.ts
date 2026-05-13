@@ -9,6 +9,14 @@ const toHistoricalPlace = (doc: any): HistoricalPlace => ({ id: doc.id, ...doc.d
 const toOrganizationEntity = (doc: any): OrganizationEntity => ({ id: doc.id, ...doc.data() } as OrganizationEntity);
 const toBooking = (doc: any): Booking => ({ id: doc.id, ...doc.data() } as Booking);
 
+const getFunctionsBaseUrl = () => {
+  const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+  return import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 
+    (isProd 
+      ? 'https://us-central1-sahs-archives.cloudfunctions.net' 
+      : 'http://127.0.0.1:5001/sahs-archives/us-central1');
+};
+
 export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
   try {
     // Fetch all published posts once to avoid missing documents due to Firestore's requirement that
@@ -207,8 +215,8 @@ export async function updateBookingStatus(id: string, status: 'pending' | 'confi
 
 export async function submitBookingRequest(data: Omit<Booking, 'id' | 'status' | 'submittedAt'>): Promise<{ url: string }> {
   try {
-    // In production, this URL should come from env variables
-    const functionUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1/createBookingCheckoutSession';
+    const baseUrl = getFunctionsBaseUrl();
+    const functionUrl = `${baseUrl}/createBookingCheckoutSession`;
     
     const response = await fetch(functionUrl, {
       method: 'POST',
@@ -231,7 +239,7 @@ export async function submitBookingRequest(data: Omit<Booking, 'id' | 'status' |
 
 export async function submitMembershipRequest(data: { email: string; level: string; quantity: number; userId?: string }): Promise<{ url: string }> {
   try {
-    const baseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1';
+    const baseUrl = getFunctionsBaseUrl();
     const functionUrl = `${baseUrl}/createMembershipCheckoutSession`;
     
     const response = await fetch(functionUrl, {
@@ -255,7 +263,7 @@ export async function submitMembershipRequest(data: { email: string; level: stri
 
 export async function submitTicketRequest(data: { eventId: string; title: string; price: number; quantity: number; email: string; customerName?: string; slug?: string }): Promise<{ url: string }> {
   try {
-    const baseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1';
+    const baseUrl = getFunctionsBaseUrl();
     const functionUrl = `${baseUrl}/createTicketCheckoutSession`;
     
     const response = await fetch(functionUrl, {
@@ -292,18 +300,14 @@ export async function getTicketBySessionId(sessionId: string): Promise<import('.
 }
 
 export async function verifyTicketConfirmation(confirmationNumber: string): Promise<{ valid: boolean; reason?: string; ticket?: any }> {
-  const baseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 'http://127.0.0.1:5001/sahs-archives/us-central1';
+  const baseUrl = getFunctionsBaseUrl();
   const res = await fetch(`${baseUrl}/verifyTicket?confirmationNumber=${encodeURIComponent(confirmationNumber.trim())}`);
   return res.json();
 }
 
 export async function getMemberships(): Promise<Membership[]> {
   try {
-    const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
-    const functionsBaseUrl = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 
-      (isProd 
-        ? 'https://us-central1-sahs-archives.cloudfunctions.net' 
-        : 'http://127.0.0.1:5001/sahs-archives/us-central1');
+    const functionsBaseUrl = getFunctionsBaseUrl();
     
     const functionUrl = `${functionsBaseUrl}/listStripeSubscriptions`;
     

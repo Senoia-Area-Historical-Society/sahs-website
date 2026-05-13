@@ -11,27 +11,13 @@ export default function Footer() {
           <p className="text-beige text-base leading-relaxed max-w-md mb-8">
             Dedicated to securing, preserving, and promoting the social and cultural history of Senoia, Georgia, and the surrounding community.
           </p>
-          <div className="space-y-4">
-             <h4 className="text-sm font-bold uppercase tracking-widest text-tan-light">Join Our Newsletter</h4>
-             <form className="flex max-w-md" onSubmit={(e) => e.preventDefault()}>
-               <input 
-                 type="email" 
-                 placeholder="Email Address" 
-                 className="flex-grow bg-charcoal-light border border-tan/20 rounded-l-md px-4 py-2 text-sm text-cream placeholder:text-beige/40 focus:outline-none focus:border-tan transition-colors"
-                />
-               <button className="bg-tan text-white px-6 py-2 rounded-r-md text-sm font-bold uppercase tracking-widest hover:bg-tan-dark transition-colors">
-                 Join
-               </button>
-             </form>
-          </div>
+
         </div>
         
         <div>
           <h4 className="text-lg font-bold mb-6 font-sans tracking-wider uppercase text-tan-light">Resources</h4>
           <ul className="space-y-3 text-sm font-sans text-beige">
             <li><Link to="/location-and-hours" className="hover:text-white transition-colors">Location & Hours</Link></li>
-            <li><Link to="/carmichael-house" className="hover:text-white transition-colors">The Carmichael House</Link></li>
-            <li><Link to="/museum" className="hover:text-white transition-colors">SAHS Museum</Link></li>
             <li><Link to="/meeting-room" className="hover:text-white transition-colors">Meeting Room Booking</Link></li>
             <li><Link to="/past-sahs-events" className="hover:text-white transition-colors">Past Events Archive</Link></li>
             <li><a href="https://archives.senoiahistory.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Digital Archives</a></li>
@@ -43,7 +29,7 @@ export default function Footer() {
           <h4 className="text-lg font-bold mb-6 font-sans tracking-wider uppercase text-tan-light">Stay Connected</h4>
           <ul className="space-y-4 text-sm font-sans text-beige mb-8">
             <li>
-              <a href="https://www.facebook.com/SenoiaAreaHistoricalSociety" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:text-white transition-colors group">
+              <a href="https://www.facebook.com/Senoia-Area-Historical-Society-127037960707462" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:text-white transition-colors group">
                 <span className="bg-charcoal-light p-2 rounded-full group-hover:bg-tan transition-colors">
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
                 </span>
