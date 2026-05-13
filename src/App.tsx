@@ -6,7 +6,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 // Pages
 import Home from './pages/Home';
 import About from './pages/About';
-import Museum from './pages/Museum';
 import LocationAndHours from './pages/LocationAndHours';
 import CarmichaelHouse from './pages/CarmichaelHouse';
 import Contact from './pages/Contact';
@@ -140,7 +139,6 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
           <Route path="/about-sahs" element={<PublicLayout><About /></PublicLayout>} />
-          <Route path="/museum" element={<PublicLayout><Museum /></PublicLayout>} />
           <Route path="/location-and-hours" element={<PublicLayout><LocationAndHours /></PublicLayout>} />
           <Route path="/carmichael-house" element={<PublicLayout><CarmichaelHouse /></PublicLayout>} />
           <Route path="/contact-sahs" element={<PublicLayout><Contact /></PublicLayout>} />
