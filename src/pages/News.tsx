@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { getNewsPosts, getEvents } from '../services/api';
 import type { Post } from '../types';
 
@@ -6,6 +6,8 @@ export default function News() {
   const [news, setNews] = useState<Post[]>([]);
   const [events, setEvents] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
 
   useEffect(() => {
     async function loadContent() {
@@ -30,6 +32,13 @@ export default function News() {
     const d = ts.toDate();
     return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
+
+  const currentNews = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return news.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [news, currentPage]);
+
+  const totalPages = Math.ceil(news.length / ITEMS_PER_PAGE);
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8 font-serif text-charcoal">
@@ -75,34 +84,58 @@ export default function News() {
               {news.length === 0 ? (
                 <p className="text-sm font-sans italic text-charcoal/70">Check back soon for latest news.</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {news.map(item => (
-                    <article key={item.id} className="flex flex-col bg-white rounded-lg shadow-sm border border-tan/20 overflow-hidden hover:shadow-md transition-shadow">
-                      {item.mainImage ? (
-                        <div className="h-48 w-full overflow-hidden">
-                          <img src={item.mainImage} alt={item.title} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {currentNews.map(item => (
+                      <article key={item.id} className="flex flex-col bg-white rounded-lg shadow-sm border border-tan/20 overflow-hidden hover:shadow-md transition-shadow">
+                        {item.mainImage ? (
+                          <div className="h-48 w-full overflow-hidden">
+                            <img src={item.mainImage} alt={item.title} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
+                          </div>
+                        ) : (
+                          <div className="h-48 w-full bg-tan/10 flex items-center justify-center">
+                            <img src="/sahs-logo.png" alt="SAHS Logo" className="h-24 opacity-20" />
+                          </div>
+                        )}
+                        <div className="p-6 flex flex-col flex-grow">
+                           <div className="text-xs font-sans text-charcoal/60 mb-2">
+                            {formatDate(item.publishDate)}
+                          </div>
+                          <h3 className="text-xl font-bold mb-3">{item.title}</h3>
+                          <p className="text-gray-600 font-sans text-sm mb-4 line-clamp-3 flex-grow">
+                            {item.excerpt || item.content?.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'}
+                          </p>
+                          <div className="mt-auto">
+                             <a href={`/news/${item.slug}`} className="text-charcoal font-bold font-sans text-sm uppercase tracking-wide hover:text-tan transition-colors">
+                              Read More →
+                            </a>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="h-48 w-full bg-tan/10 flex items-center justify-center">
-                          <img src="/sahs-logo.png" alt="SAHS Logo" className="h-24 opacity-20" />
-                        </div>
-                      )}
-                      <div className="p-6 flex flex-col flex-grow">
-                         <div className="text-xs font-sans text-charcoal/60 mb-2">
-                          {formatDate(item.publishDate)}
-                        </div>
-                        <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                        <p className="text-gray-600 font-sans text-sm mb-4 line-clamp-3 flex-grow">
-                          {item.excerpt || item.content?.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'}
-                        </p>
-                        <div className="mt-auto">
-                           <a href={`/news/${item.slug}`} className="text-charcoal font-bold font-sans text-sm uppercase tracking-wide hover:text-tan transition-colors">
-                            Read More →
-                          </a>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
+                      </article>
+                    ))}
+                  </div>
+                  
+                  {totalPages > 1 && (
+                    <div className="flex justify-between items-center mt-12 pt-8 border-t border-tan/20">
+                      <button 
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-6 py-2 border border-charcoal/20 rounded font-sans text-sm font-bold uppercase tracking-widest hover:border-tan hover:text-tan disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        ← Previous
+                      </button>
+                      <span className="font-sans text-sm text-charcoal/60">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button 
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-6 py-2 border border-charcoal/20 rounded font-sans text-sm font-bold uppercase tracking-widest hover:border-tan hover:text-tan disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

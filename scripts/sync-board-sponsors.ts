@@ -10,7 +10,7 @@ try {
   process.exit(1);
 }
 
-const db = getFirestore('sahs-archives');
+const db = getFirestore();
 
 const currentBoard = [
   {

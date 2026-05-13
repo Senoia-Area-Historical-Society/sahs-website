@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { getCorporateSponsors, submitMembershipRequest } from '../services/api';
-import type { OrganizationEntity } from '../types';
+import { useState } from 'react';
+import { submitMembershipRequest } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { CreditCard, Users, Plus, Minus, Loader2 } from 'lucide-react';
+import SponsorsList from '../components/SponsorsList';
 
 const MEMBERSHIP_LEVELS = [
   { id: 'senior', name: 'Senior (65+)', price: 25, description: 'Individual membership for those 65 and older.' },
@@ -13,26 +13,13 @@ const MEMBERSHIP_LEVELS = [
 
 export default function Support() {
   const { user } = useAuth();
-  const [sponsors, setSponsors] = useState<OrganizationEntity[]>([]);
-  const [loading, setLoading] = useState(true);
+
   
   const [selectedLevel, setSelectedLevel] = useState(MEMBERSHIP_LEVELS[1]);
   const [quantity, setQuantity] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    async function loadSponsors() {
-      try {
-        const data = await getCorporateSponsors();
-        setSponsors(data);
-      } catch (err) {
-        console.error("Failed to load sponsors", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadSponsors();
-  }, []);
+
 
   const handleJoin = async () => {
     setIsProcessing(true);
@@ -159,28 +146,7 @@ export default function Support() {
         </section>
 
         <section>
-          <h2 className="text-3xl font-bold mb-12 text-center">Our Corporate Sponsors</h2>
-          
-          {loading ? (
-             <div className="flex justify-center py-12">
-               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tan"></div>
-             </div>
-          ) : sponsors.length === 0 ? (
-            <p className="text-center italic text-charcoal/60 font-sans">Our current sponsors will be listed here soon.</p>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-              {sponsors.map(sponsor => (
-                <div key={sponsor.id} className="bg-white p-6 rounded-lg border border-tan/10 shadow-sm flex flex-col items-center justify-center transition-transform hover:scale-105">
-                  {sponsor.image ? (
-                    <img src={sponsor.image} alt={sponsor.name} className="max-h-24 w-auto object-contain mb-4 filter grayscale hover:grayscale-0 transition-all" />
-                  ) : (
-                    <h4 className="text-lg font-bold text-center">{sponsor.name}</h4>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          
+          <SponsorsList />
           <div className="mt-16 text-center">
              <p className="text-lg font-sans text-charcoal/70 mb-6">Interested in becoming a corporate sponsor?</p>
              <a 
