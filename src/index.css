@@ -36,3 +36,38 @@
     margin: 1.5rem 0;
   }
 }
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-lg border border-white/20 shadow-2xl;
+  }
+
+  .glass-nav {
+    @apply bg-cream/90 backdrop-blur-md border-b border-tan-light/30 sticky top-0 z-50;
+  }
+}
+
+/* Mobile Drawer Animations */
+.mobile-drawer-overlay {
+  @apply fixed inset-0 bg-charcoal/40 backdrop-blur-sm z-[60] transition-opacity duration-300;
+}
+
+.mobile-drawer-content {
+  @apply fixed top-0 right-0 h-full w-[85vw] max-w-sm glass-card z-[70] p-6 flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)];
+}
+
+.drawer-closed .mobile-drawer-overlay {
+  @apply opacity-0 pointer-events-none;
+}
+
+.drawer-closed .mobile-drawer-content {
+  @apply translate-x-full;
+}
+
+.drawer-open .mobile-drawer-overlay {
+  @apply opacity-100;
+}
+
+.drawer-open .mobile-drawer-content {
+  @apply translate-x-0;
+}

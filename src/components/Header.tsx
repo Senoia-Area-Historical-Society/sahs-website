@@ -13,11 +13,11 @@ export default function Header() {
   }, [location]);
 
   return (
-    <header className="bg-cream border-b border-tan-light sticky top-0 z-50 shadow-sm">
+    <header className="glass-nav shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20 items-center">
           <div className="flex-shrink-0 flex items-center">
-            <Link to="/" className="text-3xl font-serif font-bold text-charcoal tracking-tight">
+            <Link to="/" className="text-3xl font-serif font-bold text-charcoal tracking-tight hover:text-tan transition-colors">
               SAHS
             </Link>
           </div>
@@ -70,47 +70,80 @@ export default function Header() {
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center">
             <button 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={() => setIsMobileMenuOpen(true)}
               className="text-charcoal p-2 hover:bg-tan/10 rounded-md transition-colors"
-              aria-label="Toggle menu"
+              aria-label="Open menu"
             >
-              {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+              <Menu size={28} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Navigation Overlay */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-tan/10 shadow-inner animate-in slide-in-from-top duration-300">
-          <div className="px-4 pt-4 pb-8 space-y-2">
-            {/* Visit Section */}
-            <div className="pb-4">
-              <p className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-tan/60">Visit</p>
-              <Link to="/about-sahs" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">About the Society</Link>
-              <Link to="/location-and-hours" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">Location & Hours</Link>
-              <Link to="/meeting-room" className="block px-6 py-3 text-lg font-bold text-charcoal hover:bg-cream">Meeting Room Booking</Link>
+      {/* Premium Mobile Drawer */}
+      <div className={isMobileMenuOpen ? 'drawer-open' : 'drawer-closed'}>
+        <div 
+          className="mobile-drawer-overlay" 
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+        <div className="mobile-drawer-content">
+          <div className="flex justify-between items-center mb-8">
+            <span className="text-2xl font-serif font-bold text-charcoal">Menu</span>
+            <button 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-2 hover:bg-tan/10 rounded-full transition-colors text-charcoal"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <nav className="flex-1 overflow-y-auto space-y-6">
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-tan/60 px-2">Visit</h3>
+              <div className="space-y-1">
+                <Link to="/about-sahs" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">About the Society</Link>
+                <Link to="/location-and-hours" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Location & Hours</Link>
+                <Link to="/meeting-room" className="block px-4 py-3 text-lg font-bold text-tan-dark hover:bg-tan/5 rounded-lg transition-colors">Meeting Room Booking</Link>
+              </div>
             </div>
 
-            {/* Events */}
-            <Link to="/news" className="block px-3 py-4 text-lg font-medium text-charcoal border-t border-tan/5">Events</Link>
-
-            {/* Support Section */}
-            <div className="py-4 border-t border-tan/5">
-              <p className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-tan/60">Support</p>
-              <Link to="/support-sahs" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">Become a Member / Donate</Link>
-              <a href="https://billing.stripe.com/p/login/3cscOSe99bt8bvi000" target="_blank" rel="noopener noreferrer" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">Manage Membership</a>
-              <Link to="/supporters" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">Our Supporters</Link>
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-tan/60 px-2">Events & News</h3>
+              <Link to="/news" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Latest Updates</Link>
             </div>
 
-            {/* External Links */}
-            <div className="pt-4 border-t border-tan/5 space-y-4">
-              <a href="https://archives.senoiahistory.com" target="_blank" rel="noopener noreferrer" className="block w-full text-center py-4 bg-tan text-white rounded-lg font-bold shadow-md">Browse Archives</a>
-              <Link to="/contact-sahs" className="block w-full text-center py-4 border border-tan/30 text-charcoal rounded-lg font-medium">Contact Us</Link>
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-tan/60 px-2">Support</h3>
+              <div className="space-y-1">
+                <Link to="/support-sahs" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Membership & Donations</Link>
+                <a href="https://billing.stripe.com/p/login/3cscOSe99bt8bvi000" target="_blank" rel="noopener noreferrer" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Manage Membership</a>
+                <Link to="/supporters" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Our Supporters</Link>
+              </div>
             </div>
+
+            <div className="pt-6 space-y-4">
+              <a 
+                href="https://archives.senoiahistory.com" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="block w-full text-center py-4 bg-tan text-white rounded-xl font-bold shadow-lg shadow-tan/20 hover:bg-tan-dark transition-all transform active:scale-95"
+              >
+                Browse Digital Archives
+              </a>
+              <Link 
+                to="/contact-sahs" 
+                className="block w-full text-center py-4 border-2 border-tan/20 text-charcoal rounded-xl font-semibold hover:bg-tan/5 transition-colors"
+              >
+                Contact Us
+              </Link>
+            </div>
+          </nav>
+          
+          <div className="mt-auto pt-8 border-t border-tan/10 text-center">
+            <p className="text-sm text-charcoal/40 font-serif italic">Preserving Senoia's History Since 1977</p>
           </div>
         </div>
-      )}
+      </div>
     </header>
   );
 }

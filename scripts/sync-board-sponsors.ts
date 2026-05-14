@@ -114,16 +114,22 @@ const sponsors = [
     url: "https://us.tencatefabrics.com/"
   },
   {
+    id: "synovus-bank",
+    name: "Synovus Bank",
+    type: "sponsor",
+    url: ""
+  },
+  {
     id: "country-junction",
     name: "Country Junction Soaps",
     type: "sponsor",
     url: "https://country-junction.com/"
   },
   {
-    id: "hearn-landscape",
-    name: "Hearn Landscape",
+    id: "dr-ventures",
+    name: "D&R Ventures",
     type: "sponsor",
-    url: "https://hearnlandscape.com"
+    url: ""
   },
   {
     id: "senoia-dda",
