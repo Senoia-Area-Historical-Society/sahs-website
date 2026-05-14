@@ -21,7 +21,6 @@ import StripeCancel from './pages/StripeCancel';
 import BookingSuccess from './pages/BookingSuccess';
 import BookingCancel from './pages/BookingCancel';
 import VendorApplication from './pages/VendorApplication';
-import SponsorApplication from './pages/SponsorApplication';
 import HistoricalPlaces from './pages/HistoricalPlaces';
 import HistoricalPlaceDetail from './pages/HistoricalPlaceDetail';
 import Media from './pages/Media';
@@ -158,7 +157,7 @@ function App() {
           <Route path="/meeting-room/success" element={<PublicLayout><BookingSuccess /></PublicLayout>} />
           <Route path="/meeting-room/cancel" element={<PublicLayout><BookingCancel /></PublicLayout>} />
           <Route path="/vendor-application-form" element={<PublicLayout><VendorApplication /></PublicLayout>} />
-          <Route path="/sponsor-application-form" element={<PublicLayout><SponsorApplication /></PublicLayout>} />
+          <Route path="/sponsor-application-form" element={<Navigate to="/support-sahs#memberships" replace />} />
           <Route path="/historic-structures-and-places" element={<PublicLayout><HistoricalPlaces /></PublicLayout>} />
           <Route path="/historic-structures-and-places/:slug" element={<PublicLayout><HistoricalPlaceDetail /></PublicLayout>} />
           <Route path="/media" element={<PublicLayout><Media /></PublicLayout>} />

@@ -47,7 +47,7 @@ export default function Supporters() {
             <a href="/support-sahs" className="bg-tan text-white px-10 py-4 rounded-md font-sans font-bold uppercase tracking-widest hover:bg-tan-dark transition-colors shadow-sm">
               Ways to Give
             </a>
-            <a href="/sponsor-application-form" className="border-2 border-tan text-tan px-10 py-4 rounded-md font-sans font-bold uppercase tracking-widest hover:bg-tan/5 transition-colors">
+            <a href="/support-sahs#memberships" className="border-2 border-tan text-tan px-10 py-4 rounded-md font-sans font-bold uppercase tracking-widest hover:bg-tan/5 transition-colors">
               Become a Sponsor
             </a>
           </div>

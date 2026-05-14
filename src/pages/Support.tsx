@@ -42,7 +42,7 @@ export default function Support() {
             </div>
           </div>
 
-          <div className="mb-16">
+          <div className="mb-16" id="memberships">
             <h3 className="text-2xl font-bold mb-6 text-tan-dark text-center">Patron & Corporate Memberships</h3>
             <div className="bg-white p-4 rounded-lg shadow-sm border border-tan/20">
               {React.createElement('stripe-pricing-table', {
@@ -81,7 +81,7 @@ export default function Support() {
           <div className="mt-16 text-center">
              <p className="text-lg font-sans text-charcoal/70 mb-6">Interested in becoming a corporate sponsor?</p>
              <a 
-               href="/sponsor-application-form" 
+               href="#memberships" 
                className="inline-block border-b-2 border-tan pb-1 text-tan font-sans font-bold uppercase tracking-widest hover:text-tan-dark hover:border-tan-dark transition-colors"
              >
                Apply to Sponsor
