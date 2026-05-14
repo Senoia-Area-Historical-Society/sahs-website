@@ -1,50 +1,20 @@
-import { useState } from 'react';
-import { submitMembershipRequest } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
-import { CreditCard, Users, Plus, Minus, Loader2 } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { CreditCard } from 'lucide-react';
 import SponsorsList from '../components/SponsorsList';
 
-const MEMBERSHIP_LEVELS = [
-  { id: 'senior', name: 'Senior (65+)', price: 25, description: 'Individual membership for those 65 and older.' },
-  { id: 'individual', name: 'Individual', price: 35, description: 'Standard annual membership for one person.' },
-  { id: 'family', name: 'Family', price: 50, description: 'Annual membership for a household.' },
-  { id: 'patron', name: 'Patron', price: 100, description: 'Enhanced support for society programs.' },
-];
-
 export default function Support() {
-  const { user } = useAuth();
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://js.stripe.com/v3/pricing-table.js";
+    script.async = true;
+    document.body.appendChild(script);
 
-  
-  const [selectedLevel, setSelectedLevel] = useState(MEMBERSHIP_LEVELS[1]);
-  const [quantity, setQuantity] = useState(1);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-
-
-  const handleJoin = async () => {
-    setIsProcessing(true);
-    try {
-      const email = user?.email || prompt("Please enter your email address for the membership record:");
-      if (!email) {
-        setIsProcessing(false);
-        return;
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
       }
-
-      const { url } = await submitMembershipRequest({
-        email,
-        level: selectedLevel.id,
-        quantity,
-        userId: user?.uid
-      });
-
-      window.location.href = url;
-    } catch (err) {
-      console.error("Join error:", err);
-      alert("There was an error starting the checkout process. Please try again.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    };
+  }, []);
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
@@ -56,79 +26,40 @@ export default function Support() {
           </p>
         </header>
 
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
-          <div className="bg-white p-8 rounded-lg border border-tan/20 shadow-sm flex flex-col">
-            <h2 className="text-3xl font-bold mb-6 text-tan">Become a Member</h2>
-            <p className="text-lg font-sans text-charcoal/90 mb-8">
-              Join a community of history enthusiasts. Members receive our newsletter, early access to events, and the satisfaction of supporting local preservation.
-            </p>
-            
-            <div className="flex-grow space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {MEMBERSHIP_LEVELS.map((level) => (
-                  <button
-                    key={level.id}
-                    onClick={() => setSelectedLevel(level)}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      selectedLevel.id === level.id 
-                        ? 'border-tan bg-tan/5' 
-                        : 'border-tan/10 hover:border-tan/30'
-                    }`}
-                  >
-                    <div className="font-bold text-lg">${level.price}</div>
-                    <div className="text-sm font-sans font-bold uppercase tracking-wider text-tan">{level.name}</div>
-                  </button>
-                ))}
-              </div>
+        <section className="mb-20">
+          <h2 className="text-3xl font-bold mb-6 text-tan text-center">Become a Member</h2>
+          <p className="text-lg font-sans text-charcoal/90 mb-12 text-center max-w-3xl mx-auto">
+            Join a community of history enthusiasts. Members receive our newsletter, early access to events, and the satisfaction of supporting local preservation.
+          </p>
 
-              <div className="bg-cream/30 p-4 rounded-lg border border-tan/10">
-                <p className="text-sm font-sans text-charcoal/70 mb-4 italic">{selectedLevel.description}</p>
-                
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-sans font-bold uppercase tracking-widest text-charcoal/60">Quantity</div>
-                  <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="p-1 rounded-full hover:bg-tan/10 text-tan transition-colors"
-                    >
-                      <Minus size={20} />
-                    </button>
-                    <span className="font-bold text-xl w-8 text-center">{quantity}</span>
-                    <button 
-                      onClick={() => setQuantity(quantity + 1)}
-                      className="p-1 rounded-full hover:bg-tan/10 text-tan transition-colors"
-                    >
-                      <Plus size={20} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <button 
-                onClick={handleJoin}
-                disabled={isProcessing}
-                className="w-full bg-tan text-white px-6 py-4 rounded-md uppercase tracking-widest font-bold hover:bg-tan-dark transition-all shadow-sm flex items-center justify-center gap-2"
-              >
-                {isProcessing ? (
-                  <Loader2 className="animate-spin" size={20} />
-                ) : (
-                  <>
-                    <Users size={20} />
-                    Join Now — ${selectedLevel.price * quantity}
-                  </>
-                )}
-              </button>
+          <div className="mb-16">
+            <h3 className="text-2xl font-bold mb-6 text-tan-dark text-center">Regular Memberships</h3>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-tan/20">
+              {React.createElement('stripe-pricing-table', {
+                'pricing-table-id': 'prctbl_1TX1hCKzm1KE54P0XjSt12YW',
+                'publishable-key': 'pk_live_51OgxLhKzm1KE54P08gXtFXRj2v2NPSiCcwYwHNuw1Pt2gHgQJZDQmdHQ8U5Lsg07N512qfWVphIasHbDWkzPTlFq000JHkvmnv'
+              })}
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-lg border border-tan/20 shadow-sm flex flex-col">
+          <div className="mb-16">
+            <h3 className="text-2xl font-bold mb-6 text-tan-dark text-center">Patron & Corporate Memberships</h3>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-tan/20">
+              {React.createElement('stripe-pricing-table', {
+                'pricing-table-id': 'prctbl_1R3OEzKzm1KE54P0n8airNok',
+                'publishable-key': 'pk_live_51OgxLhKzm1KE54P08gXtFXRj2v2NPSiCcwYwHNuw1Pt2gHgQJZDQmdHQ8U5Lsg07N512qfWVphIasHbDWkzPTlFq000JHkvmnv'
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className="max-w-3xl mx-auto mb-20">
+          <div className="bg-white p-8 rounded-lg border border-tan/20 shadow-sm flex flex-col items-center text-center">
             <h2 className="text-3xl font-bold mb-6 text-tan">Make a Donation</h2>
             <p className="text-lg font-sans text-charcoal/90 mb-8">
               Your financial contributions directly support our museum operations, preservation projects, and community programs. Every gift helps us keep Senoia's history alive.
             </p>
-            <div className="mt-auto space-y-4">
+            <div className="w-full max-w-md mt-auto space-y-4">
               <a 
                 href="https://donate.stripe.com/aEU1602kYegp3UQfZ0"
                 target="_blank"

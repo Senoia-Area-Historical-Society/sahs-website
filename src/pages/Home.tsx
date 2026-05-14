@@ -33,8 +33,8 @@ export default function Home() {
       <section className="relative h-[80vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://uploads-ssl.webflow.com/64b1962bdd56b5834a570290/64b1962bdd56b5834a5702ec_museum-exterior.jpg"
-            alt="SAHS Museum"
+            src="/images/carmichael-house-drawing.jpg"
+            alt="SAHS Museum - Carmichael House Drawing"
             className="w-full h-full object-cover scale-105 animate-slow-zoom"
           />
           <div className="absolute inset-0 bg-charcoal/40 backdrop-blur-[2px]"></div>
@@ -46,7 +46,7 @@ export default function Home() {
             Securing, preserving, and promoting the social and cultural history of the community since 1976.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/museum" className="bg-tan text-white px-8 py-4 rounded uppercase font-bold tracking-widest hover:bg-tan-dark transition-all shadow-xl">
+            <Link to="/location-and-hours" className="bg-tan text-white px-8 py-4 rounded uppercase font-bold tracking-widest hover:bg-tan-dark transition-all shadow-xl">
               Visit the Museum
             </Link>
             <Link to="/support-sahs" className="bg-white/10 backdrop-blur-md border-2 border-white/30 text-white px-8 py-4 rounded uppercase font-bold tracking-widest hover:bg-white/20 transition-all">
