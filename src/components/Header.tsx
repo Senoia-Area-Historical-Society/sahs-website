@@ -1,9 +1,16 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { ChevronDown, Menu, X } from 'lucide-react';
 
 export default function Header() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location = useLocation();
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location]);
 
   return (
     <header className="bg-cream border-b border-tan-light sticky top-0 z-50 shadow-sm">
@@ -14,6 +21,8 @@ export default function Header() {
               SAHS
             </Link>
           </div>
+
+          {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-4 lg:space-x-8 h-full items-center">
             {/* Visit Dropdown */}
             <div 
@@ -57,8 +66,51 @@ export default function Header() {
             
             <Link to="/contact-sahs" className="text-charcoal hover:text-tan transition-colors px-3 py-2 text-sm font-medium uppercase tracking-wider">Contact</Link>
           </nav>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden flex items-center">
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="text-charcoal p-2 hover:bg-tan/10 rounded-md transition-colors"
+              aria-label="Toggle menu"
+            >
+              {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Mobile Navigation Overlay */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden bg-white border-t border-tan/10 shadow-inner animate-in slide-in-from-top duration-300">
+          <div className="px-4 pt-4 pb-8 space-y-2">
+            {/* Visit Section */}
+            <div className="pb-4">
+              <p className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-tan/60">Visit</p>
+              <Link to="/about-sahs" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">About the Society</Link>
+              <Link to="/location-and-hours" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">Location & Hours</Link>
+              <Link to="/meeting-room" className="block px-6 py-3 text-lg font-bold text-charcoal hover:bg-cream">Meeting Room Booking</Link>
+            </div>
+
+            {/* Events */}
+            <Link to="/news" className="block px-3 py-4 text-lg font-medium text-charcoal border-t border-tan/5">Events</Link>
+
+            {/* Support Section */}
+            <div className="py-4 border-t border-tan/5">
+              <p className="px-3 py-2 text-xs font-bold uppercase tracking-widest text-tan/60">Support</p>
+              <Link to="/support-sahs" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">Become a Member / Donate</Link>
+              <a href="https://billing.stripe.com/p/login/3cscOSe99bt8bvi000" target="_blank" rel="noopener noreferrer" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">Manage Membership</a>
+              <Link to="/supporters" className="block px-6 py-3 text-lg text-charcoal hover:bg-cream">Our Supporters</Link>
+            </div>
+
+            {/* External Links */}
+            <div className="pt-4 border-t border-tan/5 space-y-4">
+              <a href="https://archives.senoiahistory.com" target="_blank" rel="noopener noreferrer" className="block w-full text-center py-4 bg-tan text-white rounded-lg font-bold shadow-md">Browse Archives</a>
+              <Link to="/contact-sahs" className="block w-full text-center py-4 border border-tan/30 text-charcoal rounded-lg font-medium">Contact Us</Link>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
