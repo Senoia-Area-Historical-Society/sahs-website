@@ -1,8 +1,10 @@
+import { Link } from 'react-router-dom';
+
 export default function LocationAndHours() {
   return (
     <div className="max-w-4xl mx-auto py-16 px-8 text-left">
       <h1 className="text-4xl font-serif text-charcoal mb-8">SAHS Museum Hours and Location</h1>
-      <div className="bg-white rounded-xl shadow-sm border border-tan-light p-8 mb-8">
+      <div className="bg-white rounded-xl shadow-sm border border-tan-light p-8 mb-12">
         <h2 className="text-2xl font-bold text-charcoal mb-4">Hours of Operation</h2>
         <p className="text-lg text-charcoal leading-relaxed mb-8">
           Saturday and Sunday from 1:00 PM to 4:00 PM
@@ -21,6 +23,19 @@ export default function LocationAndHours() {
         >
           Get Directions
         </a>
+      </div>
+
+      <div className="bg-tan/5 rounded-xl border border-tan/20 p-8">
+        <h2 className="text-2xl font-bold text-charcoal mb-4">Plan a Private Event</h2>
+        <p className="text-lg text-charcoal/80 font-sans mb-6">
+          Did you know you can rent our historic meeting room for your next gathering? Our facility is available for private events, workshops, and community meetings.
+        </p>
+        <Link 
+          to="/meeting-room"
+          className="inline-block px-6 py-3 bg-tan text-white font-bold rounded-md hover:bg-tan-dark transition-colors uppercase tracking-wider text-sm"
+        >
+          View Facility & Availability
+        </Link>
       </div>
     </div>
   );

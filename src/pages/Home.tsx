@@ -1,25 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getNewsPosts, getEvents, getCorporateSponsors } from '../services/api';
-import type { Post, OrganizationEntity } from '../types';
+import { getNewsPosts, getEvents } from '../services/api';
+import type { Post } from '../types';
 import { format } from 'date-fns'; // Added this import for the format function
 
 export default function Home() {
   const [news, setNews] = useState<Post[]>([]);
   const [events, setEvents] = useState<Post[]>([]);
-  const [sponsors, setSponsors] = useState<OrganizationEntity[]>([]);
+
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [newsData, eventsData, sponsorsData] = await Promise.all([
+        const [newsData, eventsData] = await Promise.all([
           getNewsPosts(3),
-          getEvents(3),
-          getCorporateSponsors()
+          getEvents(3)
         ]);
         setNews(newsData);
         setEvents(eventsData);
-        setSponsors(sponsorsData);
       } catch (err) {
         console.error("Failed to load home page data", err);
       }
@@ -118,20 +116,47 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Sponsors Section */}
-      <section className="bg-white border-y border-tan/10 py-16">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-xs font-sans font-bold text-charcoal/40 uppercase tracking-[0.2em] mb-8">Our Distinguished Partners</p>
-          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-60 hover:opacity-100 transition-opacity">
-            {sponsors.map(sponsor => (
-              <div key={sponsor.id} className="h-12 w-auto flex items-center">
-                {sponsor.image ? (
-                  <img src={sponsor.image} alt={sponsor.name} className="max-h-full w-auto filter grayscale hover:grayscale-0 transition-all pointer-events-none" />
-                ) : (
-                  <span className="font-bold tracking-tight text-charcoal/60">{sponsor.name}</span>
-                )}
+      {/* Host Your Event Section */}
+      <section className="bg-white py-24 border-y border-tan/10">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div className="order-2 lg:order-1">
+              <h2 className="text-4xl font-bold mb-6">Host Your Next Event at the Museum</h2>
+              <p className="text-lg font-sans text-charcoal/80 mb-8 leading-relaxed">
+                Looking for a unique, historic venue for your next meeting, workshop, or gathering? Our Carmichael House meeting room offers a beautiful atmosphere combined with modern amenities.
+              </p>
+              <ul className="space-y-4 mb-10 text-charcoal/70 font-sans">
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-tan"></div>
+                  Capacity for up to 40 guests
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-tan"></div>
+                  Climate-controlled indoor space
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-tan"></div>
+                  High-speed Wi-Fi and presentation facilities
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-tan"></div>
+                  Beautiful historic surroundings
+                </li>
+              </ul>
+              <Link to="/meeting-room" className="inline-block bg-tan text-white px-8 py-4 rounded uppercase font-bold tracking-widest hover:bg-tan-dark transition-all">
+                Check Availability
+              </Link>
+            </div>
+            <div className="order-1 lg:order-2">
+              <div className="relative">
+                <img 
+                  src="/images/meeting-room-interior.jpg" 
+                  alt="SAHS Meeting Room Interior" 
+                  className="rounded-lg shadow-2xl relative z-10 w-full h-[400px] object-cover"
+                />
+                <div className="absolute -top-4 -right-4 w-full h-full border-2 border-tan/20 rounded-lg z-0"></div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
