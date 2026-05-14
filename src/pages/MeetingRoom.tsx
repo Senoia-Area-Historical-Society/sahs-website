@@ -1,3 +1,4 @@
+import meetingRoomImg from '../assets/images/meeting-room-interior.jpg';
 
 export default function MeetingRoom() {
   return (
@@ -21,7 +22,7 @@ export default function MeetingRoom() {
           <div className="lg:col-span-2">
             <div className="relative group">
               <img 
-                src="/images/meeting-room-interior.jpg" 
+                src={meetingRoomImg} 
                 alt="SAHS Meeting Room Interior" 
                 className="rounded-lg shadow-xl w-full h-[300px] object-cover"
               />

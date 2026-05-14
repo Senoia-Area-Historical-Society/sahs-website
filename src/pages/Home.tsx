@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getNewsPosts, getEvents } from '../services/api';
 import type { Post } from '../types';
-import { format } from 'date-fns'; // Added this import for the format function
+import { format } from 'date-fns';
+import carmichaelImg from '../assets/images/carmichael-house-drawing.jpg';
+import meetingRoomImg from '../assets/images/meeting-room-interior.jpg';
 
 export default function Home() {
   const [news, setNews] = useState<Post[]>([]);
@@ -31,7 +33,7 @@ export default function Home() {
       <section className="relative h-[80vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="/images/carmichael-house-drawing.jpg"
+            src={carmichaelImg}
             alt="SAHS Museum - Carmichael House Drawing"
             className="w-full h-full object-cover scale-105 animate-slow-zoom"
           />
@@ -150,7 +152,7 @@ export default function Home() {
             <div className="order-1 lg:order-2">
               <div className="relative">
                 <img 
-                  src="/images/meeting-room-interior.jpg" 
+                  src={meetingRoomImg} 
                   alt="SAHS Meeting Room Interior" 
                   className="rounded-lg shadow-2xl relative z-10 w-full h-[400px] object-cover"
                 />
