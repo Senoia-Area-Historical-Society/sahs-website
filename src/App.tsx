@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import ScrollToTop from './components/ScrollToTop';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Pages
@@ -87,6 +88,7 @@ function App() {
     <AuthProvider>
       <div className="flex flex-col min-h-screen bg-cream selection:bg-tan selection:text-white">
         <HostnameRedirect />
+        <ScrollToTop />
         <Routes>
           {/* Admin Routes (No Header/Footer, strictly protected) */}
           <Route path="/admin/login" element={<Login />} />
