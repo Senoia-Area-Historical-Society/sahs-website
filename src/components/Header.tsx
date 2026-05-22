@@ -12,6 +12,18 @@ export default function Header() {
     setIsMobileMenuOpen(false);
   }, [location]);
 
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
+
   return (
     <header className="glass-nav shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -81,7 +93,7 @@ export default function Header() {
       </div>
 
       {/* Premium Mobile Drawer */}
-      <div className={isMobileMenuOpen ? 'drawer-open' : 'drawer-closed'}>
+      <div className={`md:hidden ${isMobileMenuOpen ? 'drawer-open' : 'drawer-closed'}`}>
         <div 
           className="mobile-drawer-overlay" 
           onClick={() => setIsMobileMenuOpen(false)}

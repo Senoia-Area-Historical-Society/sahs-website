@@ -48,12 +48,24 @@
 }
 
 /* Mobile Drawer Animations */
+.drawer-closed {
+  visibility: hidden;
+  pointer-events: none;
+  transition: visibility 0s linear 0.5s;
+}
+
+.drawer-open {
+  visibility: visible;
+  pointer-events: auto;
+  transition: visibility 0s linear 0s;
+}
+
 .mobile-drawer-overlay {
   @apply fixed inset-0 bg-charcoal/40 backdrop-blur-sm z-[60] transition-opacity duration-300;
 }
 
 .mobile-drawer-content {
-  @apply fixed top-0 right-0 h-full w-[85vw] max-w-sm glass-card z-[70] p-6 flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)];
+  @apply fixed top-0 right-0 h-[100dvh] w-[85vw] max-w-sm glass-card z-[70] p-6 flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)];
 }
 
 .drawer-closed .mobile-drawer-overlay {
