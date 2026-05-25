@@ -29,7 +29,7 @@ export default function Footer() {
           <h4 className="text-lg font-bold mb-6 font-sans tracking-wider uppercase text-tan-light">Stay Connected</h4>
           <ul className="space-y-4 text-sm font-sans text-beige mb-8">
             <li>
-              <a href="https://www.facebook.com/Senoia-Area-Historical-Society-127037960707462" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:text-white transition-colors group">
+              <a href="https://www.facebook.com/people/Senoia-Area-Historical-Society/100064525936225/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:text-white transition-colors group">
                 <span className="bg-charcoal-light p-2 rounded-full group-hover:bg-tan transition-colors">
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
                 </span>

@@ -63,7 +63,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Header />
-      <main className="flex-grow">{children}</main>
+      <main id="content" tabIndex={-1} className="flex-grow focus:outline-none">{children}</main>
       <Footer />
     </>
   );
@@ -86,6 +86,7 @@ function App() {
   return (
     <AuthProvider>
       <div className="flex flex-col min-h-screen bg-cream selection:bg-tan selection:text-white">
+        <a href="#content" className="skip-link visually-hidden fixed top-4 left-4 z-[100]">Skip to main content</a>
         <HostnameRedirect />
         <ScrollToTop />
         <Routes>

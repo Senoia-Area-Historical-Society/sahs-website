@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import meetingRoomImg from '../assets/images/meeting-room-interior.jpg';
 
 export default function MeetingRoom() {
@@ -42,7 +43,7 @@ export default function MeetingRoom() {
           />
         </div>
         <p className="mt-6 text-center text-sm text-charcoal/50 font-sans italic">
-          If you have trouble with the calendar, please <a href="/contact-sahs" className="text-tan underline">contact us</a> directly.
+          If you have trouble with the calendar, please <Link to="/contact-sahs" className="text-tan underline">contact us</Link> directly.
         </p>
       </div>
     </div>

@@ -9,6 +9,31 @@
     @apply bg-cream text-charcoal font-serif antialiased;
   }
 
+  /* Global focus outlines for accessibility */
+  :focus-visible {
+    outline: 3px solid #8b7355; /* tan */
+    outline-offset: 3px;
+  }
+
+  /* Hides content visually but keeps it in the accessibility tree for screen readers.
+     Focusable elements like skip links are made visible again when focused. */
+  .visually-hidden:where(:not(:focus-within, :active)) {
+    position: absolute !important;
+    clip-path: inset(50%) !important;
+    overflow: hidden !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: -1px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  /* Skip Link formatting when focused */
+  .skip-link {
+    @apply bg-tan text-white px-6 py-3 rounded-md font-sans font-bold uppercase tracking-wider shadow-lg border border-tan-dark;
+  }
+
   /* Tiptap List Styles */
   .ProseMirror ul {
     list-style-type: disc;
