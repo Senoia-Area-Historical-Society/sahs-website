@@ -12,6 +12,8 @@ export interface Post {
   content: string; 
   excerpt: string; 
   mainImage: string; 
+  bannerImage?: string;
+  squareImage?: string;
   galleryImages: string[]; 
   documentUrl?: string; 
   location?: string; 

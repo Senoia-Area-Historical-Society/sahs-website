@@ -43,6 +43,7 @@ export default function ContentAdmin() {
   const [loading, setLoading] = useState(true);
   const [editingPost, setEditingPost] = useState<Post | Partial<Post> | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadingImageField, setUploadingImageField] = useState<string | null>(null);
   const { user } = useAuth();
 
   const startEditing = (post: Post) => {
@@ -153,6 +154,28 @@ export default function ContentAdmin() {
       alert("Failed to upload PDF. Please try again.");
     } finally {
       setUploadingDoc(false);
+    }
+  };
+
+  const handlePostImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'mainImage' | 'bannerImage' | 'squareImage') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert("Please upload an image file.");
+      return;
+    }
+
+    setUploadingImageField(fieldName);
+    try {
+      const url = await uploadFile(file, 'content_images');
+      setEditingPost(p => p ? ({ ...p, [fieldName]: url }) : null);
+      alert(`${fieldName === 'mainImage' ? 'Cover' : fieldName === 'bannerImage' ? 'Banner' : 'Square'} image uploaded successfully!`);
+    } catch (err) {
+      console.error("Error uploading image:", err);
+      alert("Failed to upload image.");
+    } finally {
+      setUploadingImageField(null);
     }
   };
 
@@ -358,11 +381,116 @@ export default function ContentAdmin() {
                 </>
               )}
 
+              {/* Media / Images Section */}
+              <div className="bg-cream border border-tan-light/50 rounded-lg p-5">
+                <p className="text-xs font-bold text-charcoal/50 uppercase tracking-wider mb-4 font-sans">Post Media / Images</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Main Cover Image */}
+                  <div className="flex flex-col items-center p-4 border border-tan-light/30 rounded-lg bg-white shadow-xs">
+                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Cover Image (Standard)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handlePostImageUpload(e, 'mainImage')}
+                      className="hidden"
+                      id="main-image-upload"
+                    />
+                    <label
+                      htmlFor="main-image-upload"
+                      className="w-full text-center bg-cream border border-tan hover:bg-tan/10 text-charcoal py-2 rounded cursor-pointer transition-colors font-sans text-xs font-bold uppercase tracking-wider shadow-2xs mb-3"
+                    >
+                      {uploadingImageField === 'mainImage' ? 'Uploading...' : 'Choose Cover'}
+                    </label>
+                    {editingPost.mainImage ? (
+                      <div className="relative w-full aspect-video rounded overflow-hidden border border-tan-light/50">
+                        <img src={editingPost.mainImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setEditingPost(p => p ? ({ ...p, mainImage: undefined }) : null)}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-800 text-white p-1 rounded-full shadow transition-colors"
+                          title="Remove Image"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-charcoal/40 font-sans text-center">No image selected. Recommended for preview cards.</span>
+                    )}
+                  </div>
+
+                  {/* Wide Banner Image */}
+                  <div className="flex flex-col items-center p-4 border border-tan-light/30 rounded-lg bg-white shadow-xs">
+                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Top Banner (1280x720)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handlePostImageUpload(e, 'bannerImage')}
+                      className="hidden"
+                      id="banner-image-upload"
+                    />
+                    <label
+                      htmlFor="banner-image-upload"
+                      className="w-full text-center bg-cream border border-tan hover:bg-tan/10 text-charcoal py-2 rounded cursor-pointer transition-colors font-sans text-xs font-bold uppercase tracking-wider shadow-2xs mb-3"
+                    >
+                      {uploadingImageField === 'bannerImage' ? 'Uploading...' : 'Choose Banner'}
+                    </label>
+                    {editingPost.bannerImage ? (
+                      <div className="relative w-full aspect-video rounded overflow-hidden border border-tan-light/50">
+                        <img src={editingPost.bannerImage} alt="Banner Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setEditingPost(p => p ? ({ ...p, bannerImage: undefined }) : null)}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-800 text-white p-1 rounded-full shadow transition-colors"
+                          title="Remove Image"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-charcoal/40 font-sans text-center">No image selected. Displayed wide at page top.</span>
+                    )}
+                  </div>
+
+                  {/* Square Image */}
+                  <div className="flex flex-col items-center p-4 border border-tan-light/30 rounded-lg bg-white shadow-xs">
+                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Square Alt (1080x1080)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handlePostImageUpload(e, 'squareImage')}
+                      className="hidden"
+                      id="square-image-upload"
+                    />
+                    <label
+                      htmlFor="square-image-upload"
+                      className="w-full text-center bg-cream border border-tan hover:bg-tan/10 text-charcoal py-2 rounded cursor-pointer transition-colors font-sans text-xs font-bold uppercase tracking-wider shadow-2xs mb-3"
+                    >
+                      {uploadingImageField === 'squareImage' ? 'Uploading...' : 'Choose Square'}
+                    </label>
+                    {editingPost.squareImage ? (
+                      <div className="relative w-full aspect-square rounded overflow-hidden border border-tan-light/50 max-h-[85px] max-w-[85px]">
+                        <img src={editingPost.squareImage} alt="Square Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setEditingPost(p => p ? ({ ...p, squareImage: undefined }) : null)}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-800 text-white p-1 rounded-full shadow transition-colors"
+                          title="Remove Image"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-charcoal/40 font-sans text-center">No image selected. Displayed in post body.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Document/PDF Flyer Uploader */}
               <div className="bg-cream border border-tan-light/50 rounded-lg p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Upload size={16} className="text-tan" />
-                  <span className="text-sm font-bold text-charcoal uppercase tracking-wider">Optional PDF Flyer / Attachment</span>
+                  <span className="text-sm font-bold text-charcoal uppercase tracking-wider font-sans">Optional PDF Flyer / Attachment</span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 items-center">
                   <input

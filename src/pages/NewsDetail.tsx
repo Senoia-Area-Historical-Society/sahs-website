@@ -86,11 +86,15 @@ export default function NewsDetail() {
               </a>
             )}
           </div>
-          {post.mainImage && (
+          {post.bannerImage ? (
+            <div className="w-full aspect-[16/9] rounded-xl overflow-hidden shadow-lg border border-tan/20">
+              <img src={post.bannerImage} alt={post.title} className="w-full h-full object-cover" />
+            </div>
+          ) : post.mainImage ? (
             <div className="w-full h-64 md:h-96 rounded-lg overflow-hidden shadow-md border border-tan/20">
               <img src={post.mainImage} alt={post.title} className="w-full h-full object-cover" />
             </div>
-          )}
+          ) : null}
         </header>
         
         <SocialShare slug={post.slug} title={post.title} />
@@ -102,6 +106,12 @@ export default function NewsDetail() {
         )}
 
         <div className="prose prose-lg prose-charcoal max-w-none font-sans" dangerouslySetInnerHTML={{ __html: post.content }} />
+
+        {post.squareImage && (
+          <div className="my-12 max-w-md mx-auto aspect-square rounded-xl overflow-hidden shadow-md border border-tan/10 bg-white p-1">
+            <img src={post.squareImage} alt={`${post.title} alternate view`} className="w-full h-full object-cover rounded-lg" />
+          </div>
+        )}
 
         {post.documentUrl && (
           <div className="mt-8 mb-12 p-6 bg-tan/5 border border-tan-light/50 rounded-xl flex items-center justify-between shadow-sm flex-col sm:flex-row gap-4 font-sans">
