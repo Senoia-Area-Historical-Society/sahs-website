@@ -8,7 +8,7 @@ import { Navigate } from 'react-router-dom';
 
 interface UserRole {
   email: string;
-  role: 'admin' | 'curator' | 'editor' | 'board_member';
+  role: 'admin' | 'curator' | 'editor' | 'read_only';
 }
 
 export default function UsersAdmin() {
@@ -123,7 +123,7 @@ export default function UsersAdmin() {
                   <option value="editor">Editor (Can edit posts/events)</option>
                   <option value="curator">Curator (Can edit posts, forms, bookings)</option>
                   <option value="admin">Admin (Full Access)</option>
-                  <option value="board_member">Board Member (Read-only Access)</option>
+                  <option value="read_only">Read-Only</option>
                 </select>
               </div>
 
