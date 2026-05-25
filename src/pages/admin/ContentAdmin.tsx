@@ -3,8 +3,16 @@ import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, or
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import RichTextEditor from '../../components/admin/RichTextEditor';
-import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon } from 'lucide-react';
+import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon, Upload, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { uploadFile } from '../../services/storage';
+
+const timestampToLocalISO = (timestamp: any): string => {
+  if (!timestamp) return '';
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+};
 
 interface Post {
   id: string;
@@ -34,27 +42,18 @@ export default function ContentAdmin() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingPost, setEditingPost] = useState<Post | Partial<Post> | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const { user } = useAuth();
 
-  const fetchPosts = async () => {
-    setLoading(true);
-    try {
-      const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const fetchedPosts = snapshot.docs.map(doc => {
-        const data = doc.data();
-        let category = data.category;
-        if (!category) {
-          category = data.type === 'event' ? 'Event' : 'News';
-        }
-        return { id: doc.id, ...data, category } as Post;
-      });
-      setPosts(fetchedPosts);
-    } catch (err) {
-      console.error("Error fetching posts:", err);
-    } finally {
-      setLoading(false);
-    }
+  const startEditing = (post: Post) => {
+    setEditingPost({
+      ...post,
+      eventStartDate: post.eventDate ? timestampToLocalISO(post.eventDate) : post.eventStartDate || '',
+      eventEndDate: post.eventEndDate || '',
+      publishDateDisplay: post.publishDate ? timestampToLocalISO(post.publishDate) : '',
+      _ticketPriceDisplay: post.ticketPrice ? (post.ticketPrice / 100).toFixed(2) : '',
+      _enableTicketing: !!post.ticketPrice,
+    });
   };
 
   useEffect(() => {
@@ -81,15 +80,25 @@ export default function ContentAdmin() {
 
       if (!editingPost.id) {
         postData.createdAt = serverTimestamp();
-        postData.publishDate = serverTimestamp();
-      } else if (editingPost.status === 'published' && !editingPost.publishDate) {
-        postData.publishDate = serverTimestamp();
+        if (editingPost.publishDateDisplay) {
+          postData.publishDate = new Date(editingPost.publishDateDisplay);
+        } else {
+          postData.publishDate = serverTimestamp();
+        }
+      } else {
+        if (editingPost.publishDateDisplay) {
+          postData.publishDate = new Date(editingPost.publishDateDisplay);
+        } else if (editingPost.status === 'published' && !editingPost.publishDate) {
+          postData.publishDate = serverTimestamp();
+        }
       }
 
       if (isEvent && editingPost.eventStartDate) {
         postData.eventDate = new Date(editingPost.eventStartDate);
         postData.location = editingPost.eventLocation || '';
       }
+
+      delete postData.publishDateDisplay;
 
       // Ticketing config — convert display price ($) to cents for Stripe
       if (isEvent) {
@@ -122,6 +131,49 @@ export default function ContentAdmin() {
     } catch (err) {
       console.error("Error saving post:", err);
       alert("Failed to save post.");
+    }
+  };
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      alert("Please upload a PDF document.");
+      return;
+    }
+
+    setUploadingDoc(true);
+    try {
+      const url = await uploadFile(file, 'content_documents');
+      setEditingPost(p => p ? ({ ...p, documentUrl: url }) : null);
+      alert("Flyer PDF uploaded successfully!");
+    } catch (err) {
+      console.error("Error uploading PDF:", err);
+      alert("Failed to upload PDF. Please try again.");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const fetchPosts = async () => {
+    setLoading(true);
+    try {
+      const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const fetchedPosts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let category = data.category;
+        if (!category) {
+          category = data.type === 'event' ? 'Event' : 'News';
+        }
+        return { id: doc.id, ...data, category } as Post;
+      });
+      setPosts(fetchedPosts);
+    } catch (err) {
+      console.error("Error fetching posts:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -162,7 +214,7 @@ export default function ContentAdmin() {
                     required
                     value={editingPost.title || ''}
                     onChange={e => setEditingPost({...editingPost, title: e.target.value})}
-                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50"
+                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                   />
                 </div>
                 <div>
@@ -170,11 +222,36 @@ export default function ContentAdmin() {
                   <select
                     value={editingPost.category || 'Blog'}
                     onChange={e => setEditingPost({...editingPost, category: e.target.value as Post['category']})}
-                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50"
+                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                   >
                     <option value="Blog">Blog</option>
                     <option value="News">News</option>
                     <option value="Event">Event</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-charcoal mb-2">Publish Date & Time (Optional)</label>
+                  <input
+                    type="datetime-local"
+                    value={editingPost.publishDateDisplay || ''}
+                    onChange={e => setEditingPost({...editingPost, publishDateDisplay: e.target.value})}
+                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
+                  />
+                  <p className="text-xs text-charcoal/40 mt-1">If blank, defaults to the time of publishing.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-charcoal mb-2">Status</label>
+                  <select
+                    value={editingPost.status || 'draft'}
+                    onChange={e => setEditingPost({...editingPost, status: e.target.value as Post['status']})}
+                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="archived">Archived</option>
                   </select>
                 </div>
               </div>
@@ -191,7 +268,7 @@ export default function ContentAdmin() {
                           type="datetime-local"
                           value={editingPost.eventStartDate || ''}
                           onChange={e => setEditingPost({...editingPost, eventStartDate: e.target.value})}
-                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                         />
                       </div>
                       <div>
@@ -200,7 +277,7 @@ export default function ContentAdmin() {
                           type="datetime-local"
                           value={editingPost.eventEndDate || ''}
                           onChange={e => setEditingPost({...editingPost, eventEndDate: e.target.value})}
-                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                         />
                       </div>
                       <div>
@@ -209,7 +286,7 @@ export default function ContentAdmin() {
                           type="text"
                           value={editingPost.eventLocation || ''}
                           onChange={e => setEditingPost({...editingPost, eventLocation: e.target.value})}
-                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                         />
                       </div>
                     </div>
@@ -281,17 +358,42 @@ export default function ContentAdmin() {
                 </>
               )}
 
-              <div>
-                <label className="block text-sm font-bold text-charcoal mb-2">Status</label>
-                <select
-                  value={editingPost.status || 'draft'}
-                  onChange={e => setEditingPost({...editingPost, status: e.target.value as Post['status']})}
-                  className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </select>
+              {/* Document/PDF Flyer Uploader */}
+              <div className="bg-cream border border-tan-light/50 rounded-lg p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Upload size={16} className="text-tan" />
+                  <span className="text-sm font-bold text-charcoal uppercase tracking-wider">Optional PDF Flyer / Attachment</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleDocUpload}
+                    className="hidden"
+                    id="doc-upload"
+                  />
+                  <label
+                    htmlFor="doc-upload"
+                    className="flex items-center gap-2 bg-cream border border-tan hover:bg-tan/10 text-charcoal px-6 py-2.5 rounded-md cursor-pointer transition-colors font-sans text-sm font-bold uppercase tracking-wider shadow-sm"
+                  >
+                    {uploadingDoc ? 'Uploading...' : 'Choose Flyer PDF'}
+                  </label>
+                  {editingPost.documentUrl ? (
+                    <div className="flex items-center gap-2 text-sm text-green-700 font-sans">
+                      <span>✓ Flyer Uploaded:</span>
+                      <a href={editingPost.documentUrl} target="_blank" rel="noreferrer" className="underline font-bold hover:text-green-900">View File</a>
+                      <button
+                        type="button"
+                        onClick={() => setEditingPost(p => p ? ({ ...p, documentUrl: undefined }) : null)}
+                        className="text-red-600 hover:underline font-bold ml-2 inline-flex items-center gap-0.5"
+                      >
+                        <Trash2 size={13} /> Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-charcoal/40 font-sans">No PDF attachment selected. Upload a flyer for visitors to download.</span>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -365,7 +467,7 @@ export default function ContentAdmin() {
                           {post.updatedAt?.toDate().toLocaleDateString() || post.createdAt?.toDate().toLocaleDateString() || 'N/A'}
                         </td>
                         <td className="p-4 flex gap-3 justify-end">
-                          <button onClick={() => setEditingPost(post)} className="text-charcoal/60 hover:text-tan transition-colors">
+                          <button onClick={() => startEditing(post)} className="text-charcoal/60 hover:text-tan transition-colors">
                             <Pencil size={18} />
                           </button>
                           <button title="Archive Post" onClick={() => handleArchive(post.id)} className="text-charcoal/60 hover:text-red-600 transition-colors">

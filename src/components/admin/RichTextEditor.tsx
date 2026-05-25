@@ -7,10 +7,11 @@ import TextAlign from '@tiptap/extension-text-align';
 import Youtube from '@tiptap/extension-youtube';
 import { Iframe } from './extensions/Iframe';
 import { 
-  Bold, Italic, Heading1, Heading2, Heading3, 
+  Bold, Italic, Underline as UnderlineIcon, Heading1, Heading2, Heading3, 
   List, ListOrdered, Quote, Image as ImageIcon, Link as LinkIcon, Undo, Redo, AlignLeft, AlignCenter, AlignRight,
-  Video, CodeXml
+  Video, CodeXml, Minus
 } from 'lucide-react';
+import TiptapUnderline from '@tiptap/extension-underline';
 import { uploadFile } from '../../services/storage';
 
 interface RichTextEditorProps {
@@ -23,15 +24,17 @@ interface ToolbarButtonProps {
   onClick: () => void;
   isActive?: boolean;
   disabled?: boolean;
+  title?: string;
   children: React.ReactNode;
 }
 
-const ToolbarButton = ({ onClick, isActive, disabled, children }: ToolbarButtonProps) => (
+const ToolbarButton = ({ onClick, isActive, disabled, title, children }: ToolbarButtonProps) => (
   <button
     type="button"
     onMouseDown={(e) => e.preventDefault()} // Prevent losing focus
     onClick={onClick}
     disabled={disabled}
+    title={title}
     className={`p-2 rounded hover:bg-tan/10 transition-colors ${
       isActive ? 'text-tan bg-tan/10' : 'text-charcoal/70'
     } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -48,6 +51,7 @@ export default function RichTextEditor({ value, onChange, storagePath = 'content
       Link.configure({
         openOnClick: false,
       }),
+      TiptapUnderline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
@@ -161,6 +165,9 @@ export default function RichTextEditor({ value, onChange, storagePath = 'content
         <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')}>
           <Italic size={18} />
         </ToolbarButton>
+        <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={editor.isActive('underline')}>
+          <UnderlineIcon size={18} />
+        </ToolbarButton>
         
         <div className="w-[1px] bg-tan/30 mx-1 my-1"></div>
 
@@ -177,7 +184,6 @@ export default function RichTextEditor({ value, onChange, storagePath = 'content
 
         <div className="w-[1px] bg-tan/30 mx-1 my-1"></div>
 
-        {/* Lists & Quotes */}
         <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')}>
           <List size={18} />
         </ToolbarButton>
@@ -186,6 +192,9 @@ export default function RichTextEditor({ value, onChange, storagePath = 'content
         </ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} isActive={editor.isActive('blockquote')}>
           <Quote size={18} />
+        </ToolbarButton>
+        <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Insert Horizontal Line">
+          <Minus size={18} />
         </ToolbarButton>
 
         <div className="w-[1px] bg-tan/30 mx-1 my-1"></div>
@@ -219,6 +228,14 @@ export default function RichTextEditor({ value, onChange, storagePath = 'content
 
       </div>
       <EditorContent editor={editor} className="bg-white" />
+      <div className="flex justify-between items-center text-[11px] text-charcoal/50 mt-1.5 px-1 font-sans">
+        <div>
+          {editor.isActive('underline') && <span className="bg-tan/10 text-tan px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Underline Active</span>}
+        </div>
+        <div>
+          {editor.getText().trim() === '' ? 0 : editor.getText().trim().split(/\s+/).length} words | {editor.getText().length} characters
+        </div>
+      </div>
     </div>
   );
 }

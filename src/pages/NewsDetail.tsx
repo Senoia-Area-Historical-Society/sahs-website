@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Post } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, MapPin } from 'lucide-react';
+import { Calendar, MapPin, Download, FileText } from 'lucide-react';
 import TicketPurchaseWidget from '../components/public/TicketPurchaseWidget';
 
 import SocialShare from '../components/public/SocialShare';
@@ -102,6 +102,28 @@ export default function NewsDetail() {
         )}
 
         <div className="prose prose-lg prose-charcoal max-w-none font-sans" dangerouslySetInnerHTML={{ __html: post.content }} />
+
+        {post.documentUrl && (
+          <div className="mt-8 mb-12 p-6 bg-tan/5 border border-tan-light/50 rounded-xl flex items-center justify-between shadow-sm flex-col sm:flex-row gap-4 font-sans">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-tan/10 text-tan rounded-lg">
+                <FileText size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-charcoal">Event Flyer / Attachment</h3>
+                <p className="text-xs text-charcoal/60">View or download the official flyer for more details.</p>
+              </div>
+            </div>
+            <a 
+              href={post.documentUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="bg-tan hover:bg-tan-dark text-white px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider shadow transition-colors flex items-center gap-2 shrink-0"
+            >
+              <Download size={16} /> View PDF Flyer
+            </a>
+          </div>
+        )}
 
         {post.galleryImages && post.galleryImages.length > 0 && (
           <div className="mt-16 border-t border-tan-light pt-12">
