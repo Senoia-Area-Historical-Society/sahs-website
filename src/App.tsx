@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
+import AnalyticsTracker from './components/AnalyticsTracker';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Pages
@@ -89,6 +90,7 @@ function App() {
         <a href="#content" className="skip-link visually-hidden fixed top-4 left-4 z-[100]">Skip to main content</a>
         <HostnameRedirect />
         <ScrollToTop />
+        <AnalyticsTracker />
         <Routes>
           {/* Admin Routes (No Header/Footer, strictly protected) */}
           <Route path="/admin/login" element={<Login />} />
