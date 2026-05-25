@@ -394,11 +394,11 @@ export const shortlinkRedirect = onRequest({ cors: true }, async (req, res) => {
         }
 
         // 1. Check custom shortlinks collection
-        const shortlinkSnap = await db.collection('shortlinks').doc(slug).get();
-        if (shortlinkSnap.exists) {
-            const data = shortlinkSnap.data();
-            if (data && data.url) {
-                res.redirect(301, data.url);
+        const shortlinkSnap = await db.collection('shortlinks').where('slug', '==', slug).limit(1).get();
+        if (!shortlinkSnap.empty) {
+            const data = shortlinkSnap.docs[0].data();
+            if (data && data.targetUrl) {
+                res.redirect(301, data.targetUrl);
                 return;
             }
         }
