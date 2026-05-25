@@ -153,7 +153,7 @@ export default function Header() {
                 <div 
                   id="visit-menu"
                   role="menu"
-                  className="absolute top-full left-0 w-56 bg-white border border-tan/20 shadow-xl rounded-b-md py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200"
+                  className="absolute top-full left-0 w-56 bg-white border border-tan/20 shadow-xl rounded-b-md py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200 before:absolute before:bottom-full before:left-0 before:right-0 before:h-4 before:content-['']"
                 >
                   <Link to="/about-sahs" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">About the Society</Link>
                   <Link to="/location-and-hours" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Location & Hours</Link>
@@ -185,7 +185,7 @@ export default function Header() {
                 <div 
                   id="support-menu"
                   role="menu"
-                  className="absolute top-full left-0 w-64 bg-white border border-tan/20 shadow-xl rounded-b-md py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200"
+                  className="absolute top-full left-0 w-64 bg-white border border-tan/20 shadow-xl rounded-b-md py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200 before:absolute before:bottom-full before:left-0 before:right-0 before:h-4 before:content-['']"
                 >
                   <Link to="/support-sahs" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Become a Member / Donate</Link>
                   <a href="https://billing.stripe.com/p/login/3cscOSe99bt8bvi000" role="menuitem" target="_blank" rel="noopener noreferrer" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Manage Membership</a>
