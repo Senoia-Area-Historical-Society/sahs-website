@@ -24,7 +24,8 @@ interface SlotDraft extends Partial<VolunteerSlot> {
 interface PostOption { id: string; title: string; eventDate?: any; location?: string; }
 
 export default function VolunteersAdmin() {
-  const { user } = useAuth();
+  const { user, isAdmin, isEditor, isCurator } = useAuth();
+  const canEdit = isAdmin || isEditor || isCurator;
   const [view, setView] = useState<View>('list');
   const [sheets, setSheets] = useState<VolunteerSheet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +64,7 @@ export default function VolunteersAdmin() {
   useEffect(() => { fetchSheets(); fetchEventOptions(); }, [fetchSheets, fetchEventOptions]);
 
   const openEditor = async (sheet?: VolunteerSheet) => {
+    if (!canEdit) return;
     if (sheet) {
       setEditingSheet({ ...sheet });
       const existing = await getVolunteerSlots(sheet.id);
@@ -283,9 +285,11 @@ export default function VolunteersAdmin() {
                               {reg.signedUpAt ? (reg.signedUpAt as any).toDate().toLocaleDateString() : '—'}
                             </td>
                             <td className="px-6 py-3 text-right">
-                              <button onClick={() => handleCancelReg(reg)} title="Remove registration" className="text-charcoal/40 hover:text-red-600 transition-colors">
-                                <X size={16} />
-                              </button>
+                              {canEdit && (
+                                <button onClick={() => handleCancelReg(reg)} title="Remove registration" className="text-charcoal/40 hover:text-red-600 transition-colors">
+                                  <X size={16} />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -430,9 +434,11 @@ export default function VolunteersAdmin() {
             <h2 className="text-3xl font-serif text-charcoal">Volunteers</h2>
             <p className="text-sm text-charcoal/60 mt-1">Create and manage volunteer signup sheets for SAHS events.</p>
           </div>
-          <button onClick={() => openEditor()} className="flex items-center gap-2 bg-tan hover:bg-tan-dark text-white px-6 py-2 rounded-md transition-colors font-sans text-sm font-bold uppercase tracking-wider shadow-sm">
-            <Plus size={18} /> New Sheet
-          </button>
+          {canEdit && (
+            <button onClick={() => openEditor()} className="flex items-center gap-2 bg-tan hover:bg-tan-dark text-white px-6 py-2 rounded-md transition-colors font-sans text-sm font-bold uppercase tracking-wider shadow-sm">
+              <Plus size={18} /> New Sheet
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -441,10 +447,14 @@ export default function VolunteersAdmin() {
           <div className="bg-white rounded-lg border border-tan-light p-12 text-center">
             <Users size={40} className="mx-auto text-tan/40 mb-4" />
             <p className="text-charcoal/60 font-serif text-lg">No volunteer sheets yet.</p>
-            <p className="text-sm text-charcoal/40 mt-1 mb-6">Create your first sheet to start managing volunteers for SAHS events.</p>
-            <button onClick={() => openEditor()} className="inline-flex items-center gap-2 bg-tan text-white px-6 py-2 rounded-md text-sm font-bold uppercase tracking-wider hover:bg-tan-dark transition-colors">
-              <Plus size={16} /> Create First Sheet
-            </button>
+            {canEdit && (
+              <>
+                <p className="text-sm text-charcoal/40 mt-1 mb-6">Create your first sheet to start managing volunteers for SAHS events.</p>
+                <button onClick={() => openEditor()} className="inline-flex items-center gap-2 bg-tan text-white px-6 py-2 rounded-md text-sm font-bold uppercase tracking-wider hover:bg-tan-dark transition-colors">
+                  <Plus size={16} /> Create First Sheet
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-sm border border-tan-light overflow-hidden">
@@ -486,9 +496,11 @@ export default function VolunteersAdmin() {
                         <button onClick={() => openRoster(sheet)} title="View volunteer roster" className="text-charcoal/50 hover:text-tan transition-colors">
                           <Eye size={18} />
                         </button>
-                        <button onClick={() => openEditor(sheet)} title="Edit sheet" className="text-charcoal/50 hover:text-tan transition-colors">
-                          <Pencil size={18} />
-                        </button>
+                        {canEdit && (
+                          <button onClick={() => openEditor(sheet)} title="Edit sheet" className="text-charcoal/50 hover:text-tan transition-colors">
+                            <Pencil size={18} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

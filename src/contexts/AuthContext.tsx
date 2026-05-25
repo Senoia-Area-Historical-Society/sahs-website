@@ -14,6 +14,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isCurator: boolean;
   isEditor: boolean;
+  isBoardMember: boolean;
   isSAHSUser: boolean;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
@@ -32,8 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isCurator, setIsCurator] = useState(false);
-
   const [isEditor, setIsEditor] = useState(false);
+  const [isBoardMember, setIsBoardMember] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsAdmin(true);
           setIsCurator(true);
           setIsEditor(true);
+          setIsBoardMember(true);
         } else {
           // 2. Check Firestore overrides
           try {
@@ -54,22 +56,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setIsAdmin(role === 'admin');
               setIsCurator(role === 'admin' || role === 'curator');
               setIsEditor(role === 'admin' || role === 'curator' || role === 'editor');
+              setIsBoardMember(role === 'board_member');
             } else {
               setIsAdmin(false);
               setIsCurator(false);
               setIsEditor(false);
+              setIsBoardMember(false);
             }
           } catch (error) {
             console.error('Error fetching user role:', error);
             setIsAdmin(false);
             setIsCurator(false);
             setIsEditor(false);
+            setIsBoardMember(false);
           }
         }
       } else {
         setIsAdmin(false);
         setIsCurator(false);
         setIsEditor(false);
+        setIsBoardMember(false);
       }
       
       setUser(currentUser);
@@ -97,10 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isSAHSUser = isAdmin || isCurator || isEditor;
+  const isSAHSUser = isAdmin || isCurator || isEditor || isBoardMember;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, isCurator, isEditor, isSAHSUser, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isCurator, isEditor, isBoardMember, isSAHSUser, loginWithGoogle, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );
