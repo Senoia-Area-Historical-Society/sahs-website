@@ -88,7 +88,7 @@ export default function SenoiaStories() {
                 Preserve our town's history!
               </h2>
               <p className="text-base md:text-lg leading-relaxed font-sans text-charcoal/80 mb-6">
-                History is more than just dates in a textbook—it's the laughter, the struggles, the wisdom, and the daily lives of the people who built our town. By recording these voices now, we preserve our community's living legacy for children, grandchildren, and future historians.
+                History is more than just dates in a textbook--we live through history everyday. By recording the stories of every day Senoians, we preserve our community's legacy for children, grandchildren, and future historians.
               </p>
             </div>
             <a 
