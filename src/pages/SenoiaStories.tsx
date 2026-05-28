@@ -45,7 +45,7 @@ export default function SenoiaStories() {
               <div className="w-20 h-1 bg-tan mx-auto lg:mx-0 mb-6 rounded-full" />
               
               <p className="text-lg md:text-xl leading-relaxed font-sans text-charcoal/80">
-                Every town has a voice, and every resident has a story. **Senoia Stories** is a new oral history project by the Senoia Area Historical Society dedicated to capturing, preserving, and sharing the voices, memories, and lived experiences of the Senoia community.
+                Every town has a voice, and every resident has a story. <strong className="font-bold text-charcoal">Senoia Stories</strong> is a new oral history project by the Senoia Area Historical Society dedicated to capturing, preserving, and sharing the voices, memories, and lived experiences of the Senoia community.
               </p>
             </div>
           </div>
