@@ -68,10 +68,12 @@ export default function SenoiaStories() {
               </p>
             </div>
             <a 
-              href="mailto:catnolan@senoiahistory.com?subject=I'd%20like%20to%20share%20my%20Senoia%20story!"
+              href="https://forms.gle/vLX73FBXiSPJqutK8"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-tan font-sans font-bold uppercase tracking-widest hover:text-tan-dark transition-colors self-start mt-4"
             >
-              Schedule an Interview <ArrowRight size={16} />
+              Fill Out an Interview Application <ArrowRight size={16} />
             </a>
           </div>
 
