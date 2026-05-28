@@ -1,4 +1,5 @@
 import { Heart, Mic, HelpCircle, ArrowRight, Share2, Award, Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import logoImg from '../assets/senoia-stories-logo.png';
 
 export default function SenoiaStories() {
@@ -173,12 +174,12 @@ export default function SenoiaStories() {
                 <Heart size={18} fill="currentColor" /> Donate to Project
               </a>
               
-              <a 
-                href="mailto:catnolan@senoiahistory.com?subject=Sponsoring%20Senoia%20Stories"
+              <Link 
+                to="/contact-sahs"
                 className="inline-flex items-center justify-center gap-2 border-2 border-white/20 text-white font-sans font-bold uppercase tracking-widest px-8 py-4 rounded-lg hover:bg-white/10 active:scale-95 transition-all text-base"
               >
                 <Mail size={18} /> Contact Sponsorship
-              </a>
+              </Link>
             </div>
             
             <p className="text-xs text-white/50 font-sans mt-6">
