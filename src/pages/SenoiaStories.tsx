@@ -39,7 +39,7 @@ export default function SenoiaStories() {
               </h1>
               
               <p className="text-2xl md:text-3xl italic text-tan font-sans font-light tracking-wide mb-6">
-                Preserving Our Living Heritage
+                Preserving Senoia's Voice
               </p>
               
               <div className="w-20 h-1 bg-tan mx-auto lg:mx-0 mb-6 rounded-full" />
