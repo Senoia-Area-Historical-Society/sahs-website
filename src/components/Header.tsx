@@ -48,6 +48,7 @@ export default function Header() {
               {activeDropdown === 'visit' && (
                 <div className="absolute top-full left-0 w-56 bg-white border border-tan/20 shadow-xl rounded-b-md py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
                   <Link to="/about-sahs" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">About the Society</Link>
+                  <Link to="/senoia-stories" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Senoia Stories Oral History</Link>
                   <Link to="/location-and-hours" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Location & Hours</Link>
                   <Link to="/meeting-room" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan font-bold">Meeting Room Booking</Link>
                 </div>
@@ -68,6 +69,7 @@ export default function Header() {
               {activeDropdown === 'support' && (
                 <div className="absolute top-full left-0 w-64 bg-white border border-tan/20 shadow-xl rounded-b-md py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
                   <Link to="/support-sahs" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Become a Member / Donate</Link>
+                  <Link to="/senoia-stories" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all font-semibold text-tan-dark">Senoia Stories Project</Link>
                   <a href="https://billing.stripe.com/p/login/3cscOSe99bt8bvi000" target="_blank" rel="noopener noreferrer" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Manage Membership</a>
                   <Link to="/supporters" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Our Supporters</Link>
                 </div>
@@ -114,6 +116,7 @@ export default function Header() {
               <h3 className="text-xs font-bold uppercase tracking-widest text-tan/60 px-2">Visit</h3>
               <div className="space-y-1">
                 <Link to="/about-sahs" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">About the Society</Link>
+                <Link to="/senoia-stories" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Senoia Stories Oral History</Link>
                 <Link to="/location-and-hours" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Location & Hours</Link>
                 <Link to="/meeting-room" className="block px-4 py-3 text-lg font-bold text-tan-dark hover:bg-tan/5 rounded-lg transition-colors">Meeting Room Booking</Link>
               </div>
@@ -128,6 +131,7 @@ export default function Header() {
               <h3 className="text-xs font-bold uppercase tracking-widest text-tan/60 px-2">Support</h3>
               <div className="space-y-1">
                 <Link to="/support-sahs" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Membership & Donations</Link>
+                <Link to="/senoia-stories" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors font-bold text-tan-dark">Senoia Stories Project</Link>
                 <a href="https://billing.stripe.com/p/login/3cscOSe99bt8bvi000" target="_blank" rel="noopener noreferrer" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Manage Membership</a>
                 <Link to="/supporters" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Our Supporters</Link>
               </div>
