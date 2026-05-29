@@ -25,7 +25,7 @@ export default function About() {
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl md:text-5xl font-bold mb-8 border-b border-tan pb-4">About the Society</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-8 border-b border-tan pb-4 text-center">About the Society</h1>
 
         {/* Museum Exterior Image Banner */}
         <div className="mb-12 overflow-hidden rounded-2xl border border-tan/20 shadow-xl relative group">
@@ -153,6 +153,14 @@ export default function About() {
                 <span className="font-sans font-bold text-tan text-lg">1990 – 2010</span>
                 <p className="text-base font-sans text-charcoal/80 leading-relaxed mt-1">
                   The society purchases the historic <strong>Carmichael Home</strong> at 6 Couch Street in 1990, officially opening it to the public as the Senoia History Museum in July 2010.
+                </p>
+              </div>
+
+              <div className="relative pl-10 group">
+                <div className="absolute left-2.5 top-1.5 w-3.5 h-3.5 rounded-full bg-cream border-2 border-tan group-hover:bg-tan transition-colors" />
+                <span className="font-sans font-bold text-tan text-lg">2026</span>
+                <p className="text-base font-sans text-charcoal/80 leading-relaxed mt-1">
+                  The society officially launches its comprehensive **online digital archive**, allowing researchers, members, and local historians to browse historical documents, family records, and photos from anywhere in the world.
                 </p>
               </div>
 
