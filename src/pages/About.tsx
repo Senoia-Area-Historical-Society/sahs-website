@@ -160,7 +160,7 @@ export default function About() {
                 <div className="absolute left-2.5 top-1.5 w-3.5 h-3.5 rounded-full bg-cream border-2 border-tan group-hover:bg-tan transition-colors" />
                 <span className="font-sans font-bold text-tan text-lg">2026</span>
                 <p className="text-base font-sans text-charcoal/80 leading-relaxed mt-1">
-                  The society officially launches its comprehensive <strong className="font-bold text-charcoal">SAHS Digital Archive</strong>, allowing researchers, members, and local historians to browse historical documents, family records, and photos from anywhere in the world.
+                  The society officially launches its comprehensive <a href="https://archives.senoiahistory.com/" target="_blank" rel="noopener noreferrer" className="font-bold text-tan hover:text-tan-dark underline decoration-tan/30 transition-colors">SAHS Digital Archive</a>, allowing researchers, members, and local historians to browse historical documents, family records, and photos from anywhere in the world.
                 </p>
               </div>
 
