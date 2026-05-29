@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getBoardMembers } from '../services/api';
 import type { OrganizationEntity } from '../types';
+import museumExteriorImg from '../assets/museum-exterior.jpg';
 
 export default function About() {
   const [board, setBoard] = useState<OrganizationEntity[]>([]);
@@ -23,7 +24,20 @@ export default function About() {
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl md:text-5xl font-bold mb-12 border-b border-tan pb-4">About the Society</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-8 border-b border-tan pb-4">About the Society</h1>
+
+        {/* Museum Exterior Image Banner */}
+        <div className="mb-12 overflow-hidden rounded-2xl border border-tan/20 shadow-xl relative group">
+          <img 
+            src={museumExteriorImg} 
+            alt="Senoia History Museum" 
+            className="w-full h-[300px] md:h-[400px] object-cover group-hover:scale-105 transition-transform duration-700 select-none"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-charcoal/50 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute bottom-4 left-6 text-white text-lg font-sans font-semibold tracking-wide drop-shadow-md">
+            Senoia Area Historical Society Museum — 6 Couch Street
+          </div>
+        </div>
 
         <section className="mb-16">
           <h3 className="text-2xl font-bold mb-6 text-tan">Mission Statement</h3>
