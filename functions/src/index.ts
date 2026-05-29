@@ -1,5 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https';
-import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
@@ -383,6 +383,116 @@ export const onBookingConfirmed = onDocumentUpdated('bookings/{bookingId}', asyn
     }
 });
 
+// 8b. Sync Published Event Posts to Google Calendar
+export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) => {
+    const beforeData = event.data?.before.data();
+    const afterData = event.data?.after.data();
+    
+    // 1. Handle deletion
+    if (beforeData && !afterData) {
+        if (beforeData.googleCalendarEventId) {
+            const auth = getCalendarAuth();
+            try {
+                const calendar = google.calendar({ version: 'v3', auth });
+                await calendar.events.delete({
+                    calendarId: CALENDAR_ID,
+                    eventId: beforeData.googleCalendarEventId
+                });
+            } catch (err) {
+                console.error('Failed to delete calendar event for deleted post:', err);
+            }
+        }
+        return;
+    }
+    
+    // 2. Handle creation / updates
+    if (afterData) {
+        const isEvent = afterData.type === 'event';
+        const isPublished = afterData.status === 'published';
+        const wasPublished = beforeData ? beforeData.status === 'published' : false;
+        
+        // We only care about published Events
+        if (!isEvent) return;
+        
+        const auth = getCalendarAuth();
+        const calendar = google.calendar({ version: 'v3', auth });
+        
+        // Case A: Newly published event (was not published, or newly created and published)
+        if (isPublished && !wasPublished) {
+            try {
+                if (afterData.googleCalendarEventId) return;
+                
+                const startDateTime = afterData.eventDate 
+                    ? new Date(afterData.eventDate.toDate()).toISOString() 
+                    : (afterData.eventStartDate ? new Date(afterData.eventStartDate).toISOString() : new Date().toISOString());
+                    
+                const endDateTime = afterData.eventEndDate 
+                    ? new Date(afterData.eventEndDate).toISOString() 
+                    : new Date(new Date(startDateTime).getTime() + 2 * 60 * 60 * 1000).toISOString();
+                
+                const calendarEvent = {
+                    summary: `SAHS Event: ${afterData.title}`,
+                    description: afterData.excerpt || afterData.content?.replace(/<[^>]*>/g, '').substring(0, 300) || '',
+                    location: afterData.location || afterData.eventLocation || '',
+                    start: { dateTime: startDateTime, timeZone: 'America/New_York' },
+                    end: { dateTime: endDateTime, timeZone: 'America/New_York' },
+                };
+                
+                const response = await calendar.events.insert({
+                    calendarId: CALENDAR_ID,
+                    requestBody: calendarEvent
+                });
+                
+                await event.data?.after.ref.update({
+                    googleCalendarEventId: response.data.id
+                });
+            } catch (err) {
+                console.error('Error creating Google Calendar event:', err);
+            }
+        }
+        // Case B: Edited details of an already published event
+        else if (isPublished && wasPublished && afterData.googleCalendarEventId) {
+            try {
+                const startDateTime = afterData.eventDate 
+                    ? new Date(afterData.eventDate.toDate()).toISOString() 
+                    : (afterData.eventStartDate ? new Date(afterData.eventStartDate).toISOString() : new Date().toISOString());
+                    
+                const endDateTime = afterData.eventEndDate 
+                    ? new Date(afterData.eventEndDate).toISOString() 
+                    : new Date(new Date(startDateTime).getTime() + 2 * 60 * 60 * 1000).toISOString();
+                
+                await calendar.events.patch({
+                    calendarId: CALENDAR_ID,
+                    eventId: afterData.googleCalendarEventId,
+                    requestBody: {
+                        summary: `SAHS Event: ${afterData.title}`,
+                        description: afterData.excerpt || afterData.content?.replace(/<[^>]*>/g, '').substring(0, 300) || '',
+                        location: afterData.location || afterData.eventLocation || '',
+                        start: { dateTime: startDateTime, timeZone: 'America/New_York' },
+                        end: { dateTime: endDateTime, timeZone: 'America/New_York' },
+                    }
+                });
+            } catch (err) {
+                console.error('Error updating Google Calendar event:', err);
+            }
+        }
+        // Case C: Unpublished/Archived event (was published, now is draft/archived)
+        else if (!isPublished && wasPublished && afterData.googleCalendarEventId) {
+            try {
+                await calendar.events.delete({
+                    calendarId: CALENDAR_ID,
+                    eventId: afterData.googleCalendarEventId
+                });
+                await event.data?.after.ref.update({
+                    googleCalendarEventId: admin.firestore.FieldValue.delete()
+                });
+            } catch (err) {
+                console.error('Error deleting Google Calendar event for unpublished post:', err);
+            }
+        }
+    }
+});
+
 // 9. Shortlink Redirect
 export const shortlinkRedirect = onRequest({ cors: true }, async (req, res) => {
     try {
@@ -394,11 +504,11 @@ export const shortlinkRedirect = onRequest({ cors: true }, async (req, res) => {
         }
 
         // 1. Check custom shortlinks collection
-        const shortlinkSnap = await db.collection('shortlinks').doc(slug).get();
-        if (shortlinkSnap.exists) {
-            const data = shortlinkSnap.data();
-            if (data && data.url) {
-                res.redirect(301, data.url);
+        const shortlinkSnap = await db.collection('shortlinks').where('slug', '==', slug).limit(1).get();
+        if (!shortlinkSnap.empty) {
+            const data = shortlinkSnap.docs[0].data();
+            if (data && data.targetUrl) {
+                res.redirect(301, data.targetUrl);
                 return;
             }
         }

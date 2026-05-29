@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { getNewsPosts, getEvents } from '../services/api';
 import type { Post } from '../types';
 
@@ -69,9 +70,9 @@ export default function News() {
                       </div>
                       <h3 className="text-xl font-bold mb-3">{event.title}</h3>
                       {event.excerpt && <p className="text-gray-600 font-sans text-sm mb-4 line-clamp-3">{event.excerpt}</p>}
-                      <a href={`/news/${event.slug}`} className="text-charcoal font-bold font-sans text-sm uppercase tracking-wide hover:text-tan transition-colors border-b border-charcoal hover:border-tan pb-1">
+                      <Link to={`/news/${event.slug}`} className="text-charcoal font-bold font-sans text-sm uppercase tracking-wide hover:text-tan transition-colors border-b border-charcoal hover:border-tan pb-1">
                         View Details
-                      </a>
+                      </Link>
                     </article>
                   ))}
                 </div>
@@ -106,9 +107,9 @@ export default function News() {
                             {item.excerpt || item.content?.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'}
                           </p>
                           <div className="mt-auto">
-                             <a href={`/news/${item.slug}`} className="text-charcoal font-bold font-sans text-sm uppercase tracking-wide hover:text-tan transition-colors">
+                             <Link to={`/news/${item.slug}`} className="text-charcoal font-bold font-sans text-sm uppercase tracking-wide hover:text-tan transition-colors">
                               Read More →
-                            </a>
+                            </Link>
                           </div>
                         </div>
                       </article>

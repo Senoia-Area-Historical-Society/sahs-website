@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function PrivacyPolicy() {
   return (
     <div className="max-w-4xl mx-auto py-16 px-8 text-left">
@@ -40,7 +42,7 @@ export default function PrivacyPolicy() {
         
         <h2 className="text-2xl font-bold text-charcoal mt-8 mb-4">Contact Us</h2>
         <p className="mb-6 leading-relaxed">
-          If you have any questions about this privacy policy or our collection, use, and sharing of your information, please <a href="/contact-sahs" className="text-tan hover:text-tan-dark transition-colors">contact us</a>.
+          If you have any questions about this privacy policy or our collection, use, and sharing of your information, please <Link to="/contact-sahs" className="text-tan hover:text-tan-dark transition-colors">contact us</Link>.
         </p>
       </div>
     </div>

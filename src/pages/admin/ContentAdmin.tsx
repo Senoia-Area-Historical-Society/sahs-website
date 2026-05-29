@@ -3,8 +3,16 @@ import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, or
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import RichTextEditor from '../../components/admin/RichTextEditor';
-import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon } from 'lucide-react';
+import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon, Upload, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { uploadFile } from '../../services/storage';
+
+const timestampToLocalISO = (timestamp: any): string => {
+  if (!timestamp) return '';
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+};
 
 interface Post {
   id: string;
@@ -34,27 +42,19 @@ export default function ContentAdmin() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingPost, setEditingPost] = useState<Post | Partial<Post> | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadingImageField, setUploadingImageField] = useState<string | null>(null);
   const { user } = useAuth();
 
-  const fetchPosts = async () => {
-    setLoading(true);
-    try {
-      const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const fetchedPosts = snapshot.docs.map(doc => {
-        const data = doc.data();
-        let category = data.category;
-        if (!category) {
-          category = data.type === 'event' ? 'Event' : 'News';
-        }
-        return { id: doc.id, ...data, category } as Post;
-      });
-      setPosts(fetchedPosts);
-    } catch (err) {
-      console.error("Error fetching posts:", err);
-    } finally {
-      setLoading(false);
-    }
+  const startEditing = (post: Post) => {
+    setEditingPost({
+      ...post,
+      eventStartDate: post.eventDate ? timestampToLocalISO(post.eventDate) : post.eventStartDate || '',
+      eventEndDate: post.eventEndDate || '',
+      publishDateDisplay: post.publishDate ? timestampToLocalISO(post.publishDate) : '',
+      _ticketPriceDisplay: post.ticketPrice ? (post.ticketPrice / 100).toFixed(2) : '',
+      _enableTicketing: !!post.ticketPrice,
+    });
   };
 
   useEffect(() => {
@@ -81,15 +81,25 @@ export default function ContentAdmin() {
 
       if (!editingPost.id) {
         postData.createdAt = serverTimestamp();
-        postData.publishDate = serverTimestamp();
-      } else if (editingPost.status === 'published' && !editingPost.publishDate) {
-        postData.publishDate = serverTimestamp();
+        if (editingPost.publishDateDisplay) {
+          postData.publishDate = new Date(editingPost.publishDateDisplay);
+        } else {
+          postData.publishDate = serverTimestamp();
+        }
+      } else {
+        if (editingPost.publishDateDisplay) {
+          postData.publishDate = new Date(editingPost.publishDateDisplay);
+        } else if (editingPost.status === 'published' && !editingPost.publishDate) {
+          postData.publishDate = serverTimestamp();
+        }
       }
 
       if (isEvent && editingPost.eventStartDate) {
         postData.eventDate = new Date(editingPost.eventStartDate);
         postData.location = editingPost.eventLocation || '';
       }
+
+      delete postData.publishDateDisplay;
 
       // Ticketing config — convert display price ($) to cents for Stripe
       if (isEvent) {
@@ -122,6 +132,71 @@ export default function ContentAdmin() {
     } catch (err) {
       console.error("Error saving post:", err);
       alert("Failed to save post.");
+    }
+  };
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      alert("Please upload a PDF document.");
+      return;
+    }
+
+    setUploadingDoc(true);
+    try {
+      const url = await uploadFile(file, 'content_documents');
+      setEditingPost(p => p ? ({ ...p, documentUrl: url }) : null);
+      alert("Flyer PDF uploaded successfully!");
+    } catch (err) {
+      console.error("Error uploading PDF:", err);
+      alert("Failed to upload PDF. Please try again.");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handlePostImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'mainImage' | 'bannerImage' | 'squareImage') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert("Please upload an image file.");
+      return;
+    }
+
+    setUploadingImageField(fieldName);
+    try {
+      const url = await uploadFile(file, 'content_images');
+      setEditingPost(p => p ? ({ ...p, [fieldName]: url }) : null);
+      alert(`${fieldName === 'mainImage' ? 'Cover' : fieldName === 'bannerImage' ? 'Banner' : 'Square'} image uploaded successfully!`);
+    } catch (err) {
+      console.error("Error uploading image:", err);
+      alert("Failed to upload image.");
+    } finally {
+      setUploadingImageField(null);
+    }
+  };
+
+  const fetchPosts = async () => {
+    setLoading(true);
+    try {
+      const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const fetchedPosts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let category = data.category;
+        if (!category) {
+          category = data.type === 'event' ? 'Event' : 'News';
+        }
+        return { id: doc.id, ...data, category } as Post;
+      });
+      setPosts(fetchedPosts);
+    } catch (err) {
+      console.error("Error fetching posts:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -162,7 +237,7 @@ export default function ContentAdmin() {
                     required
                     value={editingPost.title || ''}
                     onChange={e => setEditingPost({...editingPost, title: e.target.value})}
-                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50"
+                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                   />
                 </div>
                 <div>
@@ -170,11 +245,36 @@ export default function ContentAdmin() {
                   <select
                     value={editingPost.category || 'Blog'}
                     onChange={e => setEditingPost({...editingPost, category: e.target.value as Post['category']})}
-                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50"
+                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                   >
                     <option value="Blog">Blog</option>
                     <option value="News">News</option>
                     <option value="Event">Event</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-charcoal mb-2">Publish Date & Time (Optional)</label>
+                  <input
+                    type="datetime-local"
+                    value={editingPost.publishDateDisplay || ''}
+                    onChange={e => setEditingPost({...editingPost, publishDateDisplay: e.target.value})}
+                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
+                  />
+                  <p className="text-xs text-charcoal/40 mt-1">If blank, defaults to the time of publishing.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-charcoal mb-2">Status</label>
+                  <select
+                    value={editingPost.status || 'draft'}
+                    onChange={e => setEditingPost({...editingPost, status: e.target.value as Post['status']})}
+                    className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="archived">Archived</option>
                   </select>
                 </div>
               </div>
@@ -191,7 +291,7 @@ export default function ContentAdmin() {
                           type="datetime-local"
                           value={editingPost.eventStartDate || ''}
                           onChange={e => setEditingPost({...editingPost, eventStartDate: e.target.value})}
-                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                         />
                       </div>
                       <div>
@@ -200,7 +300,7 @@ export default function ContentAdmin() {
                           type="datetime-local"
                           value={editingPost.eventEndDate || ''}
                           onChange={e => setEditingPost({...editingPost, eventEndDate: e.target.value})}
-                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                         />
                       </div>
                       <div>
@@ -209,7 +309,7 @@ export default function ContentAdmin() {
                           type="text"
                           value={editingPost.eventLocation || ''}
                           onChange={e => setEditingPost({...editingPost, eventLocation: e.target.value})}
-                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm"
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                         />
                       </div>
                     </div>
@@ -281,17 +381,147 @@ export default function ContentAdmin() {
                 </>
               )}
 
-              <div>
-                <label className="block text-sm font-bold text-charcoal mb-2">Status</label>
-                <select
-                  value={editingPost.status || 'draft'}
-                  onChange={e => setEditingPost({...editingPost, status: e.target.value as Post['status']})}
-                  className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </select>
+              {/* Media / Images Section */}
+              <div className="bg-cream border border-tan-light/50 rounded-lg p-5">
+                <p className="text-xs font-bold text-charcoal/50 uppercase tracking-wider mb-4 font-sans">Post Media / Images</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Main Cover Image */}
+                  <div className="flex flex-col items-center p-4 border border-tan-light/30 rounded-lg bg-white shadow-xs">
+                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Cover Image (Standard)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handlePostImageUpload(e, 'mainImage')}
+                      className="hidden"
+                      id="main-image-upload"
+                    />
+                    <label
+                      htmlFor="main-image-upload"
+                      className="w-full text-center bg-cream border border-tan hover:bg-tan/10 text-charcoal py-2 rounded cursor-pointer transition-colors font-sans text-xs font-bold uppercase tracking-wider shadow-2xs mb-3"
+                    >
+                      {uploadingImageField === 'mainImage' ? 'Uploading...' : 'Choose Cover'}
+                    </label>
+                    {editingPost.mainImage ? (
+                      <div className="relative w-full aspect-video rounded overflow-hidden border border-tan-light/50">
+                        <img src={editingPost.mainImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setEditingPost(p => p ? ({ ...p, mainImage: undefined }) : null)}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-800 text-white p-1 rounded-full shadow transition-colors"
+                          title="Remove Image"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-charcoal/40 font-sans text-center">No image selected. Recommended for preview cards.</span>
+                    )}
+                  </div>
+
+                  {/* Wide Banner Image */}
+                  <div className="flex flex-col items-center p-4 border border-tan-light/30 rounded-lg bg-white shadow-xs">
+                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Top Banner (1280x720)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handlePostImageUpload(e, 'bannerImage')}
+                      className="hidden"
+                      id="banner-image-upload"
+                    />
+                    <label
+                      htmlFor="banner-image-upload"
+                      className="w-full text-center bg-cream border border-tan hover:bg-tan/10 text-charcoal py-2 rounded cursor-pointer transition-colors font-sans text-xs font-bold uppercase tracking-wider shadow-2xs mb-3"
+                    >
+                      {uploadingImageField === 'bannerImage' ? 'Uploading...' : 'Choose Banner'}
+                    </label>
+                    {editingPost.bannerImage ? (
+                      <div className="relative w-full aspect-video rounded overflow-hidden border border-tan-light/50">
+                        <img src={editingPost.bannerImage} alt="Banner Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setEditingPost(p => p ? ({ ...p, bannerImage: undefined }) : null)}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-800 text-white p-1 rounded-full shadow transition-colors"
+                          title="Remove Image"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-charcoal/40 font-sans text-center">No image selected. Displayed wide at page top.</span>
+                    )}
+                  </div>
+
+                  {/* Square Image */}
+                  <div className="flex flex-col items-center p-4 border border-tan-light/30 rounded-lg bg-white shadow-xs">
+                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Square Alt (1080x1080)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handlePostImageUpload(e, 'squareImage')}
+                      className="hidden"
+                      id="square-image-upload"
+                    />
+                    <label
+                      htmlFor="square-image-upload"
+                      className="w-full text-center bg-cream border border-tan hover:bg-tan/10 text-charcoal py-2 rounded cursor-pointer transition-colors font-sans text-xs font-bold uppercase tracking-wider shadow-2xs mb-3"
+                    >
+                      {uploadingImageField === 'squareImage' ? 'Uploading...' : 'Choose Square'}
+                    </label>
+                    {editingPost.squareImage ? (
+                      <div className="relative w-full aspect-square rounded overflow-hidden border border-tan-light/50 max-h-[85px] max-w-[85px]">
+                        <img src={editingPost.squareImage} alt="Square Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setEditingPost(p => p ? ({ ...p, squareImage: undefined }) : null)}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-800 text-white p-1 rounded-full shadow transition-colors"
+                          title="Remove Image"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-charcoal/40 font-sans text-center">No image selected. Displayed in post body.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Document/PDF Flyer Uploader */}
+              <div className="bg-cream border border-tan-light/50 rounded-lg p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Upload size={16} className="text-tan" />
+                  <span className="text-sm font-bold text-charcoal uppercase tracking-wider font-sans">Optional PDF Flyer / Attachment</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleDocUpload}
+                    className="hidden"
+                    id="doc-upload"
+                  />
+                  <label
+                    htmlFor="doc-upload"
+                    className="flex items-center gap-2 bg-cream border border-tan hover:bg-tan/10 text-charcoal px-6 py-2.5 rounded-md cursor-pointer transition-colors font-sans text-sm font-bold uppercase tracking-wider shadow-sm"
+                  >
+                    {uploadingDoc ? 'Uploading...' : 'Choose Flyer PDF'}
+                  </label>
+                  {editingPost.documentUrl ? (
+                    <div className="flex items-center gap-2 text-sm text-green-700 font-sans">
+                      <span>✓ Flyer Uploaded:</span>
+                      <a href={editingPost.documentUrl} target="_blank" rel="noreferrer" className="underline font-bold hover:text-green-900">View File</a>
+                      <button
+                        type="button"
+                        onClick={() => setEditingPost(p => p ? ({ ...p, documentUrl: undefined }) : null)}
+                        className="text-red-600 hover:underline font-bold ml-2 inline-flex items-center gap-0.5"
+                      >
+                        <Trash2 size={13} /> Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-charcoal/40 font-sans">No PDF attachment selected. Upload a flyer for visitors to download.</span>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -365,7 +595,7 @@ export default function ContentAdmin() {
                           {post.updatedAt?.toDate().toLocaleDateString() || post.createdAt?.toDate().toLocaleDateString() || 'N/A'}
                         </td>
                         <td className="p-4 flex gap-3 justify-end">
-                          <button onClick={() => setEditingPost(post)} className="text-charcoal/60 hover:text-tan transition-colors">
+                          <button onClick={() => startEditing(post)} className="text-charcoal/60 hover:text-tan transition-colors">
                             <Pencil size={18} />
                           </button>
                           <button title="Archive Post" onClick={() => handleArchive(post.id)} className="text-charcoal/60 hover:text-red-600 transition-colors">

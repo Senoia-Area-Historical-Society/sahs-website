@@ -8,7 +8,7 @@ import { Navigate } from 'react-router-dom';
 
 interface UserRole {
   email: string;
-  role: 'admin' | 'curator' | 'editor';
+  role: 'admin' | 'curator' | 'editor' | 'read_only';
 }
 
 export default function UsersAdmin() {
@@ -123,6 +123,7 @@ export default function UsersAdmin() {
                   <option value="editor">Editor (Can edit posts/events)</option>
                   <option value="curator">Curator (Can edit posts, forms, bookings)</option>
                   <option value="admin">Admin (Full Access)</option>
+                  <option value="read_only">Read-Only</option>
                 </select>
               </div>
 
@@ -175,9 +176,11 @@ export default function UsersAdmin() {
                         <td className="p-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium uppercase tracking-wider ${
                             u.role === 'admin' ? 'bg-red-100 text-red-800' : 
-                            u.role === 'curator' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                            u.role === 'curator' ? 'bg-blue-100 text-blue-800' : 
+                            u.role === 'editor' ? 'bg-green-100 text-green-800' : 
+                            'bg-purple-100 text-purple-800'
                           }`}>
-                            {u.role}
+                            {u.role.replace('_', ' ')}
                           </span>
                         </td>
                         <td className="p-4 flex gap-3 justify-end">

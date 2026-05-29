@@ -108,7 +108,7 @@ export default function AdminHeader() {
                 </button>
 
                 {/* Dropdown Menu */}
-                <div className={`absolute top-full left-0 mt-1 w-64 bg-white/95 backdrop-blur-md border border-tan-light rounded-xl shadow-xl overflow-hidden transition-all duration-200 origin-top-left ${
+                <div className={`absolute top-full left-0 mt-1 w-64 bg-white/95 backdrop-blur-md border border-tan-light rounded-xl shadow-xl transition-all duration-200 origin-top-left before:absolute before:bottom-full before:left-0 before:right-0 before:h-4 before:content-[''] ${
                   activeGroup === group.label 
                     ? 'opacity-100 scale-100 pointer-events-auto' 
                     : 'opacity-0 scale-95 pointer-events-none'

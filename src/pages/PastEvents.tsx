@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getPastEvents } from '../services/api';
 import type { Post } from '../types';
 
@@ -66,9 +67,9 @@ export default function PastEvents() {
                     {event.excerpt || (event.content ? event.content.replace(/<[^>]*>?/gm, '').substring(0, 160) + '...' : 'Heritage event preservation and community program.')}
                   </p>
                   <div className="mt-auto">
-                    <a href={`/news/${event.slug}`} className="text-charcoal font-bold font-sans text-sm gap-2 inline-flex items-center group">
+                    <Link to={`/news/${event.slug}`} className="text-charcoal font-bold font-sans text-sm gap-2 inline-flex items-center group">
                       READ RECAP <span className="group-hover:translate-x-1 transition-transform">→</span>
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </article>
@@ -79,9 +80,9 @@ export default function PastEvents() {
         <div className="mt-16 p-8 bg-tan/5 rounded-lg border border-tan/10 text-center">
           <h3 className="text-xl font-bold mb-4">Have photos from a past event?</h3>
           <p className="font-sans text-charcoal/70 mb-6">We're always looking to expand our digital archives. Contact us to share your memories.</p>
-          <a href="/contact-sahs" className="inline-block bg-charcoal text-white px-8 py-3 rounded-md font-sans font-bold uppercase tracking-widest hover:bg-black transition-colors">
+          <Link to="/contact-sahs" className="inline-block bg-charcoal text-white px-8 py-3 rounded-md font-sans font-bold uppercase tracking-widest hover:bg-black transition-colors">
             Get In Touch
-          </a>
+          </Link>
         </div>
       </div>
     </div>
