@@ -67,25 +67,32 @@ export default function Home() {
               <Link to="/news" className="text-tan font-sans font-bold uppercase tracking-widest text-sm hover:text-tan-dark transition-colors">View All</Link>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {news.map(post => (
-                <Link key={post.id} to={`/news/${post.slug}`} className="group bg-white rounded-lg overflow-hidden border border-tan/10 shadow-sm transition-all hover:shadow-md">
-                  <div className="aspect-video overflow-hidden bg-cream flex items-center justify-center">
-                    {post.mainImage ? (
-                      <img src={post.mainImage} alt={post.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                    ) : (
-                      <span className="text-tan/30 font-bold uppercase tracking-widest text-sm">No Image</span>
-                    )}
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold mb-2 group-hover:text-tan transition-colors">{post.title}</h3>
-                    <p className="font-sans text-charcoal/60 text-sm line-clamp-2">
-                      {post.excerpt || post.content?.replace(/<[^>]*>?/gm, '').substring(0, 120) + '...'}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
+            {news.length === 0 ? (
+              <div className="bg-white p-12 rounded-xl border border-tan/10 shadow-sm text-center max-w-lg mx-auto md:max-w-none">
+                <span className="text-3xl mb-4 block">📰</span>
+                <p className="italic text-charcoal/50 font-sans text-lg">No news yet... keep an eye out!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {news.map(post => (
+                  <Link key={post.id} to={`/news/${post.slug}`} className="group bg-white rounded-lg overflow-hidden border border-tan/10 shadow-sm transition-all hover:shadow-md">
+                    <div className="aspect-video overflow-hidden bg-cream flex items-center justify-center">
+                      {post.mainImage ? (
+                        <img src={post.mainImage} alt={post.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      ) : (
+                        <span className="text-tan/30 font-bold uppercase tracking-widest text-sm">No Image</span>
+                      )}
+                    </div>
+                    <div className="p-6">
+                      <h3 className="text-xl font-bold mb-2 group-hover:text-tan transition-colors">{post.title}</h3>
+                      <p className="font-sans text-charcoal/60 text-sm line-clamp-2">
+                        {post.excerpt || post.content?.replace(/<[^>]*>?/gm, '').substring(0, 120) + '...'}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Sidebar: Upcoming Events */}
