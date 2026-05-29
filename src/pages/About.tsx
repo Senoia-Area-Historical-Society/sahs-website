@@ -44,10 +44,13 @@ export default function About() {
         <section className="mb-20">
           <div className="text-center max-w-3xl mx-auto mb-10">
             <h3 className="text-3xl font-bold mb-4 text-tan">Our Mission</h3>
-            <p className="text-xl italic font-sans text-charcoal/85 leading-relaxed">
+            <p className="text-xl italic font-sans text-charcoal/85 leading-relaxed mb-6">
               "To secure, preserve, and promote the social and cultural history of the community."
             </p>
-            <div className="w-16 h-0.5 bg-tan mx-auto mt-6" />
+            <p className="text-lg leading-relaxed font-sans text-charcoal/90 max-w-2xl mx-auto mb-8">
+              The Senoia Area Historical Society’s mission is to secure, preserve, and promote the social and cultural history of the community. To this end we will: educate and engage a diverse public through a variety of programs, maintain our museum buildings, properties, and collections, acquire and reserve additional items of significant relevance; research and publish historic records; identify and encourage preservation of significant places and structures throughout the community; work collaboratively with public, private and other non-profit organizations to attain this mission; and manage the society openly, ethically and professionally.
+            </p>
+            <div className="w-16 h-0.5 bg-tan mx-auto" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
