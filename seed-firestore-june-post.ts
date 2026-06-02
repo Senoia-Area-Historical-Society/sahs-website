@@ -17,9 +17,7 @@ initializeApp({
   projectId: 'sahs-archives'
 });
 
-const db = getFirestore();
-
-async function run() {
+async function writeToDatabase(dbName: string, db: any) {
   const eventDate = new Date('2026-06-11T19:00:00-04:00'); // Thursday, June 11, 2026 at 7:00 PM EDT
   const publishDate = new Date(); // Publish now
 
@@ -49,9 +47,19 @@ async function run() {
     updatedAt: Timestamp.fromDate(new Date())
   };
 
-  console.log(`Writing post document [${slug}] to Firestore...`);
+  console.log(`Writing post document [${slug}] to Firestore database [${dbName}]...`);
   await db.collection('posts').doc(slug).set(postData, { merge: true });
-  console.log('✅ Post document created successfully in Firestore!');
+  console.log(`✅ Post document created successfully in [${dbName}]!`);
+}
+
+async function run() {
+  // Write to (default) database
+  const defaultDb = getFirestore();
+  await writeToDatabase('(default)', defaultDb);
+
+  // Write to sahs-archives database
+  const namedDb = getFirestore('sahs-archives');
+  await writeToDatabase('sahs-archives', namedDb);
 }
 
 run().catch(console.error);
