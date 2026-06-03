@@ -1,4 +1,4 @@
-import { Facebook, Twitter, Mail, Link as LinkIcon, Check } from 'lucide-react';
+import { Facebook, Twitter, Mail, Link as LinkIcon, Check, Instagram } from 'lucide-react';
 import { useState } from 'react';
 
 interface SocialShareProps {
@@ -47,7 +47,16 @@ export default function SocialShare({ slug, title }: SocialShareProps) {
         >
           <Mail size={18} />
         </a>
-        <button 
+        <a
+          href="https://www.instagram.com/senoiahistory/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-2 rounded-full bg-tan/10 text-tan hover:bg-tan hover:text-white transition-colors"
+          aria-label="Follow us on Instagram"
+        >
+          <Instagram size={18} />
+        </a>
+        <button
           onClick={handleCopy}
           className="p-2 rounded-full bg-tan/10 text-tan hover:bg-tan hover:text-white transition-colors"
           aria-label="Copy Link"
