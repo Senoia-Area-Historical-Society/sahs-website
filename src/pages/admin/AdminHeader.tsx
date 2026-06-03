@@ -1,16 +1,18 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { 
-  Calendar, 
-  Users, 
-  Ticket, 
-  LogOut, 
-  Shield, 
-  FileText, 
-  BookOpen, 
+import {
+  Calendar,
+  Users,
+  Ticket,
+  LogOut,
+  Shield,
+  FileText,
+  BookOpen,
   HandHeart,
   ChevronDown,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Menu,
+  X
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -31,6 +33,7 @@ export default function AdminHeader() {
   const { user, isAdmin, isCurator, isEditor, logout } = useAuth();
   const location = useLocation();
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const navGroups: NavGroup[] = [
     {
@@ -72,7 +75,7 @@ export default function AdminHeader() {
   }
 
   return (
-    <header className="bg-white border-b border-tan-light px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50">
+    <header className="bg-white border-b border-tan-light px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50 relative">
       <div className="flex items-center gap-10">
         <Link to="/admin/content" className="flex items-center gap-2 group">
           <div className="bg-tan rounded-lg p-1.5 shadow-sm group-hover:bg-tan-dark transition-colors">
@@ -152,7 +155,7 @@ export default function AdminHeader() {
         </nav>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
         <div className="hidden sm:flex flex-col items-end gap-0.5 border-r border-tan/20 pr-6">
           <span className="font-sans text-[10px] text-charcoal/40 uppercase tracking-widest font-black leading-none">
             {isAdmin ? 'System Admin' : isCurator ? 'Curator' : isEditor ? 'Editor' : 'SAHS Staff'}
@@ -167,14 +170,78 @@ export default function AdminHeader() {
             )}
           </div>
         </div>
-        <button 
+        <button
           onClick={logout}
-          className="flex items-center gap-2 text-sm font-sans font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors"
+          className="hidden lg:flex items-center gap-2 text-sm font-sans font-bold uppercase tracking-widest text-red-600 hover:text-red-800 transition-colors"
         >
           <LogOut size={16} />
           Sign Out
         </button>
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setMobileOpen(o => !o)}
+          className="lg:hidden p-2 rounded-md text-charcoal/60 hover:text-charcoal hover:bg-cream transition-colors"
+          aria-label="Toggle menu"
+        >
+          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
       </div>
+
+      {/* Mobile slide-down menu */}
+      {mobileOpen && (
+        <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-b border-tan-light shadow-xl z-50 max-h-[80vh] overflow-y-auto">
+          {navGroups.map((group) => {
+            const GroupIcon = group.icon;
+            return (
+              <div key={group.label} className="border-b border-tan-light/50 last:border-0">
+                <div className="flex items-center gap-2 px-5 py-3 bg-cream/50">
+                  <GroupIcon size={13} className="text-tan" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-charcoal/50">{group.label}</span>
+                </div>
+                {group.items.map((item) => {
+                  const ItemIcon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setMobileOpen(false)}
+                      className={`flex items-center gap-3 px-5 py-3.5 transition-colors ${isActive ? 'bg-tan/10 text-tan' : 'text-charcoal hover:bg-cream'}`}
+                    >
+                      <ItemIcon size={16} className={isActive ? 'text-tan' : 'text-charcoal/40'} />
+                      <div>
+                        <div className="text-sm font-bold">{item.label}</div>
+                        {item.description && <div className="text-[10px] text-charcoal/40 uppercase tracking-tight">{item.description}</div>}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          })}
+          <div className="px-5 py-4 flex items-center justify-between border-t border-tan-light bg-cream/30">
+            <div className="flex items-center gap-2">
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="" className="w-7 h-7 rounded-full border border-tan/20" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-tan/10 border border-tan/20 flex items-center justify-center text-xs font-black text-tan">
+                  {user?.displayName?.[0] || user?.email?.[0]?.toUpperCase()}
+                </div>
+              )}
+              <div>
+                <div className="text-xs font-bold text-charcoal">{user?.displayName || user?.email}</div>
+                <div className="text-[10px] text-charcoal/40 uppercase tracking-wider">{isAdmin ? 'System Admin' : isCurator ? 'Curator' : 'Editor'}</div>
+              </div>
+            </div>
+            <button
+              onClick={() => { setMobileOpen(false); logout(); }}
+              className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-red-600 hover:text-red-800"
+            >
+              <LogOut size={15} /> Sign Out
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

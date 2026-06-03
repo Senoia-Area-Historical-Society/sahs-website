@@ -19,7 +19,7 @@ async function writeToDatabase(dbName: string, db: any) {
 
   const postData = {
     type: 'event',
-    title: 'Family Day at Seavy St. Park — July 3, 2026',
+    title: 'Family Day at Seavy St. Park',
     slug,
     status: 'published',
     publishDate: Timestamp.fromDate(publishDate),

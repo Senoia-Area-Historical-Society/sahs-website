@@ -7,6 +7,7 @@ import AdminHeader from './AdminHeader';
 export default function MembershipsAdmin() {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -15,8 +16,9 @@ export default function MembershipsAdmin() {
       try {
         const data = await getMemberships();
         setMemberships(data);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to load memberships", err);
+        setError(err?.message || 'Failed to load membership data from Stripe. Check that the Cloud Function is deployed and your account has access.');
       } finally {
         setLoading(false);
       }
@@ -85,6 +87,16 @@ export default function MembershipsAdmin() {
             </div>
           </div>
         </header>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <span className="text-red-500 mt-0.5">⚠</span>
+            <div>
+              <p className="text-sm font-bold text-red-700 mb-1">Failed to load membership data</p>
+              <p className="text-xs text-red-600 font-sans">{error}</p>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center items-center h-64">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import RichTextEditor from '../../components/admin/RichTextEditor';
@@ -28,6 +28,7 @@ interface Post {
   publishDate?: any;
   createdAt: any;
   updatedAt: any;
+  excerpt?: string;
   // Ticketing fields (stored in Firestore)
   ticketPrice?: number | null;
   capacity?: number | null;
@@ -70,10 +71,20 @@ export default function ContentAdmin() {
 
     try {
       const isEvent = editingPost.category === 'Event';
+      const proposedSlug = (editingPost.slug || editingPost.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/^-+|-+$/g, '');
+
+      // Slug uniqueness check
+      const slugSnap = await getDocs(query(collection(db, 'posts'), where('slug', '==', proposedSlug)));
+      const conflict = slugSnap.docs.find(d => d.id !== editingPost.id);
+      if (conflict) {
+        alert(`Slug "${proposedSlug}" is already used by "${conflict.data().title}". Please choose a different slug.`);
+        return;
+      }
+
       const postData: any = {
         ...editingPost,
         type: isEvent ? 'event' : 'news',
-        slug: editingPost.slug || editingPost.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        slug: proposedSlug,
         author: editingPost.author || user?.email || 'Admin',
         status: editingPost.status || 'draft',
         updatedAt: serverTimestamp(),
@@ -236,7 +247,14 @@ export default function ContentAdmin() {
                     type="text"
                     required
                     value={editingPost.title || ''}
-                    onChange={e => setEditingPost({...editingPost, title: e.target.value})}
+                    onChange={e => {
+                      const title = e.target.value;
+                      const updates: Partial<Post> = { title };
+                      if (!editingPost.id) {
+                        updates.slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                      }
+                      setEditingPost({ ...editingPost, ...updates });
+                    }}
                     className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
                   />
                 </div>
@@ -251,6 +269,23 @@ export default function ContentAdmin() {
                     <option value="News">News</option>
                     <option value="Event">Event</option>
                   </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-charcoal mb-2">
+                  URL Slug
+                  <span className="text-xs font-normal text-charcoal/40 ml-2">auto-generated from title — edit to override</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/40 text-xs font-mono">/news/</span>
+                  <input
+                    type="text"
+                    value={editingPost.slug || ''}
+                    onChange={e => setEditingPost({ ...editingPost, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') })}
+                    className="w-full pl-14 pr-4 py-2 border border-tan-light rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
+                    placeholder="url-slug-here"
+                  />
                 </div>
               </div>
 
@@ -522,6 +557,20 @@ export default function ContentAdmin() {
                     <span className="text-xs text-charcoal/40 font-sans">No PDF attachment selected. Upload a flyer for visitors to download.</span>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-charcoal mb-2">
+                  Excerpt
+                  <span className="text-xs font-normal text-charcoal/40 ml-2">shown in listing cards — auto-generated from content if left blank</span>
+                </label>
+                <textarea
+                  value={editingPost.excerpt || ''}
+                  onChange={e => setEditingPost({ ...editingPost, excerpt: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white font-sans text-sm resize-y"
+                  placeholder="Brief summary shown in news listings and social shares..."
+                />
               </div>
 
               <div>
