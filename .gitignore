@@ -45,5 +45,9 @@ dist-ssr
 # Firebase Emulator Data
 emulator-data/
 
+# Playwright test artifacts
+test-results/
+playwright-report/
+
 # gemini-cli Conductor extension
 conductor/

@@ -12,7 +12,8 @@ import {
   ChevronDown,
   Link as LinkIcon,
   Menu,
-  X
+  X,
+  LayoutDashboard
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -40,6 +41,7 @@ export default function AdminHeader() {
       label: 'Content',
       icon: FileText,
       items: [
+        { label: 'Dashboard', path: '/admin', icon: LayoutDashboard, description: 'Stats overview and quick links' },
         { label: 'Site Content', path: '/admin/content', icon: FileText, description: 'Manage news, events, and pages' },
         { label: 'Wiki', path: '/admin/wiki', icon: BookOpen, description: 'Internal knowledge base' },
         { label: 'Short Links', path: '/admin/shortlinks', icon: LinkIcon, description: 'Manage custom URLs' },
@@ -77,7 +79,7 @@ export default function AdminHeader() {
   return (
     <header className="bg-white border-b border-tan-light px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50 relative">
       <div className="flex items-center gap-10">
-        <Link to="/admin/content" className="flex items-center gap-2 group">
+        <Link to="/admin" className="flex items-center gap-2 group">
           <div className="bg-tan rounded-lg p-1.5 shadow-sm group-hover:bg-tan-dark transition-colors">
             <Shield className="text-white" size={20} />
           </div>

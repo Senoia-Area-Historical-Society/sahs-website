@@ -191,6 +191,7 @@ export default function Header() {
                 >
                   <Link to="/support-sahs" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Become a Member / Donate</Link>
                   <a href="https://billing.stripe.com/p/login/3cscOSe99bt8bvi000" role="menuitem" target="_blank" rel="noopener noreferrer" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Manage Membership</a>
+                  <Link to="/membership-status" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Check Membership Status</Link>
                   <Link to="/supporters" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Our Supporters</Link>
                   <Link to="/admin/login" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all border-t border-tan-light/30 font-bold">Admin Portal</Link>
                 </div>
@@ -270,6 +271,7 @@ export default function Header() {
               <div className="space-y-1">
                 <Link to="/support-sahs" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Membership & Donations</Link>
                 <a href="https://billing.stripe.com/p/login/3cscOSe99bt8bvi000" target="_blank" rel="noopener noreferrer" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Manage Membership</a>
+                <Link to="/membership-status" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Check Membership Status</Link>
                 <Link to="/supporters" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Our Supporters</Link>
                 <Link to="/admin/login" className="block px-4 py-3 text-lg font-bold text-tan-dark hover:bg-tan/5 rounded-lg transition-colors">Admin Portal</Link>
               </div>

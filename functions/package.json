@@ -21,6 +21,7 @@
     "firebase-functions": "^7.2.3",
     "googleapis": "^137.1.0",
     "qrcode": "^1.5.3",
+    "resend": "^6.12.4",
     "stripe": "^15.8.0"
   },
   "devDependencies": {

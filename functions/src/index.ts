@@ -6,6 +6,8 @@ import { google } from 'googleapis';
 import Stripe from 'stripe';
 import * as QRCode from 'qrcode';
 import * as path from 'path';
+import { Resend } from 'resend';
+import { welcomeEmailHtml } from './emails/welcomeEmail';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -19,6 +21,25 @@ const getStripe = () => {
         apiVersion: '2024-04-10',
     });
 };
+
+const getResend = () => new Resend(process.env.RESEND_API_KEY);
+
+async function sendWelcomeEmail(email: string, firstName: string): Promise<void> {
+    if (!process.env.RESEND_API_KEY) {
+        console.warn('RESEND_API_KEY not configured — skipping welcome email');
+        return;
+    }
+    const resend = getResend();
+    const { error } = await resend.emails.send({
+        from: 'Senoia Area Historical Society <membership@updates.senoiahistory.com>',
+        to: email,
+        subject: 'Thank You for Your SAHS Membership',
+        html: welcomeEmailHtml(firstName),
+    });
+    if (error) {
+        console.error('Resend welcome email failed:', error);
+    }
+}
 
 // Configure Google Auth for Calendar API
 let credentials: any = null;
@@ -228,7 +249,7 @@ export const listStripeSubscriptions = onRequest({ secrets: ['STRIPE_SECRET_KEY'
 });
 
 // 6. Stripe Webhook Handler
-export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] }, async (req, res) => {
+export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'RESEND_API_KEY'] }, async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
     let event;
@@ -245,19 +266,28 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
         const type = session.metadata?.type;
 
         if (type === 'membership') {
+            const expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
             try {
                 await db.collection('memberships').add({
                     email: session.customer_email,
                     level: session.metadata?.level,
                     quantity: parseInt(session.metadata?.quantity || '1'),
                     status: 'active',
-                    expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                    expirationDate,
                     paymentId: session.id,
                     userId: session.metadata?.userId || null,
                     updatedAt: new Date().toISOString()
                 });
             } catch (err) {
                 console.error('Error creating membership record:', err);
+            }
+
+            // Send welcome email to new member via Resend
+            if (session.customer_email) {
+                const nameParts = (session.customer_details?.name || '').trim().split(/\s+/).filter(Boolean);
+                const firstName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0] || '';
+                sendWelcomeEmail(session.customer_email, firstName)
+                    .catch(err => console.error('Resend welcome email failed:', err));
             }
 
         } else if (type === 'ticket') {
@@ -493,7 +523,50 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
     }
 });
 
-// 9. Shortlink Redirect
+// 9. Member self-service lookup (public, returns only the queried email's data)
+export const getMembershipByEmail = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
+    try {
+        const email = ((req.query.email as string) || (req.body?.email as string) || '').toLowerCase().trim();
+        if (!email || !email.includes('@')) {
+            res.status(400).json({ error: 'Valid email required' });
+            return;
+        }
+
+        const stripe = getStripe();
+
+        // Find all Stripe customers with this email
+        const customers = await stripe.customers.search({ query: `email:"${email}"` });
+        if (customers.data.length === 0) {
+            res.json({ found: false, memberships: [] });
+            return;
+        }
+
+        // Fetch product names once
+        const productsList = await stripe.products.list({ limit: 100, active: true });
+        const productMap = new Map(productsList.data.map(p => [p.id, p.name]));
+
+        const memberships: object[] = [];
+        for (const customer of customers.data) {
+            const subs = await stripe.subscriptions.list({ customer: customer.id, status: 'all' });
+            for (const sub of subs.data) {
+                const productId = sub.items.data[0]?.price?.product as string;
+                memberships.push({
+                    level: productMap.get(productId) || 'Membership',
+                    status: sub.status,
+                    expirationDate: new Date(sub.current_period_end * 1000).toISOString(),
+                    cancelAtPeriodEnd: sub.cancel_at_period_end,
+                });
+            }
+        }
+
+        res.json({ found: memberships.length > 0, memberships });
+    } catch (err: any) {
+        console.error('getMembershipByEmail error:', err);
+        res.status(500).json({ error: 'Failed to look up membership' });
+    }
+});
+
+// 10. Shortlink Redirect
 export const shortlinkRedirect = onRequest({ cors: true }, async (req, res) => {
     try {
         const slug = req.path.substring(1); // removes the leading slash

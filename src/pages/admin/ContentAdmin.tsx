@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy, where } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import RichTextEditor from '../../components/admin/RichTextEditor';
-import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon, Upload, Trash2 } from 'lucide-react';
+import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon, Upload, Trash2, Eye, CheckSquare, Square, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { uploadFile } from '../../services/storage';
 
@@ -33,6 +33,7 @@ interface Post {
   ticketPrice?: number | null;
   capacity?: number | null;
   ticketsSold?: number;
+  galleryImages?: string[];
   // Editor-only ephemeral fields (stripped before save)
   _enableTicketing?: boolean;
   _ticketPriceDisplay?: string;
@@ -45,6 +46,10 @@ export default function ContentAdmin() {
   const [editingPost, setEditingPost] = useState<Post | Partial<Post> | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadingImageField, setUploadingImageField] = useState<string | null>(null);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const { user } = useAuth();
 
   const startEditing = (post: Post) => {
@@ -187,6 +192,95 @@ export default function ContentAdmin() {
       alert("Failed to upload image.");
     } finally {
       setUploadingImageField(null);
+    }
+  };
+
+  const handleGalleryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const invalidFiles = files.filter(f => !f.type.startsWith('image/'));
+    if (invalidFiles.length > 0) {
+      alert("Only image files are allowed.");
+      return;
+    }
+    setUploadingGallery(true);
+    try {
+      const urls = await Promise.all(files.map(f => uploadFile(f, 'content_images')));
+      setEditingPost(p => p ? ({ ...p, galleryImages: [...(p.galleryImages || []), ...urls] }) : null);
+    } catch (err) {
+      console.error("Error uploading gallery images:", err);
+      alert("Failed to upload one or more gallery images.");
+    } finally {
+      setUploadingGallery(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeGalleryImage = (idx: number) => {
+    setEditingPost(p => {
+      if (!p) return null;
+      const next = [...(p.galleryImages || [])];
+      next.splice(idx, 1);
+      return { ...p, galleryImages: next };
+    });
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === posts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(posts.map(p => p.id)));
+    }
+  };
+
+  const handleBulkAction = async (action: 'publish' | 'archive' | 'delete') => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+
+    if (action === 'delete') {
+      const eventWithSales = posts.filter(p => selectedIds.has(p.id) && (p.ticketsSold ?? 0) > 0);
+      if (eventWithSales.length > 0) {
+        alert(`Cannot delete: ${eventWithSales.map(p => `"${p.title}"`).join(', ')} has ticket sales. Archive instead.`);
+        return;
+      }
+      const confirmed = window.confirm(`Permanently delete ${count} post${count > 1 ? 's' : ''}? This cannot be undone.`);
+      if (!confirmed) return;
+    }
+
+    setBulkLoading(true);
+    try {
+      if (action === 'delete') {
+        const batch = writeBatch(db);
+        selectedIds.forEach(id => batch.delete(doc(db, 'posts', id)));
+        await batch.commit();
+      } else {
+        const batch = writeBatch(db);
+        const now = serverTimestamp();
+        selectedIds.forEach(id => {
+          const post = posts.find(p => p.id === id);
+          const update: any = { status: action === 'publish' ? 'published' : 'archived', updatedAt: now };
+          if (action === 'publish' && post && !post.publishDate) {
+            update.publishDate = now;
+          }
+          batch.update(doc(db, 'posts', id), update);
+        });
+        await batch.commit();
+      }
+      setSelectedIds(new Set());
+      fetchPosts();
+    } catch (err) {
+      console.error(`Bulk ${action} failed:`, err);
+      alert(`Failed to ${action} selected posts.`);
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -521,6 +615,50 @@ export default function ContentAdmin() {
                 </div>
               </div>
 
+              {/* Gallery Images */}
+              <div className="bg-cream border border-tan-light/50 rounded-lg p-5">
+                <p className="text-xs font-bold text-charcoal/50 uppercase tracking-wider mb-3 font-sans">Gallery Images</p>
+                <p className="text-xs text-charcoal/40 font-sans mb-4">Displayed as a photo grid at the bottom of the post. Upload multiple at once.</p>
+                <div className="flex items-center gap-4 mb-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleGalleryImageUpload}
+                    className="hidden"
+                    id="gallery-image-upload"
+                  />
+                  <label
+                    htmlFor="gallery-image-upload"
+                    className="flex items-center gap-2 bg-cream border border-tan hover:bg-tan/10 text-charcoal px-5 py-2 rounded cursor-pointer transition-colors font-sans text-xs font-bold uppercase tracking-wider shadow-2xs"
+                  >
+                    <Plus size={14} /> {uploadingGallery ? 'Uploading...' : 'Add Images'}
+                  </label>
+                  {(editingPost.galleryImages || []).length > 0 && (
+                    <span className="text-xs text-charcoal/50 font-sans">{(editingPost.galleryImages || []).length} image{(editingPost.galleryImages || []).length > 1 ? 's' : ''}</span>
+                  )}
+                </div>
+                {(editingPost.galleryImages || []).length > 0 ? (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                    {(editingPost.galleryImages || []).map((url, idx) => (
+                      <div key={idx} className="relative aspect-square rounded overflow-hidden border border-tan-light/30 group">
+                        <img src={url} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeGalleryImage(idx)}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-800 text-white p-1 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Remove"
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-charcoal/30 font-sans italic">No gallery images added yet.</p>
+                )}
+              </div>
+
               {/* Document/PDF Flyer Uploader */}
               <div className="bg-cream border border-tan-light/50 rounded-lg p-5">
                 <div className="flex items-center gap-2 mb-3">
@@ -590,6 +728,13 @@ export default function ContentAdmin() {
                   Cancel
                 </button>
                 <button
+                  type="button"
+                  onClick={() => setShowPreview(true)}
+                  className="flex items-center gap-2 px-6 py-2 border border-charcoal/30 text-charcoal/70 rounded hover:bg-cream transition-colors font-bold uppercase tracking-widest text-sm"
+                >
+                  <Eye size={15} /> Preview
+                </button>
+                <button
                   type="submit"
                   className="px-6 py-2 bg-tan text-white rounded hover:bg-tan-dark transition-colors font-bold uppercase tracking-widest text-sm"
                 >
@@ -611,6 +756,42 @@ export default function ContentAdmin() {
               </button>
             </div>
 
+            {selectedIds.size > 0 && (
+              <div className="mb-4 flex items-center gap-3 bg-tan/10 border border-tan/30 rounded-lg px-4 py-3">
+                <span className="text-sm font-bold text-charcoal font-sans">{selectedIds.size} selected</span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    onClick={() => handleBulkAction('publish')}
+                    disabled={bulkLoading}
+                    className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase tracking-wider rounded transition-colors disabled:opacity-50"
+                  >
+                    Publish
+                  </button>
+                  <button
+                    onClick={() => handleBulkAction('archive')}
+                    disabled={bulkLoading}
+                    className="px-4 py-1.5 bg-charcoal/60 hover:bg-charcoal text-white text-xs font-bold uppercase tracking-wider rounded transition-colors disabled:opacity-50"
+                  >
+                    Archive
+                  </button>
+                  <button
+                    onClick={() => handleBulkAction('delete')}
+                    disabled={bulkLoading}
+                    className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded transition-colors disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setSelectedIds(new Set())}
+                    className="ml-2 text-charcoal/40 hover:text-charcoal transition-colors"
+                    title="Clear selection"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {loading ? (
               <div className="text-center py-12 text-charcoal/60">Loading content...</div>
             ) : (
@@ -618,6 +799,11 @@ export default function ContentAdmin() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-cream border-b border-tan-light">
+                      <th className="p-4 w-10">
+                        <button onClick={toggleSelectAll} className="text-charcoal/40 hover:text-charcoal transition-colors">
+                          {selectedIds.size === posts.length && posts.length > 0 ? <CheckSquare size={16} className="text-tan" /> : <Square size={16} />}
+                        </button>
+                      </th>
                       <th className="p-4 font-sans font-bold text-xs uppercase tracking-wider text-charcoal/60">Title</th>
                       <th className="p-4 font-sans font-bold text-xs uppercase tracking-wider text-charcoal/60">Category</th>
                       <th className="p-4 font-sans font-bold text-xs uppercase tracking-wider text-charcoal/60">Status</th>
@@ -627,12 +813,17 @@ export default function ContentAdmin() {
                   </thead>
                   <tbody>
                     {posts.map((post) => (
-                      <tr key={post.id} className="border-b border-tan-light/50 last:border-0 hover:bg-cream/50 transition-colors">
+                      <tr key={post.id} className={`border-b border-tan-light/50 last:border-0 hover:bg-cream/50 transition-colors ${selectedIds.has(post.id) ? 'bg-tan/5' : ''}`}>
+                        <td className="p-4">
+                          <button onClick={() => toggleSelect(post.id)} className="text-charcoal/40 hover:text-tan transition-colors">
+                            {selectedIds.has(post.id) ? <CheckSquare size={16} className="text-tan" /> : <Square size={16} />}
+                          </button>
+                        </td>
                         <td className="p-4 font-serif text-charcoal">{post.title}</td>
                         <td className="p-4 text-sm text-charcoal/80">{post.category}</td>
                         <td className="p-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            post.status === 'published' ? 'bg-green-100 text-green-800' : 
+                            post.status === 'published' ? 'bg-green-100 text-green-800' :
                             post.status === 'archived' ? 'bg-gray-100 text-gray-800' :
                             'bg-yellow-100 text-yellow-800'
                           }`}>
@@ -644,7 +835,7 @@ export default function ContentAdmin() {
                           {post.updatedAt?.toDate().toLocaleDateString() || post.createdAt?.toDate().toLocaleDateString() || 'N/A'}
                         </td>
                         <td className="p-4 flex gap-3 justify-end">
-                          <button onClick={() => startEditing(post)} className="text-charcoal/60 hover:text-tan transition-colors">
+                          <button onClick={() => startEditing(post)} className="text-charcoal/60 hover:text-tan transition-colors" title="Edit">
                             <Pencil size={18} />
                           </button>
                           <button title="Archive Post" onClick={() => handleArchive(post.id)} className="text-charcoal/60 hover:text-red-600 transition-colors">
@@ -655,13 +846,74 @@ export default function ContentAdmin() {
                     ))}
                     {posts.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="p-8 text-center text-charcoal/60">No content found.</td>
+                        <td colSpan={6} className="p-8 text-center text-charcoal/60">No content found.</td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Preview Modal */}
+        {showPreview && editingPost && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center overflow-y-auto py-8 px-4">
+            <div className="bg-cream w-full max-w-3xl rounded-xl shadow-2xl relative">
+              <div className="sticky top-0 bg-white border-b border-tan-light px-6 py-3 flex items-center justify-between rounded-t-xl z-10">
+                <div className="flex items-center gap-3">
+                  <Eye size={16} className="text-tan" />
+                  <span className="font-sans font-bold text-sm uppercase tracking-widest text-charcoal">Preview</span>
+                  <span className="text-xs text-charcoal/40 font-sans">(unsaved changes shown)</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  {editingPost.id && editingPost.slug && (
+                    <a
+                      href={`/news/${editingPost.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-tan hover:text-tan-dark font-sans font-bold uppercase tracking-widest underline"
+                    >
+                      Open live page
+                    </a>
+                  )}
+                  <button onClick={() => setShowPreview(false)} className="text-charcoal/40 hover:text-charcoal transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+              <article className="p-8 font-serif text-charcoal">
+                {editingPost.bannerImage && (
+                  <img src={editingPost.bannerImage} alt="" className="w-full rounded-lg mb-6 object-cover max-h-64" />
+                )}
+                <div className="flex flex-wrap gap-3 mb-4 text-xs font-sans font-bold text-tan uppercase tracking-widest">
+                  {editingPost.category && <span>{editingPost.category}</span>}
+                  <span className={`px-2 py-0.5 rounded-full ${editingPost.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{editingPost.status || 'draft'}</span>
+                </div>
+                <h1 className="text-3xl md:text-4xl font-bold leading-tight mb-4">{editingPost.title || 'Untitled'}</h1>
+                {editingPost.excerpt && (
+                  <p className="text-lg text-charcoal/60 font-sans mb-6 border-l-4 border-tan pl-4">{editingPost.excerpt}</p>
+                )}
+                {editingPost.mainImage && (
+                  <img src={editingPost.mainImage} alt="" className="w-full rounded-lg mb-6 object-cover max-h-80" />
+                )}
+                {editingPost.content ? (
+                  <div className="prose prose-stone max-w-none font-sans" dangerouslySetInnerHTML={{ __html: editingPost.content }} />
+                ) : (
+                  <p className="text-charcoal/30 italic font-sans">No content yet.</p>
+                )}
+                {(editingPost.galleryImages || []).length > 0 && (
+                  <div className="mt-8">
+                    <p className="text-xs font-bold uppercase tracking-widest text-charcoal/40 font-sans mb-3">Gallery</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {(editingPost.galleryImages || []).map((img, idx) => (
+                        <img key={idx} src={img} alt={`Gallery ${idx + 1}`} className="w-full aspect-square object-cover rounded" />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </article>
+            </div>
           </div>
         )}
       </main>

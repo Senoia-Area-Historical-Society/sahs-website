@@ -32,6 +32,7 @@ import Unauthorized from './pages/Unauthorized';
 import VolunteerSignup from './pages/VolunteerSignup';
 import TicketSuccess from './pages/TicketSuccess';
 import BoxOffice from './pages/BoxOffice';
+import MemberPortal from './pages/MemberPortal';
 
 // Admin Pages
 import Login from './pages/admin/Login';
@@ -45,6 +46,7 @@ import TicketScanner from './pages/admin/TicketScanner';
 
 import UsersAdmin from './pages/admin/UsersAdmin';
 import ShortLinksAdmin from './pages/admin/ShortLinksAdmin';
+import AdminDashboard from './pages/admin/AdminDashboard';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isSAHSUser, loading } = useAuth();
   const location = useLocation();
@@ -95,6 +97,11 @@ function App() {
         <Routes>
           {/* Admin Routes (No Header/Footer, strictly protected) */}
           <Route path="/admin/login" element={<Login />} />
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/users" element={
             <ProtectedRoute>
               <UsersAdmin />
@@ -169,6 +176,7 @@ function App() {
           <Route path="/past-sahs-events" element={<PublicLayout><PastEvents /></PublicLayout>} />
           <Route path="/volunteer/:token" element={<PublicLayout><VolunteerSignup /></PublicLayout>} />
           <Route path="/tickets/success" element={<PublicLayout><TicketSuccess /></PublicLayout>} />
+          <Route path="/membership-status" element={<PublicLayout><MemberPortal /></PublicLayout>} />
           
           {/* Status Pages */}
           <Route path="/401" element={<PublicLayout><Unauthorized /></PublicLayout>} />

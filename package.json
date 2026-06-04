@@ -10,7 +10,12 @@
     "preview": "vite preview",
     "migrate": "tsx scripts/migrateWebflow.ts",
     "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit",
-    "seed:event": "node scripts/seed_july4_event.cjs"
+    "seed:event": "node scripts/seed_july4_event.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "test:e2e:local": "PLAYWRIGHT_BASE_URL=http://localhost:5173 playwright test"
   },
   "dependencies": {
     "@tiptap/extension-image": "^3.22.3",
@@ -31,11 +36,16 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/typography": "^0.5.19",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.0",
+    "@vitest/ui": "^4.1.8",
     "autoprefixer": "^10.4.27",
     "dotenv": "^17.3.1",
     "eslint": "^9.39.4",
@@ -44,12 +54,14 @@
     "firebase-admin": "^13.7.0",
     "firebase-tools": "^15.19.0",
     "globals": "^17.4.0",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.10",
     "tailwindcss": "^3.4.19",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.8"
   },
   "overrides": {
     "protobufjs": "8.5.0",
