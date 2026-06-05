@@ -160,17 +160,20 @@ export default function AdminHeader() {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="hidden sm:flex flex-col items-end gap-0.5 border-r border-tan/20 pr-6">
-          <span className="font-sans text-[10px] text-charcoal/40 uppercase tracking-widest font-black leading-none">
-            {isAdmin ? 'System Admin' : isCurator ? 'Curator' : isEditor ? 'Editor' : 'SAHS Staff'}
-          </span>
-          <div className="flex items-center gap-2">
-            {user?.photoURL ? (
-              <img src={user.photoURL} alt={user.displayName || ''} className="w-6 h-6 rounded-full border border-tan/20 shadow-sm" />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-tan/10 border border-tan/20 flex items-center justify-center text-[10px] font-black text-tan uppercase tracking-tighter">
-                {user?.displayName ? user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2) : user?.email?.[0].toUpperCase()}
-              </div>
+        <div className="hidden sm:flex items-center gap-3 border-r border-tan/20 pr-6">
+          {user?.photoURL ? (
+            <img src={user.photoURL} alt={user.displayName || ''} className="w-8 h-8 rounded-full border border-tan/20 shadow-sm flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-tan/10 border border-tan/20 flex items-center justify-center text-xs font-black text-tan uppercase tracking-tighter flex-shrink-0">
+              {user?.displayName ? user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2) : user?.email?.[0].toUpperCase()}
+            </div>
+          )}
+          <div className="flex flex-col items-start gap-0.5">
+            <span className="font-sans text-[10px] text-charcoal/40 uppercase tracking-widest font-black leading-none">
+              {isAdmin ? 'System Admin' : isCurator ? 'Curator' : isEditor ? 'Editor' : 'SAHS Staff'}
+            </span>
+            {user?.displayName && (
+              <span className="font-sans text-[11px] text-charcoal/60 leading-none">{user.displayName}</span>
             )}
           </div>
         </div>

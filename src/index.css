@@ -34,6 +34,11 @@
     @apply bg-tan text-white px-6 py-3 rounded-md font-sans font-bold uppercase tracking-wider shadow-lg border border-tan-dark;
   }
 
+  /* Links in prose (public post content) */
+  .prose a {
+    @apply text-tan underline decoration-tan/40 hover:text-tan-dark hover:decoration-tan-dark transition-colors;
+  }
+
   /* Reusable form input base style */
   .input-base {
     @apply w-full px-3 py-2.5 border border-tan/20 rounded-lg bg-white font-sans text-sm text-charcoal focus:outline-none focus:ring-2 focus:ring-tan/40 placeholder:text-charcoal/25 transition-shadow;

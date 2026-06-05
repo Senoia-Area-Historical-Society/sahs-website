@@ -3,7 +3,7 @@ import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, or
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import RichTextEditor from '../../components/admin/RichTextEditor';
-import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon, Upload, Trash2, Eye, CheckSquare, Square, X } from 'lucide-react';
+import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon, Upload, Trash2, Eye, CheckSquare, Square, X, Link2, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { uploadFile } from '../../services/storage';
 
@@ -48,6 +48,7 @@ export default function ContentAdmin() {
   const [uploadingImageField, setUploadingImageField] = useState<string | null>(null);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -865,7 +866,20 @@ export default function ContentAdmin() {
                           {post.author || 'Admin'}<br/>
                           {post.updatedAt?.toDate().toLocaleDateString() || post.createdAt?.toDate().toLocaleDateString() || 'N/A'}
                         </td>
-                        <td className="p-4 flex gap-3 justify-end">
+                        <td className="p-4 flex gap-3 justify-end items-center">
+                          {post.status === 'published' && post.slug && (
+                            <button
+                              title="Copy link"
+                              onClick={() => {
+                                navigator.clipboard.writeText(`https://senoiahistory.com/news/${post.slug}`);
+                                setCopiedId(post.id);
+                                setTimeout(() => setCopiedId(null), 2000);
+                              }}
+                              className="text-charcoal/60 hover:text-tan transition-colors"
+                            >
+                              {copiedId === post.id ? <Check size={16} className="text-green-600" /> : <Link2 size={16} />}
+                            </button>
+                          )}
                           <button onClick={() => startEditing(post)} className="text-charcoal/60 hover:text-tan transition-colors" title="Edit">
                             <Pencil size={18} />
                           </button>
