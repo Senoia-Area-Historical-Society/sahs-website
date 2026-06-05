@@ -7,7 +7,10 @@ import Stripe from 'stripe';
 import * as QRCode from 'qrcode';
 import * as path from 'path';
 import { Resend } from 'resend';
-import { welcomeEmailHtml } from './emails/welcomeEmail';
+import { render } from 'react-email';
+import * as React from 'react';
+import { WelcomeEmail } from './emails/WelcomeEmail';
+import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -30,11 +33,12 @@ async function sendWelcomeEmail(email: string, firstName: string): Promise<void>
         return;
     }
     const resend = getResend();
+    const html = await render(React.createElement(WelcomeEmail, { firstName }));
     const { error } = await resend.emails.send({
         from: 'Senoia Area Historical Society <membership@updates.senoiahistory.com>',
         to: email,
         subject: 'Thank You for Your SAHS Membership',
-        html: welcomeEmailHtml(firstName),
+        html,
     });
     if (error) {
         console.error('Resend welcome email failed:', error);
@@ -566,8 +570,81 @@ export const getMembershipByEmail = onRequest({ secrets: ['STRIPE_SECRET_KEY'], 
     }
 });
 
-// 10. Shortlink Redirect
-export const shortlinkRedirect = onRequest({ cors: true }, async (req, res) => {
+// 10. Render email preview (admin use — returns HTML for iframe display)
+export const renderEmailPreview = onRequest({ cors: true }, async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
+    try {
+        const { template, props } = req.body as { template: string; props: Record<string, unknown> };
+        let html = '';
+        if (template === 'welcome') {
+            html = await render(React.createElement(WelcomeEmail, props as { firstName?: string }));
+        } else if (template === 'newsletter') {
+            html = await render(React.createElement(NewsletterEmail, props as unknown as NewsletterEmailProps));
+        } else {
+            res.status(400).json({ error: 'Unknown template' });
+            return;
+        }
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
+    } catch (err) {
+        console.error('renderEmailPreview error:', err);
+        res.status(500).json({ error: 'Render failed' });
+    }
+});
+
+// 11. Send newsletter to all members via Resend
+export const sendNewsletter = onRequest({ secrets: ['RESEND_API_KEY'], cors: true }, async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    if (!RESEND_API_KEY) { res.status(500).json({ error: 'RESEND_API_KEY not configured' }); return; }
+
+    try {
+        const { newsletterProps, testEmail } = req.body as {
+            newsletterProps: NewsletterEmailProps;
+            testEmail?: string;
+        };
+        const resend = getResend();
+        const html = await render(React.createElement(NewsletterEmail, newsletterProps));
+
+        if (testEmail) {
+            // Test send to a single address
+            const { error } = await resend.emails.send({
+                from: 'Senoia Area Historical Society <membership@updates.senoiahistory.com>',
+                to: testEmail,
+                subject: `[TEST] ${newsletterProps.subject}`,
+                html,
+            });
+            if (error) { res.status(500).json({ error }); return; }
+            res.json({ sent: 1, mode: 'test' });
+        } else {
+            // Create a Resend broadcast (sends to all contacts in the audience)
+            const audienceId = process.env.RESEND_AUDIENCE_ID;
+            if (!audienceId) { res.status(500).json({ error: 'RESEND_AUDIENCE_ID not configured' }); return; }
+            const broadcastRes = await fetch('https://api.resend.com/broadcasts', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${RESEND_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    audience_id: audienceId,
+                    from: 'Senoia Area Historical Society <membership@updates.senoiahistory.com>',
+                    subject: newsletterProps.subject,
+                    html,
+                    name: `Newsletter — ${newsletterProps.issueLabel || 'Draft'}`,
+                }),
+            });
+            const broadcastData = await broadcastRes.json() as { id?: string; name?: string };
+            res.json({ broadcast: broadcastData, mode: 'broadcast' });
+        }
+    } catch (err) {
+        console.error('sendNewsletter error:', err);
+        res.status(500).json({ error: 'Failed to send newsletter' });
+    }
+});
+
+// 12. Shortlink Redirect
+export const shortlinkRedirect = onRequest({ cors: true }, async (req, res): Promise<void> => {
     try {
         const slug = req.path.substring(1); // removes the leading slash
         

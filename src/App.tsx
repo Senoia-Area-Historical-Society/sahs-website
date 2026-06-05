@@ -47,6 +47,7 @@ import TicketScanner from './pages/admin/TicketScanner';
 import UsersAdmin from './pages/admin/UsersAdmin';
 import ShortLinksAdmin from './pages/admin/ShortLinksAdmin';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import NewsletterComposer from './pages/admin/NewsletterComposer';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isSAHSUser, loading } = useAuth();
   const location = useLocation();
@@ -145,6 +146,11 @@ function App() {
           <Route path="/admin/shortlinks" element={
             <ProtectedRoute>
               <ShortLinksAdmin />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/newsletter" element={
+            <ProtectedRoute>
+              <NewsletterComposer />
             </ProtectedRoute>
           } />
 

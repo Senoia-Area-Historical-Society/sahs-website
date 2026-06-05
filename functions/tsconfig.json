@@ -8,7 +8,9 @@
     "strict": true,
     "skipLibCheck": true,
     "target": "es2017",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2017"]
   },
   "compileOnSave": true,
   "include": [

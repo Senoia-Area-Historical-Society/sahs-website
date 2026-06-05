@@ -34,6 +34,11 @@
     @apply bg-tan text-white px-6 py-3 rounded-md font-sans font-bold uppercase tracking-wider shadow-lg border border-tan-dark;
   }
 
+  /* Reusable form input base style */
+  .input-base {
+    @apply w-full px-3 py-2.5 border border-tan/20 rounded-lg bg-white font-sans text-sm text-charcoal focus:outline-none focus:ring-2 focus:ring-tan/40 placeholder:text-charcoal/25 transition-shadow;
+  }
+
   /* Tiptap List Styles & Tailwind overrides */
   .ProseMirror ul, .prose ul {
     list-style-type: disc !important;
