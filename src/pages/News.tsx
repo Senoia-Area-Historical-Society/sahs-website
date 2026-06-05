@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { Camera } from 'lucide-react';
 import { getNewsPosts, getEvents } from '../services/api';
 import type { Post } from '../types';
 
@@ -112,8 +113,14 @@ export default function News() {
                     {currentNews.map(item => (
                       <article key={item.id} className="flex flex-col bg-white rounded-lg shadow-sm border border-tan/20 overflow-hidden hover:shadow-md transition-shadow">
                         {item.mainImage ? (
-                          <div className="h-48 w-full overflow-hidden">
+                          <div className="relative h-48 w-full overflow-hidden">
                             <img src={item.mainImage} alt={item.title} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
+                            {(item.galleryImages?.length ?? 0) > 0 && (
+                              <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 text-white text-xs font-sans font-bold px-2 py-1 rounded-full backdrop-blur-sm">
+                                <Camera size={11} />
+                                <span>{item.galleryImages!.length} photos</span>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="h-48 w-full bg-tan/10 flex items-center justify-center">

@@ -47,6 +47,7 @@ export default function ContentAdmin() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadingImageField, setUploadingImageField] = useState<string | null>(null);
   const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -223,6 +224,18 @@ export default function ContentAdmin() {
       next.splice(idx, 1);
       return { ...p, galleryImages: next };
     });
+  };
+
+  const handleGalleryDrop = (targetIdx: number) => {
+    if (dragIndex === null || dragIndex === targetIdx) return;
+    setEditingPost(p => {
+      if (!p) return null;
+      const next = [...(p.galleryImages || [])];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(targetIdx, 0, moved);
+      return { ...p, galleryImages: next };
+    });
+    setDragIndex(null);
   };
 
   const toggleSelect = (id: string) => {
@@ -618,7 +631,7 @@ export default function ContentAdmin() {
               {/* Gallery Images */}
               <div className="bg-cream border border-tan-light/50 rounded-lg p-5">
                 <p className="text-xs font-bold text-charcoal/50 uppercase tracking-wider mb-3 font-sans">Gallery Images</p>
-                <p className="text-xs text-charcoal/40 font-sans mb-4">Displayed as a photo grid at the bottom of the post. Upload multiple at once.</p>
+                <p className="text-xs text-charcoal/40 font-sans mb-4">Displayed as a photo grid at the bottom of the post. Upload multiple at once. Drag thumbnails to reorder.</p>
                 <div className="flex items-center gap-4 mb-4">
                   <input
                     type="file"
@@ -641,8 +654,26 @@ export default function ContentAdmin() {
                 {(editingPost.galleryImages || []).length > 0 ? (
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                     {(editingPost.galleryImages || []).map((url, idx) => (
-                      <div key={idx} className="relative aspect-square rounded overflow-hidden border border-tan-light/30 group">
-                        <img src={url} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
+                      <div
+                        key={url}
+                        draggable
+                        onDragStart={(e) => {
+                          setDragIndex(idx);
+                          e.dataTransfer.setData('text/plain', String(idx)); // required for Firefox
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => { e.preventDefault(); handleGalleryDrop(idx); }}
+                        onDragEnd={() => setDragIndex(null)}
+                        className={`relative aspect-square rounded overflow-hidden border group cursor-grab active:cursor-grabbing transition-all ${
+                          dragIndex === idx
+                            ? 'border-tan opacity-40 scale-95'
+                            : dragIndex !== null
+                            ? 'border-tan/40 border-dashed border-2'
+                            : 'border-tan-light/30'
+                        }`}
+                      >
+                        <img src={url} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover pointer-events-none" draggable={false} />
                         <button
                           type="button"
                           onClick={() => removeGalleryImage(idx)}

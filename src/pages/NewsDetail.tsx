@@ -5,6 +5,10 @@ import { db } from '../lib/firebase';
 import type { Post } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar, MapPin, Download, FileText } from 'lucide-react';
+import Lightbox from 'yet-another-react-lightbox';
+import Counter from 'yet-another-react-lightbox/plugins/counter';
+import 'yet-another-react-lightbox/styles.css';
+import 'yet-another-react-lightbox/plugins/counter.css';
 import TicketPurchaseWidget from '../components/public/TicketPurchaseWidget';
 
 import SocialShare from '../components/public/SocialShare';
@@ -15,6 +19,8 @@ export default function NewsDetail() {
   const { user } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   useEffect(() => {
     async function loadPost() {
@@ -137,14 +143,37 @@ export default function NewsDetail() {
 
         {post.galleryImages && post.galleryImages.length > 0 && (
           <div className="mt-16 border-t border-tan-light pt-12">
-            <h2 className="text-2xl font-bold mb-8">Image Gallery</h2>
+            <h2 className="text-2xl font-bold mb-2">Image Gallery</h2>
+            <p className="text-sm font-sans text-charcoal/50 mb-8">
+              {post.galleryImages.length} photo{post.galleryImages.length !== 1 ? 's' : ''} — click any to view full size
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {post.galleryImages.map((img, idx) => (
-                <div key={idx} className="aspect-w-4 aspect-h-3 rounded-lg overflow-hidden shadow-sm border border-tan/10">
-                  <img src={img} alt={`${post.title} gallery image ${idx + 1}`} className="object-cover w-full h-full" />
-                </div>
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => { setLightboxIndex(idx); setLightboxOpen(true); }}
+                  className="aspect-[4/3] rounded-lg overflow-hidden shadow-sm border border-tan/10 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-tan/50 block w-full"
+                  aria-label={`View photo ${idx + 1} of ${post.galleryImages!.length}`}
+                >
+                  <img
+                    src={img}
+                    alt={`${post.title} gallery image ${idx + 1}`}
+                    className="object-cover w-full h-full hover:scale-105 transition-transform duration-300"
+                  />
+                </button>
               ))}
             </div>
+            <Lightbox
+              open={lightboxOpen}
+              close={() => setLightboxOpen(false)}
+              index={lightboxIndex}
+              on={{ view: ({ index: i }) => setLightboxIndex(i) }}
+              slides={post.galleryImages.map(src => ({ src }))}
+              plugins={[Counter]}
+              controller={{ closeOnBackdropClick: true }}
+              counter={{ separator: ' / ' }}
+            />
           </div>
         )}
       </div>
