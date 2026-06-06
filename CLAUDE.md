@@ -124,38 +124,6 @@ Flow: Stripe Checkout → `stripeWebhook` function → Resend welcome email → 
 
 Admin subdomain (`admin.senoiahistory.com`) auto-redirects to `/admin/content` via `HostnameRedirect` in `App.tsx`.
 
-### Public Routes (all wrapped in `PublicLayout` — Header + Footer)
-
-| Path | Component | Notes |
-|---|---|---|
-| `/` | `Home.tsx` | Hero + latest news feed |
-| `/about-sahs` | `About.tsx` | Board members and history |
-| `/senoia-stories` | `SenoiaStories.tsx` | Historical content |
-| `/location-and-hours` | `LocationAndHours.tsx` | Museum info |
-| `/carmichael-house` | `CarmichaelHouse.tsx` | Venue details |
-| `/contact-sahs` | `Contact.tsx` | Contact form |
-| `/privacy-policy` | `PrivacyPolicy.tsx` | |
-| `/news` | `News.tsx` | News + events list with filters |
-| `/news/:slug` | `NewsDetail.tsx` | Single post view |
-| `/support-sahs` | `Support.tsx` | Membership tier selection + Stripe |
-| `/support-sahs/success` | `StripeSuccess.tsx` | Post-payment confirmation |
-| `/support-sahs/cancel` | `StripeCancel.tsx` | |
-| `/supporters` | `Supporters.tsx` | Member and sponsor listing |
-| `/meeting-room` | `MeetingRoom.tsx` | Room booking form |
-| `/meeting-room/success` | `BookingSuccess.tsx` | |
-| `/meeting-room/cancel` | `BookingCancel.tsx` | |
-| `/vendor-application-form` | `VendorApplication.tsx` | |
-| `/sponsor-application-form` | — | Redirects to `/support-sahs#memberships` |
-| `/historic-structures-and-places` | `HistoricalPlaces.tsx` | Map-based place browser |
-| `/historic-structures-and-places/:slug` | `HistoricalPlaceDetail.tsx` | |
-| `/media` | `Media.tsx` | Photo gallery lightbox |
-| `/past-sahs-events` | `PastEvents.tsx` | Historical event archive |
-| `/volunteer/:token` | `VolunteerSignup.tsx` | Public volunteer slot signup |
-| `/tickets/success` | `TicketSuccess.tsx` | QR code display post-purchase |
-| `/membership-status` | `MemberPortal.tsx` | Self-service membership lookup |
-| `/box-office` | `BoxOffice.tsx` | Admin ticket sales at the door |
-| `/401` | `Unauthorized.tsx` | |
-| `*` | `NotFound.tsx` | 404 fallback |
 
 ## Cloud Functions (`functions/src/index.ts`)
 
