@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import type { Post } from '../types';
+import type { Post, VolunteerSheet } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { Calendar, MapPin, Download, FileText } from 'lucide-react';
+import { getActiveVolunteerSheetByPostId } from '../services/api';
+import { Calendar, MapPin, Download, FileText, HandHelping } from 'lucide-react';
 import Lightbox from 'yet-another-react-lightbox';
 import Counter from 'yet-another-react-lightbox/plugins/counter';
 import 'yet-another-react-lightbox/styles.css';
@@ -18,6 +19,7 @@ export default function NewsDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
+  const [volunteerSheet, setVolunteerSheet] = useState<VolunteerSheet | null>(null);
   const [loading, setLoading] = useState(true);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -30,7 +32,12 @@ export default function NewsDetail() {
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
           const docSnap = snapshot.docs[0];
-          setPost({ id: docSnap.id, ...docSnap.data() } as Post);
+          const loadedPost = { id: docSnap.id, ...docSnap.data() } as Post;
+          setPost(loadedPost);
+          if (loadedPost.type === 'event') {
+            const sheet = await getActiveVolunteerSheetByPostId(loadedPost.id);
+            setVolunteerSheet(sheet);
+          }
         }
       } catch (err) {
         console.error('Failed to load post details', err);
@@ -108,6 +115,26 @@ export default function NewsDetail() {
         {post.type === 'event' && post.ticketPrice && (
           <div className="mb-12">
             <TicketPurchaseWidget post={post} user={user} />
+          </div>
+        )}
+
+        {volunteerSheet && (
+          <div className="mb-12 p-6 bg-tan/5 border border-tan-light/50 rounded-xl flex items-center justify-between shadow-sm flex-col sm:flex-row gap-4 font-sans">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-tan/10 text-tan rounded-lg">
+                <HandHelping size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-charcoal">Volunteer for This Event</h3>
+                <p className="text-xs text-charcoal/60">{volunteerSheet.title} — sign up for an available slot.</p>
+              </div>
+            </div>
+            <Link
+              to={`/volunteer/${volunteerSheet.shareToken}`}
+              className="bg-tan hover:bg-tan-dark text-white px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider shadow transition-colors flex items-center gap-2 shrink-0"
+            >
+              <HandHelping size={16} /> Sign Up to Volunteer
+            </Link>
           </div>
         )}
 

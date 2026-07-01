@@ -345,6 +345,25 @@ export async function getTickets(): Promise<Ticket[]> {
 
 // ── Volunteer Management ──────────────────────────────────────────────────────
 
+/** Fetch the active volunteer sheet linked to a specific event post (public) */
+export async function getActiveVolunteerSheetByPostId(postId: string): Promise<VolunteerSheet | null> {
+  try {
+    const q = query(
+      collection(db, 'volunteer_sheets'),
+      where('eventPostId', '==', postId),
+      where('status', '==', 'active'),
+      limit(1)
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    const d = snapshot.docs[0];
+    return { id: d.id, ...d.data() } as VolunteerSheet;
+  } catch (err) {
+    console.error('Error fetching volunteer sheet by post ID:', err);
+    return null;
+  }
+}
+
 /** Generate a random URL-safe token for volunteer sheet share links */
 function generateShareToken(): string {
   return Math.random().toString(36).substring(2, 10);
@@ -368,6 +387,7 @@ export async function getVolunteerSheetByToken(token: string): Promise<Volunteer
     const q = query(
       collection(db, 'volunteer_sheets'),
       where('shareToken', '==', token),
+      where('status', '==', 'active'),
       limit(1)
     );
     const snapshot = await getDocs(q);
