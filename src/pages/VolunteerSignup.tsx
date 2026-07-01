@@ -112,7 +112,10 @@ export default function VolunteerSignup() {
           <p className="text-xs font-bold uppercase tracking-widest text-tan mb-3">Volunteer Signup</p>
           <h1 className="text-3xl md:text-4xl font-serif text-charcoal mb-4">{sheet.title}</h1>
           {sheet.description && (
-            <p className="text-charcoal/70 leading-relaxed">{sheet.description}</p>
+            <div
+              className="text-charcoal/70 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: sheet.description }}
+            />
           )}
           <div className="flex flex-wrap justify-center gap-5 mt-5 text-sm text-charcoal/60">
             {sheet.eventDate && (
