@@ -68,8 +68,9 @@ export default function Footer() {
         </div>
       </div>
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 pt-8 border-t border-charcoal-light flex flex-col md:flex-row justify-between items-center text-sm text-tan-light font-sans">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 pt-8 border-t border-charcoal-light flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-tan-light font-sans">
         <p>&copy; {new Date().getFullYear()} Senoia Area Historical Society. A 501(c)(3) Organization.</p>
+        <Link to="/admin/login" className="hover:text-white transition-colors">Staff Login</Link>
       </div>
     </footer>
   );
