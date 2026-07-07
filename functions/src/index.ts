@@ -571,7 +571,7 @@ export const getMembershipByEmail = onRequest({ secrets: ['STRIPE_SECRET_KEY'], 
 });
 
 // 10. Render email preview (admin use — returns HTML for iframe display)
-export const renderEmailPreview = onRequest({ cors: true }, async (req, res) => {
+export const renderEmailPreview = onRequest({ cors: true, invoker: 'public' }, async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
     try {
         const { template, props } = req.body as { template: string; props: Record<string, unknown> };
@@ -593,7 +593,7 @@ export const renderEmailPreview = onRequest({ cors: true }, async (req, res) => 
 });
 
 // 11. Send newsletter to all members via Resend
-export const sendNewsletter = onRequest({ secrets: ['RESEND_API_KEY', 'RESEND_AUDIENCE_ID'], cors: true }, async (req, res) => {
+export const sendNewsletter = onRequest({ secrets: ['RESEND_API_KEY', 'RESEND_AUDIENCE_ID'], cors: true, invoker: 'public' }, async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     if (!RESEND_API_KEY) { res.status(500).json({ error: 'RESEND_API_KEY not configured' }); return; }
