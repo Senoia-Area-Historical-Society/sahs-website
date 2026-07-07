@@ -369,16 +369,11 @@ function generateShareToken(): string {
   return Math.random().toString(36).substring(2, 10);
 }
 
-/** Fetch all volunteer sheets (admin view) */
+/** Fetch all volunteer sheets (admin view). Throws on failure so the caller can surface the error. */
 export async function getVolunteerSheets(): Promise<VolunteerSheet[]> {
-  try {
-    const q = query(collection(db, 'volunteer_sheets'), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerSheet));
-  } catch (err) {
-    console.error('Error fetching volunteer sheets:', err);
-    return [];
-  }
+  const q = query(collection(db, 'volunteer_sheets'), orderBy('createdAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as VolunteerSheet));
 }
 
 /** Fetch a single active sheet by its public share token */

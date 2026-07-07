@@ -78,6 +78,9 @@ service cloud.firestore {
       }
     }
 
+    // Shortlinks: admin-managed custom redirect slugs
+    match /shortlinks/{doc} { allow read, write: if isAdmin(); }
+
     // Mail (Trigger Email extension): allow creation for all (even public for signups); deny read/update
     match /mail/{doc} {
       allow create: if true;

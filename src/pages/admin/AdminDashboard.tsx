@@ -16,49 +16,67 @@ export default function AdminDashboard() {
   const [recentTickets, setRecentTickets] = useState<RecentTicket[]>([]);
   const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadDashboard() {
       const now = new Date();
 
-      const [publishedSnap, draftSnap, archivedSnap, eventsSnap, ticketsSnap, bookingsSnap] = await Promise.all([
+      // Each query is settled independently so one failure (e.g. a permission
+      // or missing-index error) doesn't blank out the entire dashboard.
+      const results = await Promise.allSettled([
         getDocs(query(collection(db, 'posts'), where('status', '==', 'published'))),
         getDocs(query(collection(db, 'posts'), where('status', '==', 'draft'))),
         getDocs(query(collection(db, 'posts'), where('status', '==', 'archived'))),
-        getDocs(query(
-          collection(db, 'posts'),
-          where('type', '==', 'event'),
-          where('status', '==', 'published'),
-          orderBy('eventDate', 'asc'),
-          limit(4)
-        )),
+        // Equality-only filters (no orderBy chained) so this never depends on a
+        // composite index existing — sort/filter for "upcoming" client-side instead.
+        getDocs(query(collection(db, 'posts'), where('type', '==', 'event'), where('status', '==', 'published'))),
         getDocs(query(collection(db, 'tickets'), orderBy('purchasedAt', 'desc'), limit(5))),
         getDocs(query(collection(db, 'bookings'), orderBy('submittedAt', 'desc'), limit(5))),
       ]);
+      const [publishedRes, draftRes, archivedRes, eventsRes, ticketsRes, bookingsRes] = results;
+
+      const errors: string[] = [];
+      const labels = ['published posts', 'draft posts', 'archived posts', 'upcoming events', 'recent tickets', 'recent bookings'];
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          console.error(`Dashboard: failed to load ${labels[i]}:`, r.reason);
+          errors.push(labels[i]);
+        }
+      });
+      setLoadErrors(errors);
 
       setPostCounts({
-        published: publishedSnap.size,
-        draft: draftSnap.size,
-        archived: archivedSnap.size,
+        published: publishedRes.status === 'fulfilled' ? publishedRes.value.size : 0,
+        draft: draftRes.status === 'fulfilled' ? draftRes.value.size : 0,
+        archived: archivedRes.status === 'fulfilled' ? archivedRes.value.size : 0,
       });
 
-      const events: UpcomingEvent[] = eventsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() } as UpcomingEvent))
-        .filter(e => {
-          if (!e.eventDate) return true;
-          const eventDate = e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate as any);
-          return eventDate >= now;
-        })
-        .slice(0, 3);
+      const events: UpcomingEvent[] = eventsRes.status === 'fulfilled'
+        ? eventsRes.value.docs
+            .map(d => ({ id: d.id, ...d.data() } as UpcomingEvent))
+            .filter(e => {
+              if (!e.eventDate) return true;
+              const eventDate = e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate as any);
+              return eventDate >= now;
+            })
+            .sort((a, b) => {
+              const dateA = a.eventDate?.toMillis ? a.eventDate.toMillis() : 0;
+              const dateB = b.eventDate?.toMillis ? b.eventDate.toMillis() : 0;
+              return dateA - dateB;
+            })
+            .slice(0, 3)
+        : [];
       setUpcomingEvents(events);
 
-      setRecentTickets(ticketsSnap.docs.map(d => ({ id: d.id, ...d.data() } as RecentTicket)));
-      setRecentBookings(bookingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as RecentBooking)));
+      setRecentTickets(ticketsRes.status === 'fulfilled' ? ticketsRes.value.docs.map(d => ({ id: d.id, ...d.data() } as RecentTicket)) : []);
+      setRecentBookings(bookingsRes.status === 'fulfilled' ? bookingsRes.value.docs.map(d => ({ id: d.id, ...d.data() } as RecentBooking)) : []);
       setLoading(false);
     }
 
     loadDashboard().catch(err => {
       console.error('Dashboard load error:', err);
+      setLoadErrors(['dashboard data']);
       setLoading(false);
     });
   }, []);
@@ -90,6 +108,13 @@ export default function AdminDashboard() {
             <Plus size={16} /> New Post
           </Link>
         </div>
+
+        {loadErrors.length > 0 && (
+          <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 font-sans text-sm">
+            Failed to load: {loadErrors.join(', ')}. Check the browser console for details — this usually means a
+            Firestore permission or index error rather than missing data.
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center items-center h-48">

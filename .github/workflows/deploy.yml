@@ -57,7 +57,7 @@ jobs:
           export_environment_variables: true
 
       # 🚀 Deploy to Firebase using the authenticated environment
-      - name: Deploy to Firebase Hosting and Functions
-        run: npx firebase-tools deploy --only hosting,functions --project sahs-archives --force
+      - name: Deploy to Firebase Hosting, Functions, Firestore, and Storage
+        run: npx firebase-tools deploy --only hosting,functions,firestore:rules,firestore:indexes,storage --project sahs-archives --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}

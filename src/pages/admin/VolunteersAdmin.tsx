@@ -29,6 +29,7 @@ export default function VolunteersAdmin() {
   const [view, setView] = useState<View>('list');
   const [sheets, setSheets] = useState<VolunteerSheet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -45,8 +46,16 @@ export default function VolunteersAdmin() {
 
   const fetchSheets = useCallback(async () => {
     setLoading(true);
-    setSheets(await getVolunteerSheets());
-    setLoading(false);
+    setLoadError(null);
+    try {
+      setSheets(await getVolunteerSheets());
+    } catch (err: any) {
+      console.error('Error fetching volunteer sheets:', err);
+      setLoadError(err?.message || 'Failed to load volunteer sheets.');
+      setSheets([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const fetchEventOptions = useCallback(async () => {
@@ -440,6 +449,13 @@ export default function VolunteersAdmin() {
             </button>
           )}
         </div>
+
+        {loadError && (
+          <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 font-sans text-sm">
+            Failed to load volunteer sheets: {loadError}. Check the browser console — this usually means a Firestore
+            permissions issue rather than there being no data.
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-12 text-charcoal/60">Loading volunteer sheets...</div>

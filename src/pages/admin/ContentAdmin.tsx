@@ -43,6 +43,7 @@ interface Post {
 export default function ContentAdmin() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editingPost, setEditingPost] = useState<Post | Partial<Post> | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadingImageField, setUploadingImageField] = useState<string | null>(null);
@@ -300,6 +301,7 @@ export default function ContentAdmin() {
 
   const fetchPosts = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
@@ -312,8 +314,9 @@ export default function ContentAdmin() {
         return { id: doc.id, ...data, category } as Post;
       });
       setPosts(fetchedPosts);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching posts:", err);
+      setLoadError(err?.message || 'Failed to load posts.');
     } finally {
       setLoading(false);
     }
@@ -787,6 +790,13 @@ export default function ContentAdmin() {
                 New Post
               </button>
             </div>
+
+            {loadError && (
+              <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 font-sans text-sm">
+                Failed to load posts: {loadError}. Check the browser console — this usually means a Firestore
+                permissions issue rather than there being no content.
+              </div>
+            )}
 
             {selectedIds.size > 0 && (
               <div className="mb-4 flex items-center gap-3 bg-tan/10 border border-tan/30 rounded-lg px-4 py-3">
