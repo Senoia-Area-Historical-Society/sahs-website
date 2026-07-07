@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import RichTextEditor from '../../components/admin/RichTextEditor';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -29,6 +30,7 @@ export default function VolunteersAdmin() {
   const [view, setView] = useState<View>('list');
   const [sheets, setSheets] = useState<VolunteerSheet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -45,8 +47,16 @@ export default function VolunteersAdmin() {
 
   const fetchSheets = useCallback(async () => {
     setLoading(true);
-    setSheets(await getVolunteerSheets());
-    setLoading(false);
+    setLoadError(null);
+    try {
+      setSheets(await getVolunteerSheets());
+    } catch (err: any) {
+      console.error('Error fetching volunteer sheets:', err);
+      setLoadError(err?.message || 'Failed to load volunteer sheets.');
+      setSheets([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const fetchEventOptions = useCallback(async () => {
@@ -440,6 +450,8 @@ export default function VolunteersAdmin() {
             </button>
           )}
         </div>
+
+        {loadError && <ErrorBanner message={`Failed to load volunteer sheets: ${loadError}.`} />}
 
         {loading ? (
           <div className="text-center py-12 text-charcoal/60">Loading volunteer sheets...</div>

@@ -3,6 +3,7 @@ import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'fi
 import { db } from '../../lib/firebase';
 import { Link } from 'react-router-dom';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import { FileText, Calendar, Ticket, CalendarDays, Users, Plus, TrendingUp, BookOpen, Clock, Loader2 } from 'lucide-react';
 
 interface PostCounts { published: number; draft: number; archived: number; }
@@ -16,49 +17,66 @@ export default function AdminDashboard() {
   const [recentTickets, setRecentTickets] = useState<RecentTicket[]>([]);
   const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadDashboard() {
       const now = new Date();
 
-      const [publishedSnap, draftSnap, archivedSnap, eventsSnap, ticketsSnap, bookingsSnap] = await Promise.all([
-        getDocs(query(collection(db, 'posts'), where('status', '==', 'published'))),
-        getDocs(query(collection(db, 'posts'), where('status', '==', 'draft'))),
-        getDocs(query(collection(db, 'posts'), where('status', '==', 'archived'))),
-        getDocs(query(
-          collection(db, 'posts'),
-          where('type', '==', 'event'),
-          where('status', '==', 'published'),
-          orderBy('eventDate', 'asc'),
-          limit(4)
-        )),
-        getDocs(query(collection(db, 'tickets'), orderBy('purchasedAt', 'desc'), limit(5))),
-        getDocs(query(collection(db, 'bookings'), orderBy('submittedAt', 'desc'), limit(5))),
-      ]);
+      // Each query is labeled and settled independently so one failure (e.g. a
+      // permission or missing-index error) doesn't blank out the entire dashboard,
+      // and so an error can never be attributed to the wrong query.
+      const specs = [
+        { label: 'published posts', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'published'))) },
+        { label: 'draft posts', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'draft'))) },
+        { label: 'archived posts', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'archived'))) },
+        // Equality-only filters (no orderBy chained) so this never depends on a
+        // composite index existing — sort/filter for "upcoming" client-side instead.
+        // A generous limit still bounds the worst-case read as the event archive grows.
+        { label: 'upcoming events', promise: getDocs(query(collection(db, 'posts'), where('type', '==', 'event'), where('status', '==', 'published'), limit(50))) },
+        { label: 'recent tickets', promise: getDocs(query(collection(db, 'tickets'), orderBy('purchasedAt', 'desc'), limit(5))) },
+        { label: 'recent bookings', promise: getDocs(query(collection(db, 'bookings'), orderBy('submittedAt', 'desc'), limit(5))) },
+      ];
+      // `settled` is derived from `specs` by a single map(), so it's always the same
+      // length and order as `specs` — positionally destructuring it here is safe
+      // because label and query live together in one array, not two synced-by-hand ones.
+      const settled = await Promise.allSettled(specs.map(s => s.promise));
+      const [publishedRes, draftRes, archivedRes, eventsRes, ticketsRes, bookingsRes] = settled;
+
+      const errors: string[] = [];
+      specs.forEach((s, i) => {
+        if (settled[i].status === 'rejected') {
+          console.error(`Dashboard: failed to load ${s.label}:`, (settled[i] as PromiseRejectedResult).reason);
+          errors.push(s.label);
+        }
+      });
+      setLoadErrors(errors);
 
       setPostCounts({
-        published: publishedSnap.size,
-        draft: draftSnap.size,
-        archived: archivedSnap.size,
+        published: publishedRes.status === 'fulfilled' ? publishedRes.value.size : 0,
+        draft: draftRes.status === 'fulfilled' ? draftRes.value.size : 0,
+        archived: archivedRes.status === 'fulfilled' ? archivedRes.value.size : 0,
       });
 
-      const events: UpcomingEvent[] = eventsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() } as UpcomingEvent))
-        .filter(e => {
-          if (!e.eventDate) return true;
-          const eventDate = e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate as any);
-          return eventDate >= now;
-        })
-        .slice(0, 3);
+      const events: UpcomingEvent[] = eventsRes.status === 'fulfilled'
+        ? eventsRes.value.docs
+            .map(d => ({ id: d.id, ...d.data() } as UpcomingEvent))
+            // An event with no scheduled date isn't "upcoming" — exclude it, matching
+            // what the previous Firestore-side orderBy('eventDate') silently did.
+            .filter(e => e.eventDate && (e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate as any)) >= now)
+            .sort((a, b) => (a.eventDate?.toMillis() ?? 0) - (b.eventDate?.toMillis() ?? 0))
+            .slice(0, 3)
+        : [];
       setUpcomingEvents(events);
 
-      setRecentTickets(ticketsSnap.docs.map(d => ({ id: d.id, ...d.data() } as RecentTicket)));
-      setRecentBookings(bookingsSnap.docs.map(d => ({ id: d.id, ...d.data() } as RecentBooking)));
+      setRecentTickets(ticketsRes.status === 'fulfilled' ? ticketsRes.value.docs.map(d => ({ id: d.id, ...d.data() } as RecentTicket)) : []);
+      setRecentBookings(bookingsRes.status === 'fulfilled' ? bookingsRes.value.docs.map(d => ({ id: d.id, ...d.data() } as RecentBooking)) : []);
       setLoading(false);
     }
 
     loadDashboard().catch(err => {
       console.error('Dashboard load error:', err);
+      setLoadErrors(['dashboard data']);
       setLoading(false);
     });
   }, []);
@@ -90,6 +108,8 @@ export default function AdminDashboard() {
             <Plus size={16} /> New Post
           </Link>
         </div>
+
+        {loadErrors.length > 0 && <ErrorBanner message={`Failed to load: ${loadErrors.join(', ')}.`} />}
 
         {loading ? (
           <div className="flex justify-center items-center h-48">

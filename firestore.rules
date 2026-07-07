@@ -3,11 +3,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper functions: Flattened to avoid recursion and circular dependencies
+    // Admin = permanent hardcoded admins or an explicit 'admin' role override.
+    // Do NOT match on the @senoiahistory.com domain broadly here — that would grant
+    // every SAHS staff account admin rights regardless of their actual role.
     function isAdmin() {
       return request.auth != null && (
-        request.auth.token.email.lower() == 'catnolan@senoiahistory.com' || 
+        request.auth.token.email.lower() == 'catnolan@senoiahistory.com' ||
         request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com' ||
-        request.auth.token.email.lower().matches('.*@senoiahistory\\.com$') ||
         (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
          get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'admin')
       );
@@ -77,6 +79,9 @@ service cloud.firestore {
         allow read, update, delete: if isCurator();
       }
     }
+
+    // Shortlinks: admin-managed custom redirect slugs
+    match /shortlinks/{doc} { allow read, write: if isAdmin(); }
 
     // Mail (Trigger Email extension): allow creation for all (even public for signups); deny read/update
     match /mail/{doc} {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import RichTextEditor from '../../components/admin/RichTextEditor';
 import { Pencil, Trash2, Plus, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,18 +21,21 @@ interface WikiPage {
 export default function WikiAdmin() {
   const [pages, setPages] = useState<WikiPage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editingPage, setEditingPage] = useState<WikiPage | Partial<WikiPage> | null>(null);
   const { user } = useAuth();
 
   const fetchPages = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const q = query(collection(db, 'wiki'), orderBy('category'), orderBy('title'));
       const snapshot = await getDocs(q);
       const fetchedPages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WikiPage));
       setPages(fetchedPages);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching wiki pages:", err);
+      setLoadError(err?.message || 'Failed to load wiki pages.');
     } finally {
       setLoading(false);
     }
@@ -158,6 +162,8 @@ export default function WikiAdmin() {
                 New Page
               </button>
             </div>
+
+            {loadError && <ErrorBanner message={`Failed to load wiki pages: ${loadError}.`} />}
 
             {loading ? (
               <div className="text-center py-12 text-charcoal/60">Loading wiki...</div>

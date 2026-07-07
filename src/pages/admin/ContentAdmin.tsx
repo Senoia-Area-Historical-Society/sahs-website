@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import RichTextEditor from '../../components/admin/RichTextEditor';
 import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon, Upload, Trash2, Eye, CheckSquare, Square, X, Link2, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -43,6 +44,7 @@ interface Post {
 export default function ContentAdmin() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editingPost, setEditingPost] = useState<Post | Partial<Post> | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadingImageField, setUploadingImageField] = useState<string | null>(null);
@@ -300,6 +302,7 @@ export default function ContentAdmin() {
 
   const fetchPosts = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
@@ -312,8 +315,9 @@ export default function ContentAdmin() {
         return { id: doc.id, ...data, category } as Post;
       });
       setPosts(fetchedPosts);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching posts:", err);
+      setLoadError(err?.message || 'Failed to load posts.');
     } finally {
       setLoading(false);
     }
@@ -787,6 +791,8 @@ export default function ContentAdmin() {
                 New Post
               </button>
             </div>
+
+            {loadError && <ErrorBanner message={`Failed to load posts: ${loadError}.`} />}
 
             {selectedIds.size > 0 && (
               <div className="mb-4 flex items-center gap-3 bg-tan/10 border border-tan/30 rounded-lg px-4 py-3">

@@ -5,6 +5,7 @@ import { db } from '../../lib/firebase';
 import type { Ticket } from '../../types';
 import { Ticket as TicketIcon, Loader2, Search, X, QrCode, ScanLine } from 'lucide-react';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 
@@ -13,6 +14,7 @@ type FilterTab = 'all' | 'paid' | 'cancelled';
 export default function TicketsAdmin() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -23,8 +25,9 @@ export default function TicketsAdmin() {
       try {
         const data = await getTickets();
         setTickets(data.sort((a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime()));
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to load tickets', err);
+        setLoadError(err?.message || 'Failed to load tickets.');
       } finally {
         setLoading(false);
       }
@@ -113,6 +116,8 @@ export default function TicketsAdmin() {
             </Link>
           </div>
         </header>
+
+        {loadError && <ErrorBanner message={`Failed to load tickets: ${loadError}.`} />}
 
         {/* Search + Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">

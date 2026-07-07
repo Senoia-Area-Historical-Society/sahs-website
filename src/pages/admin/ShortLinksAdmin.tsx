@@ -4,11 +4,13 @@ import { db } from '../../lib/firebase';
 import type { ShortLink } from '../../types';
 import { Loader2, Link as LinkIcon, Trash2, ExternalLink } from 'lucide-react';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import { format } from 'date-fns';
 
 export default function ShortLinksAdmin() {
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   const [newSlug, setNewSlug] = useState('');
   const [newTarget, setNewTarget] = useState('');
@@ -23,12 +25,14 @@ export default function ShortLinksAdmin() {
   const loadLinks = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const q = query(collection(db, 'shortlinks'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShortLink));
       setLinks(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load shortlinks', err);
+      setLoadError(err?.message || 'Failed to load shortlinks.');
     } finally {
       setLoading(false);
     }
@@ -132,6 +136,8 @@ export default function ShortLinksAdmin() {
             </button>
           </form>
         </div>
+
+        {loadError && <ErrorBanner message={`Failed to load shortlinks: ${loadError}.`} />}
 
         {/* Links List */}
         {loading ? (
