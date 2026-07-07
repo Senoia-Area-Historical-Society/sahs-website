@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, getDocs, setDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import { Pencil, Trash2, Plus, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -15,10 +16,12 @@ export default function UsersAdmin() {
   const { isAdmin, user } = useAuth();
   const [users, setUsers] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<UserRole | Partial<UserRole> | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const q = query(collection(db, 'user_roles'));
       const snapshot = await getDocs(q);
@@ -27,8 +30,9 @@ export default function UsersAdmin() {
         role: doc.data().role
       } as UserRole));
       setUsers(fetchedUsers);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching users:", err);
+      setLoadError(err?.message || 'Failed to load user roles.');
     } finally {
       setLoading(false);
     }
@@ -156,6 +160,8 @@ export default function UsersAdmin() {
                 Add User
               </button>
             </div>
+
+            {loadError && <ErrorBanner message={`Failed to load user roles: ${loadError}.`} />}
 
             {loading ? (
               <div className="text-center py-12 text-charcoal/60">Loading users...</div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Post } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,25 +10,28 @@ export default function BoxOffice() {
   const { user } = useAuth();
   const [events, setEvents] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadEvents() {
       try {
-        // Fetch posts that are events and have a ticket price
+        // Equality-only filters (no orderBy chained) so this never depends on a
+        // composite index existing — sort client-side instead.
         const q = query(
           collection(db, 'posts'),
           where('type', '==', 'event'),
-          where('status', '==', 'published'),
-          orderBy('eventDate', 'asc')
+          where('status', '==', 'published')
         );
         const snapshot = await getDocs(q);
         const fetchedEvents = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as Post))
-          .filter(event => event.ticketPrice && event.ticketPrice > 0);
-        
+          .filter(event => event.ticketPrice && event.ticketPrice > 0)
+          .sort((a, b) => (a.eventDate?.toMillis() ?? 0) - (b.eventDate?.toMillis() ?? 0));
+
         setEvents(fetchedEvents);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to load box office events", err);
+        setLoadError(err?.message || 'Failed to load events.');
       } finally {
         setLoading(false);
       }
@@ -52,6 +55,11 @@ export default function BoxOffice() {
         {loading ? (
           <div className="flex justify-center items-center py-24">
             <Loader2 className="animate-spin text-tan" size={48} />
+          </div>
+        ) : loadError ? (
+          <div className="bg-white rounded-xl border border-tan/20 p-12 text-center shadow-sm">
+            <p className="text-charcoal/50 font-sans italic text-lg">We couldn't load events right now.</p>
+            <p className="mt-2 text-charcoal/40 text-sm font-sans">Please try refreshing the page, or check back shortly.</p>
           </div>
         ) : events.length === 0 ? (
           <div className="bg-white rounded-xl border border-tan/20 p-12 text-center shadow-sm">

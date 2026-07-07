@@ -4,6 +4,7 @@ import { db } from '../../lib/firebase';
 import type { ShortLink } from '../../types';
 import { Loader2, Link as LinkIcon, Trash2, ExternalLink } from 'lucide-react';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import { format } from 'date-fns';
 
 export default function ShortLinksAdmin() {
@@ -136,12 +137,7 @@ export default function ShortLinksAdmin() {
           </form>
         </div>
 
-        {loadError && (
-          <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 font-sans text-sm">
-            Failed to load shortlinks: {loadError}. Check the browser console — this usually means a Firestore
-            permissions issue rather than there being no links.
-          </div>
-        )}
+        {loadError && <ErrorBanner message={`Failed to load shortlinks: ${loadError}.`} />}
 
         {/* Links List */}
         {loading ? (

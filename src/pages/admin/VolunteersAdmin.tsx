@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import RichTextEditor from '../../components/admin/RichTextEditor';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -450,12 +451,7 @@ export default function VolunteersAdmin() {
           )}
         </div>
 
-        {loadError && (
-          <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 font-sans text-sm">
-            Failed to load volunteer sheets: {loadError}. Check the browser console — this usually means a Firestore
-            permissions issue rather than there being no data.
-          </div>
-        )}
+        {loadError && <ErrorBanner message={`Failed to load volunteer sheets: ${loadError}.`} />}
 
         {loading ? (
           <div className="text-center py-12 text-charcoal/60">Loading volunteer sheets...</div>

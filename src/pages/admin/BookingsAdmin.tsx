@@ -4,10 +4,12 @@ import type { Booking } from '../../types';
 import { format, parseISO } from 'date-fns';
 import { Calendar, Clock, User, Building, Mail, FileText, CheckCircle, XCircle } from 'lucide-react';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 
 export default function BookingsAdmin() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
 
   useEffect(() => {
@@ -16,13 +18,15 @@ export default function BookingsAdmin() {
 
   const loadBookings = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await getAllBookings();
       // Sort by date descending (newest bookings first)
       const sortedData = data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setBookings(sortedData);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load bookings", error);
+      setLoadError(error?.message || 'Failed to load bookings.');
     } finally {
       setLoading(false);
     }
@@ -60,7 +64,9 @@ export default function BookingsAdmin() {
 
       {/* Main Content */}
       <main className="flex-grow p-8 max-w-7xl mx-auto w-full">
-        
+
+        {loadError && <ErrorBanner message={`Failed to load bookings: ${loadError}.`} />}
+
         {/* Tabs */}
         <div className="flex gap-4 mb-8 border-b border-tan-light">
           {(['pending', 'confirmed', 'cancelled'] as const).map(tab => (

@@ -189,18 +189,14 @@ export async function getBookings(startDate: string, endDate: string): Promise<B
   }
 }
 
+/** Fetch all bookings (admin view). Throws on failure so the caller can surface the error. */
 export async function getAllBookings(): Promise<Booking[]> {
-  try {
-    const q = query(
-      collection(db, 'bookings'),
-      orderBy('submittedAt', 'desc')
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(toBooking);
-  } catch (err) {
-    console.error('Error fetching all bookings:', err);
-    return [];
-  }
+  const q = query(
+    collection(db, 'bookings'),
+    orderBy('submittedAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(toBooking);
 }
 
 export async function updateBookingStatus(id: string, status: 'pending' | 'confirmed' | 'cancelled'): Promise<void> {
@@ -329,18 +325,14 @@ export async function getMemberships(): Promise<Membership[]> {
   }
 }
 
+/** Fetch all tickets (admin view). Throws on failure so the caller can surface the error. */
 export async function getTickets(): Promise<Ticket[]> {
-  try {
-    const q = query(
-      collection(db, 'tickets'),
-      orderBy('purchasedAt', 'desc')
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
-  } catch (err) {
-    console.error('Error fetching tickets:', err);
-    return [];
-  }
+  const q = query(
+    collection(db, 'tickets'),
+    orderBy('purchasedAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ticket));
 }
 
 // ── Volunteer Management ──────────────────────────────────────────────────────

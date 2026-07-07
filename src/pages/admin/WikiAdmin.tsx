@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import RichTextEditor from '../../components/admin/RichTextEditor';
 import { Pencil, Trash2, Plus, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -162,12 +163,7 @@ export default function WikiAdmin() {
               </button>
             </div>
 
-            {loadError && (
-              <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 font-sans text-sm">
-                Failed to load wiki pages: {loadError}. Check the browser console — this usually means a Firestore
-                permissions issue rather than there being no pages.
-              </div>
-            )}
+            {loadError && <ErrorBanner message={`Failed to load wiki pages: ${loadError}.`} />}
 
             {loading ? (
               <div className="text-center py-12 text-charcoal/60">Loading wiki...</div>

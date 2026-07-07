@@ -3,6 +3,7 @@ import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'fi
 import { db } from '../../lib/firebase';
 import { Link } from 'react-router-dom';
 import AdminHeader from './AdminHeader';
+import ErrorBanner from '../../components/admin/ErrorBanner';
 import { FileText, Calendar, Ticket, CalendarDays, Users, Plus, TrendingUp, BookOpen, Clock, Loader2 } from 'lucide-react';
 
 interface PostCounts { published: number; draft: number; archived: number; }
@@ -22,26 +23,31 @@ export default function AdminDashboard() {
     async function loadDashboard() {
       const now = new Date();
 
-      // Each query is settled independently so one failure (e.g. a permission
-      // or missing-index error) doesn't blank out the entire dashboard.
-      const results = await Promise.allSettled([
-        getDocs(query(collection(db, 'posts'), where('status', '==', 'published'))),
-        getDocs(query(collection(db, 'posts'), where('status', '==', 'draft'))),
-        getDocs(query(collection(db, 'posts'), where('status', '==', 'archived'))),
+      // Each query is labeled and settled independently so one failure (e.g. a
+      // permission or missing-index error) doesn't blank out the entire dashboard,
+      // and so an error can never be attributed to the wrong query.
+      const specs = [
+        { label: 'published posts', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'published'))) },
+        { label: 'draft posts', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'draft'))) },
+        { label: 'archived posts', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'archived'))) },
         // Equality-only filters (no orderBy chained) so this never depends on a
         // composite index existing — sort/filter for "upcoming" client-side instead.
-        getDocs(query(collection(db, 'posts'), where('type', '==', 'event'), where('status', '==', 'published'))),
-        getDocs(query(collection(db, 'tickets'), orderBy('purchasedAt', 'desc'), limit(5))),
-        getDocs(query(collection(db, 'bookings'), orderBy('submittedAt', 'desc'), limit(5))),
-      ]);
-      const [publishedRes, draftRes, archivedRes, eventsRes, ticketsRes, bookingsRes] = results;
+        // A generous limit still bounds the worst-case read as the event archive grows.
+        { label: 'upcoming events', promise: getDocs(query(collection(db, 'posts'), where('type', '==', 'event'), where('status', '==', 'published'), limit(50))) },
+        { label: 'recent tickets', promise: getDocs(query(collection(db, 'tickets'), orderBy('purchasedAt', 'desc'), limit(5))) },
+        { label: 'recent bookings', promise: getDocs(query(collection(db, 'bookings'), orderBy('submittedAt', 'desc'), limit(5))) },
+      ];
+      // `settled` is derived from `specs` by a single map(), so it's always the same
+      // length and order as `specs` — positionally destructuring it here is safe
+      // because label and query live together in one array, not two synced-by-hand ones.
+      const settled = await Promise.allSettled(specs.map(s => s.promise));
+      const [publishedRes, draftRes, archivedRes, eventsRes, ticketsRes, bookingsRes] = settled;
 
       const errors: string[] = [];
-      const labels = ['published posts', 'draft posts', 'archived posts', 'upcoming events', 'recent tickets', 'recent bookings'];
-      results.forEach((r, i) => {
-        if (r.status === 'rejected') {
-          console.error(`Dashboard: failed to load ${labels[i]}:`, r.reason);
-          errors.push(labels[i]);
+      specs.forEach((s, i) => {
+        if (settled[i].status === 'rejected') {
+          console.error(`Dashboard: failed to load ${s.label}:`, (settled[i] as PromiseRejectedResult).reason);
+          errors.push(s.label);
         }
       });
       setLoadErrors(errors);
@@ -55,16 +61,10 @@ export default function AdminDashboard() {
       const events: UpcomingEvent[] = eventsRes.status === 'fulfilled'
         ? eventsRes.value.docs
             .map(d => ({ id: d.id, ...d.data() } as UpcomingEvent))
-            .filter(e => {
-              if (!e.eventDate) return true;
-              const eventDate = e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate as any);
-              return eventDate >= now;
-            })
-            .sort((a, b) => {
-              const dateA = a.eventDate?.toMillis ? a.eventDate.toMillis() : 0;
-              const dateB = b.eventDate?.toMillis ? b.eventDate.toMillis() : 0;
-              return dateA - dateB;
-            })
+            // An event with no scheduled date isn't "upcoming" — exclude it, matching
+            // what the previous Firestore-side orderBy('eventDate') silently did.
+            .filter(e => e.eventDate && (e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate as any)) >= now)
+            .sort((a, b) => (a.eventDate?.toMillis() ?? 0) - (b.eventDate?.toMillis() ?? 0))
             .slice(0, 3)
         : [];
       setUpcomingEvents(events);
@@ -109,12 +109,7 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        {loadErrors.length > 0 && (
-          <div className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 font-sans text-sm">
-            Failed to load: {loadErrors.join(', ')}. Check the browser console for details — this usually means a
-            Firestore permission or index error rather than missing data.
-          </div>
-        )}
+        {loadErrors.length > 0 && <ErrorBanner message={`Failed to load: ${loadErrors.join(', ')}.`} />}
 
         {loading ? (
           <div className="flex justify-center items-center h-48">

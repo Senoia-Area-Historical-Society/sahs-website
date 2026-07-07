@@ -56,8 +56,33 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
 
-      # 🚀 Deploy to Firebase using the authenticated environment
-      - name: Deploy to Firebase Hosting, Functions, Firestore, and Storage
-        run: npx firebase-tools deploy --only hosting,functions,firestore:rules,firestore:indexes,storage --project sahs-archives --force
+      # 🚀 Deploy the app first — this is the well-established, previously-working
+      # path. Keeping it as its own step means a problem deploying rules/storage
+      # below (e.g. a missing IAM role for this service account) can't block the
+      # app from shipping.
+      - name: Deploy to Firebase Hosting and Functions
+        run: npx firebase-tools deploy --only hosting,functions --project sahs-archives --force
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
+
+      # Validate firestore.rules and storage.rules before pushing them live. This
+      # repo has no rules-unit-test suite, so this dry run is the only automated
+      # check that catches a syntax/compile error before it reaches production.
+      - name: Validate Firestore & Storage rules (dry run)
+        run: npx firebase-tools deploy --only firestore:rules,storage --project sahs-archives --dry-run
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
+
+      # Deploy Firestore rules and Storage rules. Firestore.rules previously only
+      # ever got deployed manually (or not at all), which let it silently drift out
+      # of sync with the app — this keeps it in sync on every merge to main.
+      #
+      # firestore:indexes is intentionally NOT deployed here: `firebase deploy
+      # --only firestore:indexes` is declarative and deletes any production index
+      # not listed in firestore.indexes.json, which is too destructive to run
+      # unattended on every push. Deploy index changes manually and deliberately
+      # with `firebase deploy --only firestore:indexes` per CLAUDE.md.
+      - name: Deploy Firestore & Storage rules
+        run: npx firebase-tools deploy --only firestore:rules,storage --project sahs-archives --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
