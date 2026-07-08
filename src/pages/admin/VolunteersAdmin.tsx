@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, getDocs, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import ErrorBanner from '../../components/admin/ErrorBanner';
@@ -61,12 +61,15 @@ export default function VolunteersAdmin() {
 
   const fetchEventOptions = useCallback(async () => {
     try {
-      const q = query(collection(db, 'posts'), orderBy('eventDate', 'asc'));
-      const snap = await getDocs(q);
+      // Fetch all posts and sort in memory — Firestore's orderBy excludes documents
+      // missing the ordered field entirely, which would silently drop legacy event
+      // posts without an eventDate (see conductor/fix-news-events.md).
+      const snap = await getDocs(collection(db, 'posts'));
       const events = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
         .filter((p: any) => p.type === 'event' || p.category === 'Event')
-        .map((p: any) => ({ id: p.id, title: p.title, eventDate: p.eventDate, location: p.location || p.eventLocation }));
+        .map((p: any) => ({ id: p.id, title: p.title, eventDate: p.eventDate, location: p.location || p.eventLocation }))
+        .sort((a, b) => (a.eventDate?.toMillis() || 0) - (b.eventDate?.toMillis() || 0));
       setEventOptions(events);
     } catch { /* ignore */ }
   }, []);
