@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, getDocs, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import ErrorBanner from '../../components/admin/ErrorBanner';
@@ -61,12 +61,15 @@ export default function VolunteersAdmin() {
 
   const fetchEventOptions = useCallback(async () => {
     try {
-      const q = query(collection(db, 'posts'), orderBy('eventDate', 'asc'));
-      const snap = await getDocs(q);
+      // Fetch all posts and sort in memory — Firestore's orderBy excludes documents
+      // missing the ordered field entirely, which would silently drop legacy event
+      // posts without an eventDate (see conductor/fix-news-events.md).
+      const snap = await getDocs(collection(db, 'posts'));
       const events = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
         .filter((p: any) => p.type === 'event' || p.category === 'Event')
-        .map((p: any) => ({ id: p.id, title: p.title, eventDate: p.eventDate, location: p.location || p.eventLocation }));
+        .map((p: any) => ({ id: p.id, title: p.title, eventDate: p.eventDate, location: p.location || p.eventLocation }))
+        .sort((a, b) => (a.eventDate?.toMillis() || 0) - (b.eventDate?.toMillis() || 0));
       setEventOptions(events);
     } catch { /* ignore */ }
   }, []);
@@ -484,6 +487,11 @@ export default function VolunteersAdmin() {
                   <tr key={sheet.id} className="border-b border-tan-light/50 last:border-0 hover:bg-cream/50 transition-colors">
                     <td className="p-4">
                       <p className="font-serif text-charcoal font-medium">{sheet.title}</p>
+                      {sheet.eventPostId && (
+                        <p className="text-xs text-tan mt-0.5">
+                          🔗 {eventOptions.find(e => e.id === sheet.eventPostId)?.title || 'Linked event (not found)'}
+                        </p>
+                      )}
                       {sheet.eventLocation && <p className="text-xs text-charcoal/50 mt-0.5">📍 {sheet.eventLocation}</p>}
                     </td>
                     <td className="p-4">{statusBadge(sheet.status)}</td>

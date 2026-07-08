@@ -4,9 +4,11 @@ import { db } from '../../lib/firebase';
 import AdminHeader from './AdminHeader';
 import ErrorBanner from '../../components/admin/ErrorBanner';
 import RichTextEditor from '../../components/admin/RichTextEditor';
-import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon, Upload, Trash2, Eye, CheckSquare, Square, X, Link2, Check } from 'lucide-react';
+import { Pencil, Archive, Plus, ArrowLeft, Ticket as TicketIcon, Upload, Trash2, Eye, CheckSquare, Square, X, Link2, Check, HandHelping } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { uploadFile } from '../../services/storage';
+import { getVolunteerSheets } from '../../services/api';
+import type { VolunteerSheet } from '../../types';
 
 const timestampToLocalISO = (timestamp: any): string => {
   if (!timestamp) return '';
@@ -35,9 +37,12 @@ interface Post {
   capacity?: number | null;
   ticketsSold?: number;
   galleryImages?: string[];
+  // Volunteer signup fields (stored in Firestore)
+  volunteerSheetId?: string | null;
   // Editor-only ephemeral fields (stripped before save)
   _enableTicketing?: boolean;
   _ticketPriceDisplay?: string;
+  _enableVolunteer?: boolean;
   [key: string]: any;
 }
 
@@ -54,6 +59,7 @@ export default function ContentAdmin() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [volunteerSheets, setVolunteerSheets] = useState<VolunteerSheet[]>([]);
   const { user } = useAuth();
 
   const startEditing = (post: Post) => {
@@ -64,11 +70,13 @@ export default function ContentAdmin() {
       publishDateDisplay: post.publishDate ? timestampToLocalISO(post.publishDate) : '',
       _ticketPriceDisplay: post.ticketPrice ? (post.ticketPrice / 100).toFixed(2) : '',
       _enableTicketing: !!post.ticketPrice,
+      _enableVolunteer: !!post.volunteerSheetId,
     });
   };
 
   useEffect(() => {
     fetchPosts();
+    getVolunteerSheets().then(setVolunteerSheets).catch(err => console.error('Error fetching volunteer sheets:', err));
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -136,6 +144,12 @@ export default function ContentAdmin() {
         // Clean up display-only fields
         delete postData._enableTicketing;
         delete postData._ticketPriceDisplay;
+
+        // Volunteer signup link
+        postData.volunteerSheetId = editingPost._enableVolunteer && editingPost.volunteerSheetId
+          ? editingPost.volunteerSheetId
+          : null;
+        delete postData._enableVolunteer;
       }
 
       if (editingPost.id) {
@@ -522,6 +536,47 @@ export default function ContentAdmin() {
                             <span className="ml-2 text-xs text-charcoal/40">(read-only)</span>
                           </div>
                         </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Volunteer Signup Panel */}
+                  <div className="bg-white border border-tan-light rounded-lg p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <HandHelping size={16} className="text-tan" />
+                        <p className="text-sm font-bold text-charcoal uppercase tracking-wider">Volunteer Signup</p>
+                      </div>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <span className="text-sm text-charcoal/60">{editingPost._enableVolunteer ? 'Enabled' : 'Disabled'}</span>
+                        <div
+                          onClick={() => setEditingPost(p => p ? ({ ...p, _enableVolunteer: !p._enableVolunteer }) : p)}
+                          className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                            editingPost._enableVolunteer ? 'bg-tan' : 'bg-charcoal/20'
+                          }`}
+                        >
+                          <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                            editingPost._enableVolunteer ? 'translate-x-5' : 'translate-x-0'
+                          }`} />
+                        </div>
+                      </label>
+                    </div>
+
+                    {editingPost._enableVolunteer && (
+                      <div>
+                        <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-1">Volunteer Sheet</label>
+                        <select
+                          required
+                          value={editingPost.volunteerSheetId || ''}
+                          onChange={e => setEditingPost(p => p ? ({ ...p, volunteerSheetId: e.target.value }) : p)}
+                          className="w-full px-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50 bg-white"
+                        >
+                          <option value="">— Select a volunteer sheet —</option>
+                          {volunteerSheets.map(sheet => (
+                            <option key={sheet.id} value={sheet.id}>{sheet.title} ({sheet.status})</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-charcoal/40 mt-1">Manage sheets and slots under Admin → Volunteers.</p>
                       </div>
                     )}
                   </div>

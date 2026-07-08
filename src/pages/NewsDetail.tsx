@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Post, VolunteerSheet } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { getActiveVolunteerSheetByPostId } from '../services/api';
+import { getVolunteerSheetById } from '../services/api';
 import { Calendar, MapPin, Download, FileText, HandHelping } from 'lucide-react';
 import Lightbox from 'yet-another-react-lightbox';
 import Counter from 'yet-another-react-lightbox/plugins/counter';
@@ -34,8 +34,8 @@ export default function NewsDetail() {
           const docSnap = snapshot.docs[0];
           const loadedPost = { id: docSnap.id, ...docSnap.data() } as Post;
           setPost(loadedPost);
-          if (loadedPost.type === 'event') {
-            const sheet = await getActiveVolunteerSheetByPostId(loadedPost.id);
+          if (loadedPost.type === 'event' && loadedPost.volunteerSheetId) {
+            const sheet = await getVolunteerSheetById(loadedPost.volunteerSheetId);
             setVolunteerSheet(sheet);
           }
         }
