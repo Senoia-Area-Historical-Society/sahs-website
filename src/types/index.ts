@@ -23,7 +23,10 @@ export interface Post {
   ticketPrice?: number; // in cents
   capacity?: number;
   ticketsSold?: number;
-  
+
+  // Volunteer signup fields
+  volunteerSheetId?: string | null;
+
   // System Fields
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;

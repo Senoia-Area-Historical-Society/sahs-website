@@ -484,6 +484,11 @@ export default function VolunteersAdmin() {
                   <tr key={sheet.id} className="border-b border-tan-light/50 last:border-0 hover:bg-cream/50 transition-colors">
                     <td className="p-4">
                       <p className="font-serif text-charcoal font-medium">{sheet.title}</p>
+                      {sheet.eventPostId && (
+                        <p className="text-xs text-tan mt-0.5">
+                          🔗 {eventOptions.find(e => e.id === sheet.eventPostId)?.title || 'Linked event (not found)'}
+                        </p>
+                      )}
                       {sheet.eventLocation && <p className="text-xs text-charcoal/50 mt-0.5">📍 {sheet.eventLocation}</p>}
                     </td>
                     <td className="p-4">{statusBadge(sheet.status)}</td>
