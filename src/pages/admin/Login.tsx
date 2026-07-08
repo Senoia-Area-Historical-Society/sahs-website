@@ -4,17 +4,17 @@ import { useAuth } from '../../contexts/AuthContext';
 import { LogIn } from 'lucide-react';
 
 export default function Login() {
-  const { user, isAdmin, loginWithGoogle, loading } = useAuth();
+  const { user, isSAHSUser, loginWithGoogle, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = location.state?.from?.pathname || '/admin/bookings';
 
   useEffect(() => {
-    if (user && isAdmin) {
+    if (user && isSAHSUser) {
       navigate(from, { replace: true });
     }
-  }, [user, isAdmin, navigate, from]);
+  }, [user, isSAHSUser, navigate, from]);
 
   if (loading) {
     return (
@@ -38,14 +38,14 @@ export default function Login() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-sm border border-tan/20 sm:rounded-lg sm:px-10">
           
-          {user && !isAdmin ? (
+          {user && !isSAHSUser ? (
             <div className="rounded-md bg-red-50 p-4 mb-6 border border-red-200">
               <div className="flex">
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800 font-sans">Access Denied</h3>
                   <div className="mt-2 text-sm text-red-700 font-sans">
                     <p>
-                      Your account ({user.email}) does not have curator access privileges. Please contact an administrator if you believe this is an error.
+                      Your account ({user.email}) does not have admin portal access. Please contact an administrator if you believe this is an error.
                     </p>
                   </div>
                 </div>
