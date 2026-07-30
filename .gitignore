@@ -62,3 +62,6 @@ playwright-report/
 
 # gemini-cli Conductor extension
 conductor/
+
+# Local emulator scripts
+start-emulators.sh
