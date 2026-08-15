@@ -42,8 +42,7 @@ export interface Post {
   galleryImages?: string[];
   // Volunteer signup fields (stored in Firestore)
   volunteerSheetId?: string | null;
-  // Editor-only ephemeral fields. NOTE: `buildPostData` only strips these when the
-  // post is an Event — News/Blog posts currently persist them to Firestore.
+  // Editor-only ephemeral fields — `buildPostData` strips these before every save.
   _enableTicketing?: boolean;
   _ticketPriceDisplay?: string;
   _enableVolunteer?: boolean;
@@ -117,8 +116,12 @@ export function buildPostData(
     postData.publishDate = now;
   }
 
-  if (isEvent && editingPost.eventStartDate) {
-    postData.eventDate = new Date(editingPost.eventStartDate);
+  if (isEvent) {
+    // Both writes are unconditional. Gating them on `eventStartDate` used to mean an
+    // event with no start date never got its typed venue promoted to `location` (the
+    // field every public page reads), and that blanking an existing start date left a
+    // stale `eventDate` behind.
+    postData.eventDate = editingPost.eventStartDate ? new Date(editingPost.eventStartDate) : null;
     postData.location = editingPost.eventLocation || '';
   }
 
@@ -136,15 +139,25 @@ export function buildPostData(
     }
     // Never overwrite ticketsSold from the editor
     delete postData.ticketsSold;
-    // Clean up display-only fields
-    delete postData._enableTicketing;
-    delete postData._ticketPriceDisplay;
 
     // Volunteer signup link
     postData.volunteerSheetId = editingPost._enableVolunteer && editingPost.volunteerSheetId
       ? editingPost.volunteerSheetId
       : null;
-    delete postData._enableVolunteer;
+  }
+
+  // Editor-only fields never belong in Firestore, event or not. These deletes used to
+  // live inside `if (isEvent)`, so every News/Blog post persisted them.
+  delete postData._enableTicketing;
+  delete postData._ticketPriceDisplay;
+  delete postData._enableVolunteer;
+
+  // Firestore rejects `undefined` outright ("Unsupported field value: undefined") unless
+  // `ignoreUndefinedProperties` is set, which src/lib/firebase.ts does not set — so a
+  // single cleared field would throw and take the whole save with it. Normalize to null,
+  // which every consumer already treats as "absent".
+  for (const key of Object.keys(postData)) {
+    if (postData[key] === undefined) postData[key] = null;
   }
 
   return postData;
