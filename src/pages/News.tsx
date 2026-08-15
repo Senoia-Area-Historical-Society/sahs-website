@@ -2,15 +2,18 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Camera, CalendarX } from 'lucide-react';
 import { format } from 'date-fns';
-import { getNewsPosts, getEvents, getPastEvents } from '../services/api';
+import { getNewsPosts, getEventsSplit, getVolunteerSheetById } from '../services/api';
 import EventCard from '../components/public/EventCard';
 import CalendarSubscribe from '../components/public/CalendarSubscribe';
 import type { Post } from '../types';
+
+const PAST_EVENTS_SHOWN = 4;
 
 export default function News() {
   const [news, setNews] = useState<Post[]>([]);
   const [events, setEvents] = useState<Post[]>([]);
   const [pastEvents, setPastEvents] = useState<Post[]>([]);
+  const [activeVolunteerSheets, setActiveVolunteerSheets] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 6;
@@ -18,14 +21,22 @@ export default function News() {
   useEffect(() => {
     async function loadContent() {
       try {
-        const [newsData, eventsData, pastEventsData] = await Promise.all([
+        const [newsData, { upcoming, past }] = await Promise.all([
           getNewsPosts(200, { includePastEvents: false }),
-          getEvents(),
-          getPastEvents(4)
+          getEventsSplit()
         ]);
         setNews(newsData);
-        setEvents(eventsData);
-        setPastEvents(pastEventsData);
+        setEvents(upcoming);
+        setPastEvents(past.slice(0, PAST_EVENTS_SHOWN));
+
+        // Only advertise volunteering when the linked sheet is still active
+        // (getVolunteerSheetById returns null for draft/closed sheets).
+        const sheetChecks = await Promise.all(
+          upcoming
+            .filter(e => e.volunteerSheetId)
+            .map(async e => [e.id, !!(await getVolunteerSheetById(e.volunteerSheetId!))] as const)
+        );
+        setActiveVolunteerSheets(Object.fromEntries(sheetChecks));
       } catch (err) {
         console.error("Failed to load news & events", err);
       } finally {
@@ -41,7 +52,6 @@ export default function News() {
   }, [news, currentPage]);
 
   const totalPages = Math.ceil(news.length / ITEMS_PER_PAGE);
-  const [nextEvent, ...moreEvents] = events;
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8 font-serif text-charcoal">
@@ -73,20 +83,29 @@ export default function News() {
                     <CalendarSubscribe />
                   </div>
                   <p className="font-sans text-sm text-charcoal/60 mt-8">
-                    In the meantime, catch up on the latest news below or browse our{' '}
+                    {news.length > 0 ? 'In the meantime, catch up on the latest news below or browse our' : 'In the meantime, browse our'}{' '}
                     <Link to="/past-sahs-events" className="text-tan font-bold hover:text-tan-dark transition-colors">past events archive</Link>.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-10">
-                  <EventCard post={nextEvent} variant="hero" />
+                  <EventCard
+                    post={events[0]}
+                    variant="hero"
+                    showVolunteerPill={activeVolunteerSheets[events[0].id]}
+                  />
 
-                  {moreEvents.length > 0 && (
+                  {events.length > 1 && (
                     <div>
                       <h3 className="text-xl font-bold mb-6">More Upcoming Events</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {moreEvents.map(event => (
-                          <EventCard key={event.id} post={event} variant="standard" />
+                        {events.slice(1).map(event => (
+                          <EventCard
+                            key={event.id}
+                            post={event}
+                            variant="standard"
+                            showVolunteerPill={activeVolunteerSheets[event.id]}
+                          />
                         ))}
                       </div>
                     </div>
@@ -133,8 +152,8 @@ export default function News() {
                             )}
                           </div>
                           <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                          <p className="text-gray-600 font-sans text-sm mb-4 line-clamp-3 flex-grow">
-                            {item.excerpt || item.content?.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'}
+                          <p className="text-charcoal/60 font-sans text-sm mb-4 line-clamp-3 flex-grow">
+                            {item.excerpt || (item.content ? item.content.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...' : '')}
                           </p>
                           <div className="mt-auto">
                             <Link

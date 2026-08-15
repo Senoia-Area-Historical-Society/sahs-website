@@ -1,7 +1,7 @@
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 
-// Point to emulator if running
+// Always targets the local emulator — this script never writes to production.
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 
 if (require('firebase-admin').apps.length === 0) {
@@ -15,14 +15,17 @@ const db = getFirestore();
 async function seed() {
   console.log('🌱 Seeding July 4th Extravaganza Event...');
 
-  const eventDate = new Date('2026-07-04T19:00:00-04:00'); // 7:00 PM EDT
+  // Next July 4th (7:00 PM EDT), so the seeded event is always upcoming.
+  const now = new Date();
+  const year = now.getFullYear() + (now > new Date(`${now.getFullYear()}-07-04T19:00:00-04:00`) ? 1 : 0);
+  const eventDate = new Date(`${year}-07-04T19:00:00-04:00`);
   const publishDate = new Date();
 
   const eventData = {
     type: 'event',
     status: 'published',
     title: 'July 4th Extravaganza',
-    slug: 'july-4th-extravaganza-2026',
+    slug: `july-4th-extravaganza-${year}`,
     eventDate: Timestamp.fromDate(eventDate),
     publishDate: Timestamp.fromDate(publishDate),
     content: `
@@ -30,7 +33,7 @@ async function seed() {
       <p>The evening will feature live historical reenactments, traditional Senoia cuisine, and a prime view of the local festivities. Bring your lawn chairs and your appetite!</p>
       <h3>Event Details</h3>
       <ul>
-        <li><strong>When:</strong> July 4th, 2026 at 7:00 PM</li>
+        <li><strong>When:</strong> July 4th, ${year} at 7:00 PM</li>
         <li><strong>Where:</strong> SAHS Museum grounds</li>
         <li><strong>Tickets:</strong> $25 per person (includes historical sampler plate)</li>
       </ul>

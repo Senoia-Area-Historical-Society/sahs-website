@@ -3,14 +3,31 @@ import { Calendar, MapPin, HandHelping } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Post } from '../../types';
 
-export type EventCardVariant = 'hero' | 'standard' | 'past';
+type EventCardVariant = 'hero' | 'standard' | 'past';
 
 interface EventCardProps {
   post: Post;
   variant?: EventCardVariant;
+  /** Show the "Volunteers Needed" pill. Callers should verify the linked
+   * volunteer sheet is active (getVolunteerSheetById) before setting this. */
+  showVolunteerPill?: boolean;
+}
+
+interface TicketState {
+  ticketed: boolean;
+  soldOut: boolean;
+  price: string | null;
 }
 
 const CARD_SHELL = 'bg-white rounded-lg shadow-sm border border-tan/20 hover:shadow-md transition-shadow overflow-hidden';
+
+// Mirrors TicketPurchaseWidget: falsy capacity (0 or undefined) means unlimited.
+function ticketState(post: Post): TicketState {
+  const ticketed = (post.ticketPrice ?? 0) > 0;
+  const soldOut = ticketed && !!post.capacity && post.capacity - (post.ticketsSold ?? 0) <= 0;
+  const price = ticketed ? `$${(post.ticketPrice! / 100).toFixed(2)}` : null;
+  return { ticketed, soldOut, price };
+}
 
 function DateBadge({ date }: { date: Date }) {
   return (
@@ -71,22 +88,16 @@ function VolunteerPill() {
   );
 }
 
-function ticketState(post: Post) {
-  const ticketed = (post.ticketPrice ?? 0) > 0;
-  const soldOut = ticketed && post.capacity != null && post.capacity - (post.ticketsSold ?? 0) <= 0;
-  const price = ticketed ? `$${(post.ticketPrice! / 100).toFixed(2)}` : null;
-  return { ticketed, soldOut, price };
-}
-
-function EventJsonLd({ post }: { post: Post }) {
+function EventJsonLd({ post, ticket }: { post: Post; ticket: TicketState }) {
   if (!post.eventDate) return null;
-  const { ticketed, soldOut } = ticketState(post);
   const url = `${window.location.origin}/news/${post.slug}`;
   const schema: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Event',
     name: post.title,
-    startDate: format(post.eventDate.toDate(), 'yyyy-MM-dd'),
+    // Full ISO datetime (UTC): unambiguous for crawlers regardless of the
+    // rendering client's timezone.
+    startDate: post.eventDate.toDate().toISOString(),
     eventStatus: 'https://schema.org/EventScheduled',
     url,
   };
@@ -95,13 +106,13 @@ function EventJsonLd({ post }: { post: Post }) {
   if (post.location) {
     schema.location = { '@type': 'Place', name: post.location, address: post.location };
   }
-  if (ticketed) {
+  if (ticket.ticketed) {
     schema.offers = {
       '@type': 'Offer',
       price: (post.ticketPrice! / 100).toFixed(2),
       priceCurrency: 'USD',
       url,
-      availability: soldOut ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+      availability: ticket.soldOut ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
     };
   }
   return (
@@ -112,21 +123,22 @@ function EventJsonLd({ post }: { post: Post }) {
   );
 }
 
-export default function EventCard({ post, variant = 'standard' }: EventCardProps) {
+export default function EventCard({ post, variant = 'standard', showVolunteerPill = false }: EventCardProps) {
   const detailPath = `/news/${post.slug}`;
 
   if (variant === 'past') {
+    const pastDate = (post.eventDate ?? post.publishDate)?.toDate();
     return (
       <article className={CARD_SHELL}>
         <Link to={detailPath} aria-label={`View recap of ${post.title}`} className="block h-full">
           <CardImage post={post} className="h-36 w-full" muted />
           <div className="p-4">
-            {post.eventDate && (
+            {pastDate && (
               <time
-                dateTime={format(post.eventDate.toDate(), 'yyyy-MM-dd')}
+                dateTime={format(pastDate, 'yyyy-MM-dd')}
                 className="block text-[11px] font-sans text-charcoal/40 uppercase tracking-widest mb-1"
               >
-                {format(post.eventDate.toDate(), 'MMMM d, yyyy')}
+                {format(pastDate, 'MMMM d, yyyy')}
               </time>
             )}
             <h3 className="text-base font-bold">{post.title}</h3>
@@ -136,21 +148,12 @@ export default function EventCard({ post, variant = 'standard' }: EventCardProps
     );
   }
 
-  const { ticketed, soldOut, price } = ticketState(post);
+  const ticket = ticketState(post);
+  const ctaClass = variant === 'hero'
+    ? 'inline-block bg-tan text-white px-8 py-3.5 rounded uppercase font-bold font-sans tracking-widest text-sm hover:bg-tan-dark transition-colors'
+    : 'text-tan font-bold font-sans text-sm uppercase tracking-wide hover:text-tan-dark transition-colors';
 
-  const primaryCta = ticketed && !soldOut ? (
-    <Link
-      to={detailPath}
-      aria-label={`Get tickets for ${post.title}`}
-      className={
-        variant === 'hero'
-          ? 'inline-block bg-tan text-white px-8 py-3.5 rounded uppercase font-bold font-sans tracking-widest text-sm hover:bg-tan-dark transition-colors'
-          : 'text-tan font-bold font-sans text-sm uppercase tracking-wide hover:text-tan-dark transition-colors'
-      }
-    >
-      Get Tickets — {price}
-    </Link>
-  ) : soldOut ? (
+  const primaryCta = ticket.soldOut ? (
     <span className="flex items-center gap-3 flex-wrap">
       <span className="inline-block bg-charcoal/10 text-charcoal/50 px-4 py-2 rounded uppercase font-bold font-sans tracking-widest text-xs">
         Sold Out
@@ -166,21 +169,17 @@ export default function EventCard({ post, variant = 'standard' }: EventCardProps
   ) : (
     <Link
       to={detailPath}
-      aria-label={`View details for ${post.title}`}
-      className={
-        variant === 'hero'
-          ? 'inline-block bg-tan text-white px-8 py-3.5 rounded uppercase font-bold font-sans tracking-widest text-sm hover:bg-tan-dark transition-colors'
-          : 'text-tan font-bold font-sans text-sm uppercase tracking-wide hover:text-tan-dark transition-colors'
-      }
+      aria-label={ticket.ticketed ? `Get tickets for ${post.title}` : `View details for ${post.title}`}
+      className={ctaClass}
     >
-      View Details
+      {ticket.ticketed ? `Get Tickets — ${ticket.price}` : 'View Details'}
     </Link>
   );
 
   if (variant === 'hero') {
     return (
       <article className={`${CARD_SHELL} md:flex`}>
-        <EventJsonLd post={post} />
+        <EventJsonLd post={post} ticket={ticket} />
         <CardImage post={post} className="aspect-[16/10] md:aspect-auto md:w-1/2" />
         <div className="p-8 md:p-10 md:w-1/2 flex flex-col justify-center">
           <div className="text-xs font-sans text-tan font-bold uppercase tracking-widest mb-3">Next Event</div>
@@ -195,7 +194,7 @@ export default function EventCard({ post, variant = 'standard' }: EventCardProps
           )}
           <div className="flex items-center gap-4 flex-wrap mt-auto">
             {primaryCta}
-            {post.volunteerSheetId && <VolunteerPill />}
+            {showVolunteerPill && <VolunteerPill />}
           </div>
         </div>
       </article>
@@ -204,7 +203,7 @@ export default function EventCard({ post, variant = 'standard' }: EventCardProps
 
   return (
     <article className={`${CARD_SHELL} flex flex-col`}>
-      <EventJsonLd post={post} />
+      <EventJsonLd post={post} ticket={ticket} />
       <CardImage post={post} className="aspect-video w-full" />
       <div className="p-6 flex flex-col flex-grow">
         <h3 className="text-xl font-bold mb-3">
@@ -214,11 +213,11 @@ export default function EventCard({ post, variant = 'standard' }: EventCardProps
           <MetadataRow post={post} compact />
         </div>
         {post.excerpt && (
-          <p className="text-gray-600 font-sans text-sm line-clamp-3 mb-4">{post.excerpt}</p>
+          <p className="text-charcoal/60 font-sans text-sm line-clamp-3 mb-4">{post.excerpt}</p>
         )}
         <div className="mt-auto flex items-center justify-between gap-3 flex-wrap">
           {primaryCta}
-          {post.volunteerSheetId && <VolunteerPill />}
+          {showVolunteerPill && <VolunteerPill />}
         </div>
       </div>
     </article>
