@@ -17,7 +17,11 @@ const getFunctionsBaseUrl = () => {
       : 'http://127.0.0.1:5001/sahs-archives/us-central1');
 };
 
-export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
+export async function getNewsPosts(
+  maxItems: number = 20,
+  opts: { includePastEvents?: boolean } = {}
+): Promise<Post[]> {
+  const { includePastEvents = true } = opts;
   try {
     // Fetch all published posts once to avoid missing documents due to Firestore's requirement that
     // any field used in orderBy/where-range must exist. Imported posts may lack fields.
@@ -28,10 +32,11 @@ export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
     const snapshot = await getDocs(q);
     const allPosts = snapshot.docs.map(toPost);
     const now = new Date();
-    
+
     return allPosts
       .filter(post => {
         if (post.type === 'event') {
+          if (!includePastEvents) return false;
           // Include events if they are in the past OR if they are missing an event date
           if (!post.eventDate) return true;
           return post.eventDate.toDate() < now;
