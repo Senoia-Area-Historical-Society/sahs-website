@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPastEvents } from '../services/api';
+import { excerptFromHtml } from '../lib/text';
 import type { Post } from '../types';
 
 export default function PastEvents() {
@@ -64,7 +65,7 @@ export default function PastEvents() {
                   </div>
                   <h3 className="text-2xl font-bold mb-4 leading-tight">{event.title}</h3>
                   <p className="text-charcoal/70 font-sans text-sm mb-6 line-clamp-4 flex-grow italic leading-relaxed">
-                    {event.excerpt || (event.content ? event.content.replace(/<[^>]*>?/gm, '').substring(0, 160) + '...' : 'Heritage event preservation and community program.')}
+                    {event.excerpt || excerptFromHtml(event.content, 160) || 'Heritage event preservation and community program.'}
                   </p>
                   <div className="mt-auto">
                     <Link to={`/news/${event.slug}`} className="text-charcoal font-bold font-sans text-sm gap-2 inline-flex items-center group">
