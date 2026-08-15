@@ -17,9 +17,9 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "firebase-admin": "^12.1.0",
+    "firebase-admin": "^14.2.0",
     "firebase-functions": "^7.2.3",
-    "googleapis": "^137.1.0",
+    "googleapis": "^174.0.1",
     "qrcode": "^1.5.3",
     "react": "^19.2.7",
     "react-email": "^6.5.0",
@@ -29,8 +29,10 @@
   "devDependencies": {
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.16",
-    "firebase-functions-test": "^3.1.0",
     "typescript": "^4.9.0"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "uuid": "14.0.1"
+  }
 }
