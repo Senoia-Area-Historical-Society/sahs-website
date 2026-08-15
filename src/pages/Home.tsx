@@ -64,11 +64,12 @@ export default function Home() {
           
           {/* News Feed */}
           <div className="lg:col-span-2">
-            <div className="flex justify-between items-end mb-12">
-              <h2 className="text-3xl font-bold border-b-2 border-tan pb-2">News & Past Events</h2>
-              <Link to="/news" className="text-tan font-sans font-bold uppercase tracking-widest text-sm hover:text-tan-dark transition-colors">View All</Link>
+            {/* No "View All" link: /news is the Events page and there is no
+                page that lists news articles. */}
+            <div className="mb-12">
+              <h2 className="text-3xl font-bold border-b-2 border-tan pb-2 inline-block">News &amp; Past Events</h2>
             </div>
-            
+
             {news.length === 0 ? (
               <div className="bg-white p-12 rounded-xl border border-tan/10 shadow-sm text-center max-w-lg mx-auto md:max-w-none">
                 <span className="text-3xl mb-4 block">📰</span>
