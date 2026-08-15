@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Camera, CalendarX } from 'lucide-react';
 import { format } from 'date-fns';
 import { getNewsPosts, getEventsSplit, getVolunteerSheetById } from '../services/api';
+import { excerptFromHtml } from '../lib/text';
 import EventCard from '../components/public/EventCard';
 import CalendarSubscribe from '../components/public/CalendarSubscribe';
 import type { Post } from '../types';
@@ -153,7 +154,7 @@ export default function News() {
                           </div>
                           <h3 className="text-xl font-bold mb-3">{item.title}</h3>
                           <p className="text-charcoal/60 font-sans text-sm mb-4 line-clamp-3 flex-grow">
-                            {item.excerpt || (item.content ? item.content.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...' : '')}
+                            {item.excerpt || excerptFromHtml(item.content, 150)}
                           </p>
                           <div className="mt-auto">
                             <Link

@@ -1,4 +1,4 @@
-import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc, serverTimestamp, type FirestoreError } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking, Membership, Ticket, VolunteerSheet, VolunteerSlot, VolunteerRegistration } from '../types/index';
 
@@ -357,7 +357,11 @@ export async function getVolunteerSheetById(id: string): Promise<VolunteerSheet 
     if (!snap.exists() || snap.data().status !== 'active') return null;
     return { id: snap.id, ...snap.data() } as VolunteerSheet;
   } catch (err) {
-    console.error('Error fetching volunteer sheet by ID:', err);
+    // Security rules only allow public reads of active sheets, so
+    // permission-denied is the expected outcome for draft/closed sheets.
+    if ((err as FirestoreError)?.code !== 'permission-denied') {
+      console.error('Error fetching volunteer sheet by ID:', err);
+    }
     return null;
   }
 }
