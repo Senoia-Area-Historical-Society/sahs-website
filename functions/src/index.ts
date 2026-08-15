@@ -1,7 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
 import Stripe from 'stripe';
 import * as QRCode from 'qrcode';
@@ -13,7 +13,7 @@ import { WelcomeEmail } from './emails/WelcomeEmail';
 import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
 
 admin.initializeApp();
-const db = admin.firestore();
+const db = getFirestore();
 
 const CALENDAR_ID = 'c_188962a8uva3ijbpl6cdtc9621g6m@resource.calendar.google.com';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://senoiahistory.com';
@@ -518,7 +518,7 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
                     eventId: afterData.googleCalendarEventId
                 });
                 await event.data?.after.ref.update({
-                    googleCalendarEventId: admin.firestore.FieldValue.delete()
+                    googleCalendarEventId: FieldValue.delete()
                 });
             } catch (err) {
                 console.error('Error deleting Google Calendar event for unpublished post:', err);
