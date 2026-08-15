@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getNewsPosts, getEvents } from '../services/api';
+import { excerptFromHtml } from '../lib/text';
 import CalendarSubscribe from '../components/public/CalendarSubscribe';
 import type { Post } from '../types';
 import { format } from 'date-fns';
@@ -87,7 +88,7 @@ export default function Home() {
                     <div className="p-6">
                       <h3 className="text-xl font-bold mb-2 group-hover:text-tan transition-colors">{post.title}</h3>
                       <p className="font-sans text-charcoal/60 text-sm line-clamp-2">
-                        {post.excerpt || post.content?.replace(/<[^>]*>?/gm, '').substring(0, 120) + '...'}
+                        {post.excerpt || excerptFromHtml(post.content, 120)}
                       </p>
                     </div>
                   </Link>
