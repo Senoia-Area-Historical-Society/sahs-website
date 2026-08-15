@@ -73,7 +73,7 @@ export default function HistoricalPlaces() {
                       </div>
                     ) : (
                       <div className="h-64 bg-cream flex flex-col items-center justify-center p-6 border-b border-tan/10">
-                         <img src="/sahs-logo.png" alt="SAHS Logo" className="h-24 opacity-20" />
+                         <img src="/favicon.png" alt="SAHS Logo" className="h-24 opacity-20" />
                       </div>
                     )}
                     
