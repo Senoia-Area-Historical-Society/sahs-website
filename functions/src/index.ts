@@ -452,11 +452,13 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
         const auth = getCalendarAuth();
         const calendar = google.calendar({ version: 'v3', auth });
         
-        // Case A: Newly published event (was not published, or newly created and published)
-        if (isPublished && !wasPublished) {
+        // Case A: Published event with no calendar entry yet. Gated on the missing
+        // googleCalendarEventId rather than on `!wasPublished` so that an event whose
+        // earlier sync was skipped — published before its date was filled in — still
+        // gets onto the calendar once the date arrives. (A published event that never
+        // gets a date re-enters here on every write and simply warns.)
+        if (isPublished && !afterData.googleCalendarEventId) {
             try {
-                if (afterData.googleCalendarEventId) return;
-                
                 const window = resolveEventWindow(afterData);
                 if (!window) {
                     console.warn(`Skipping calendar insert for post ${event.params.postId}: no usable event date`);
@@ -484,8 +486,8 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
                 console.error('Error creating Google Calendar event:', err);
             }
         }
-        // Case B: Edited details of an already published event
-        else if (isPublished && wasPublished && afterData.googleCalendarEventId) {
+        // Case B: Edited details of a published event that already has a calendar entry
+        else if (isPublished && afterData.googleCalendarEventId) {
             try {
                 const window = resolveEventWindow(afterData);
                 if (!window) {
