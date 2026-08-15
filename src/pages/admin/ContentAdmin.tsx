@@ -432,7 +432,7 @@ export default function ContentAdmin() {
                             min="1"
                             required
                             value={editingPost.capacity || ''}
-                            onChange={e => setEditingPost(p => ({ ...p, capacity: parseInt(e.target.value) || undefined }))}
+                            onChange={e => setEditingPost(p => ({ ...p, capacity: parseInt(e.target.value) || null }))}
                             placeholder="e.g. 100"
                             className="w-full px-3 py-2 border border-tan-light rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-tan/50"
                           />
@@ -685,7 +685,7 @@ export default function ContentAdmin() {
                       <a href={editingPost.documentUrl} target="_blank" rel="noreferrer" className="underline font-bold hover:text-green-900">View File</a>
                       <button
                         type="button"
-                        onClick={() => setEditingPost(p => p ? ({ ...p, documentUrl: undefined }) : null)}
+                        onClick={() => setEditingPost(p => p ? ({ ...p, documentUrl: null }) : null)}
                         className="text-red-600 hover:underline font-bold ml-2 inline-flex items-center gap-0.5"
                       >
                         <Trash2 size={13} /> Remove

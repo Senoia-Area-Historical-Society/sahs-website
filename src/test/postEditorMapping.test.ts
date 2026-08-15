@@ -178,6 +178,70 @@ describe('buildEditorState seeds every display-only field', () => {
   });
 });
 
+describe('buildPostData — fields the editor can clear', () => {
+  // Firestore rejects undefined outright, so a cleared field used to throw and take the
+  // whole save down. null actually clears the value; `ignoreUndefinedProperties` would
+  // have merely skipped the field, leaving the old flyer URL in place.
+  it('writes null, not undefined, when the flyer PDF is removed', () => {
+    const stored = seedScriptEvent();
+    const saved = buildPostData(
+      { ...buildEditorState(stored), documentUrl: undefined },
+      { ...SAVE_OPTS, slug: stored.slug }
+    );
+    expect(saved).toHaveProperty('documentUrl');
+    expect(saved.documentUrl).toBeNull();
+  });
+
+  it('writes null when capacity is cleared', () => {
+    const stored = seedScriptEvent();
+    const saved = buildPostData(
+      { ...buildEditorState(stored), capacity: undefined },
+      { ...SAVE_OPTS, slug: stored.slug }
+    );
+    expect(saved.capacity).toBeNull();
+  });
+
+  it('never emits undefined for any field the editor blanks', () => {
+    const stored = seedScriptEvent();
+    const saved = buildPostData(
+      { ...buildEditorState(stored), documentUrl: undefined, mainImage: undefined, excerpt: undefined },
+      { ...SAVE_OPTS, slug: stored.slug }
+    );
+    expect(Object.keys(saved).filter(k => saved[k] === undefined)).toEqual([]);
+  });
+});
+
+describe('buildPostData — event date and location are written independently', () => {
+  // Regression guard: both writes used to be gated on `eventStartDate` being truthy.
+  it('promotes a typed venue to `location` even with no start date', () => {
+    const stored: Post = { ...seedScriptEvent(), eventDate: undefined, location: '' };
+    const saved = buildPostData(
+      { ...buildEditorState(stored), eventLocation: 'Senoia Depot' },
+      { ...SAVE_OPTS, slug: stored.slug }
+    );
+    expect(saved.location).toBe('Senoia Depot'); // the field every public page reads
+    expect(saved.eventDate).toBeNull();
+  });
+
+  it('clears eventDate when an existing start date is blanked', () => {
+    const stored = seedScriptEvent();
+    expect(stored.eventDate).toBeTruthy();
+
+    const saved = buildPostData(
+      { ...buildEditorState(stored), eventStartDate: '' },
+      { ...SAVE_OPTS, slug: stored.slug }
+    );
+    expect(saved.eventDate).toBeNull(); // was: stale Timestamp silently retained
+    expect(saved.location).toBe('SAHS Museum');
+  });
+
+  it('leaves location alone for non-events', () => {
+    const stored = newsPost();
+    const saved = buildPostData(buildEditorState(stored), { ...SAVE_OPTS, slug: stored.slug });
+    expect(saved).not.toHaveProperty('eventDate');
+  });
+});
+
 describe('buildPostData', () => {
   it('keeps a linked volunteer sheet and drops it when the toggle is off', () => {
     const stored = adminCreatedEvent();
@@ -210,6 +274,17 @@ describe('buildPostData', () => {
     expect(saved).not.toHaveProperty('_ticketPriceDisplay');
     expect(saved).not.toHaveProperty('_enableVolunteer');
     expect(saved).not.toHaveProperty('ticketsSold');
+  });
+
+  // The `_` deletes used to sit inside `if (isEvent)`, so every News/Blog save
+  // persisted editor state into Firestore.
+  it.each([
+    ['news post', newsPost()],
+    ['blog post', { ...newsPost(), category: 'Blog' as const }],
+  ])('strips editor-only fields from a %s too', (_label, stored) => {
+    const saved = buildPostData(buildEditorState(stored), { ...SAVE_OPTS, slug: stored.slug });
+    expect(Object.keys(saved).filter(k => k.startsWith('_'))).toEqual([]);
+    expect(saved).not.toHaveProperty('publishDateDisplay');
   });
 
   it('converts the display price in dollars to integer cents', () => {

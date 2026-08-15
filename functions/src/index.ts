@@ -10,6 +10,7 @@ import { Resend } from 'resend';
 import { render } from 'react-email';
 import * as React from 'react';
 import { WelcomeEmail } from './emails/WelcomeEmail';
+import { resolveEventWindow } from './calendarTime';
 import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
 
 admin.initializeApp();
@@ -456,14 +457,13 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
             try {
                 if (afterData.googleCalendarEventId) return;
                 
-                const startDateTime = afterData.eventDate 
-                    ? new Date(afterData.eventDate.toDate()).toISOString() 
-                    : (afterData.eventStartDate ? new Date(afterData.eventStartDate).toISOString() : new Date().toISOString());
-                    
-                const endDateTime = afterData.eventEndDate 
-                    ? new Date(afterData.eventEndDate).toISOString() 
-                    : new Date(new Date(startDateTime).getTime() + 2 * 60 * 60 * 1000).toISOString();
-                
+                const window = resolveEventWindow(afterData);
+                if (!window) {
+                    console.warn(`Skipping calendar insert for post ${event.params.postId}: no usable event date`);
+                    return;
+                }
+                const { startDateTime, endDateTime } = window;
+
                 const calendarEvent = {
                     summary: `SAHS Event: ${afterData.title}`,
                     description: afterData.excerpt || afterData.content?.replace(/<[^>]*>/g, '').substring(0, 300) || '',
@@ -487,14 +487,13 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
         // Case B: Edited details of an already published event
         else if (isPublished && wasPublished && afterData.googleCalendarEventId) {
             try {
-                const startDateTime = afterData.eventDate 
-                    ? new Date(afterData.eventDate.toDate()).toISOString() 
-                    : (afterData.eventStartDate ? new Date(afterData.eventStartDate).toISOString() : new Date().toISOString());
-                    
-                const endDateTime = afterData.eventEndDate 
-                    ? new Date(afterData.eventEndDate).toISOString() 
-                    : new Date(new Date(startDateTime).getTime() + 2 * 60 * 60 * 1000).toISOString();
-                
+                const window = resolveEventWindow(afterData);
+                if (!window) {
+                    console.warn(`Skipping calendar patch for post ${event.params.postId}: no usable event date`);
+                    return;
+                }
+                const { startDateTime, endDateTime } = window;
+
                 await calendar.events.patch({
                     calendarId: CALENDAR_ID,
                     eventId: afterData.googleCalendarEventId,
