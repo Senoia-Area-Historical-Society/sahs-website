@@ -74,6 +74,28 @@ const adminCreatedEvent = (): Post => ({
 });
 
 /**
+ * A non-event post. `buildPostData` takes a different branch for these (all the
+ * ticketing/volunteer handling is skipped), so the invariant needs its own fixture
+ * or a rename affecting only News/Blog posts would slip through.
+ */
+const newsPost = (): Post => ({
+  id: 'news-1',
+  type: 'news',
+  category: 'News',
+  status: 'published',
+  title: 'Museum reopens after renovation',
+  slug: 'museum-reopens',
+  author: 'Admin',
+  content: '<p>Doors open Monday.</p>',
+  excerpt: 'Doors open Monday.',
+  mainImage: 'https://example.test/museum.jpg',
+  galleryImages: ['https://example.test/1.jpg'],
+  publishDate: ts(PUBLISH_DATE),
+  createdAt: ts(PUBLISH_DATE),
+  updatedAt: ts(PUBLISH_DATE),
+});
+
+/**
  * Fields legitimately absent from / rewritten in the save payload.
  * Anything else present on the stored doc MUST survive the round-trip untouched.
  */
@@ -89,6 +111,7 @@ describe('buildEditorState -> buildPostData round-trip', () => {
   it.each([
     ['seed-script event (location, no eventLocation)', seedScriptEvent()],
     ['admin-created event (both location and eventLocation)', adminCreatedEvent()],
+    ['news post (non-event branch)', newsPost()],
   ])('preserves every stored field of a %s', (_label, stored) => {
     const saved = buildPostData(buildEditorState(stored), { ...SAVE_OPTS, slug: stored.slug });
 
@@ -120,6 +143,7 @@ describe('buildEditorState -> buildPostData round-trip', () => {
   it.each([
     ['seed-script event', seedScriptEvent()],
     ['admin-created event', adminCreatedEvent()],
+    ['news post', newsPost()],
   ])('emits no undefined values for a %s', (_label, stored) => {
     const saved = buildPostData(buildEditorState(stored), { ...SAVE_OPTS, slug: stored.slug });
     const undefinedKeys = Object.keys(saved).filter(k => saved[k] === undefined);
