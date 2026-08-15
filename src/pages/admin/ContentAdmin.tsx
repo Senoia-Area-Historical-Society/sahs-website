@@ -9,42 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { uploadFile } from '../../services/storage';
 import { getVolunteerSheets } from '../../services/api';
 import type { VolunteerSheet } from '../../types';
-
-const timestampToLocalISO = (timestamp: any): string => {
-  if (!timestamp) return '';
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  const tzOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
-};
-
-interface Post {
-  id: string;
-  title: string;
-  slug: string;
-  content: string;
-  author: string;
-  category: 'Blog' | 'News' | 'Event';
-  status: 'draft' | 'published' | 'archived';
-  eventStartDate?: string;
-  eventEndDate?: string;
-  eventLocation?: string;
-  publishDate?: any;
-  createdAt: any;
-  updatedAt: any;
-  excerpt?: string;
-  // Ticketing fields (stored in Firestore)
-  ticketPrice?: number | null;
-  capacity?: number | null;
-  ticketsSold?: number;
-  galleryImages?: string[];
-  // Volunteer signup fields (stored in Firestore)
-  volunteerSheetId?: string | null;
-  // Editor-only ephemeral fields (stripped before save)
-  _enableTicketing?: boolean;
-  _ticketPriceDisplay?: string;
-  _enableVolunteer?: boolean;
-  [key: string]: any;
-}
+import { buildEditorState, buildPostData, type Post } from '../../lib/postEditorMapping';
 
 export default function ContentAdmin() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -63,19 +28,7 @@ export default function ContentAdmin() {
   const { user } = useAuth();
 
   const startEditing = (post: Post) => {
-    setEditingPost({
-      ...post,
-      eventStartDate: post.eventDate ? timestampToLocalISO(post.eventDate) : post.eventStartDate || '',
-      eventEndDate: post.eventEndDate || '',
-      // Mirror the stored location into its display field. Without this the
-      // input renders blank and handleSave writes location back as '', wiping
-      // the venue off any event that gets opened and saved.
-      eventLocation: post.eventLocation ?? post.location ?? '',
-      publishDateDisplay: post.publishDate ? timestampToLocalISO(post.publishDate) : '',
-      _ticketPriceDisplay: post.ticketPrice ? (post.ticketPrice / 100).toFixed(2) : '',
-      _enableTicketing: !!post.ticketPrice,
-      _enableVolunteer: !!post.volunteerSheetId,
-    });
+    setEditingPost(buildEditorState(post));
   };
 
   useEffect(() => {
@@ -91,7 +44,6 @@ export default function ContentAdmin() {
     }
 
     try {
-      const isEvent = editingPost.category === 'Event';
       const proposedSlug = (editingPost.slug || editingPost.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/^-+|-+$/g, '');
 
       // Slug uniqueness check
@@ -102,59 +54,12 @@ export default function ContentAdmin() {
         return;
       }
 
-      const postData: any = {
-        ...editingPost,
-        type: isEvent ? 'event' : 'news',
+      const postData = buildPostData(editingPost, {
         slug: proposedSlug,
-        author: editingPost.author || user?.email || 'Admin',
-        status: editingPost.status || 'draft',
-        updatedAt: serverTimestamp(),
-      };
-
-      if (!editingPost.id) {
-        postData.createdAt = serverTimestamp();
-        if (editingPost.publishDateDisplay) {
-          postData.publishDate = new Date(editingPost.publishDateDisplay);
-        } else {
-          postData.publishDate = serverTimestamp();
-        }
-      } else {
-        if (editingPost.publishDateDisplay) {
-          postData.publishDate = new Date(editingPost.publishDateDisplay);
-        } else if (editingPost.status === 'published' && !editingPost.publishDate) {
-          postData.publishDate = serverTimestamp();
-        }
-      }
-
-      if (isEvent && editingPost.eventStartDate) {
-        postData.eventDate = new Date(editingPost.eventStartDate);
-        postData.location = editingPost.eventLocation || '';
-      }
-
-      delete postData.publishDateDisplay;
-
-      // Ticketing config — convert display price ($) to cents for Stripe
-      if (isEvent) {
-        const enableTicketing = editingPost._enableTicketing;
-        if (enableTicketing && editingPost._ticketPriceDisplay) {
-          postData.ticketPrice = Math.round(parseFloat(editingPost._ticketPriceDisplay) * 100);
-          postData.capacity = parseInt(String(editingPost.capacity)) || null;
-        } else if (!enableTicketing) {
-          postData.ticketPrice = null;
-          postData.capacity = null;
-        }
-        // Never overwrite ticketsSold from the editor
-        delete postData.ticketsSold;
-        // Clean up display-only fields
-        delete postData._enableTicketing;
-        delete postData._ticketPriceDisplay;
-
-        // Volunteer signup link
-        postData.volunteerSheetId = editingPost._enableVolunteer && editingPost.volunteerSheetId
-          ? editingPost.volunteerSheetId
-          : null;
-        delete postData._enableVolunteer;
-      }
+        fallbackAuthor: user?.email || 'Admin',
+        now: serverTimestamp(),
+        isNew: !editingPost.id,
+      });
 
       if (editingPost.id) {
         await updateDoc(doc(db, 'posts', editingPost.id), postData);
