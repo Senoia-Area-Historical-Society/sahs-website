@@ -1,4 +1,4 @@
-import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc, serverTimestamp, type FirestoreError } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking, Membership, Ticket, VolunteerSheet, VolunteerSlot, VolunteerRegistration } from '../types/index';
 
@@ -17,24 +17,31 @@ const getFunctionsBaseUrl = () => {
       : 'http://127.0.0.1:5001/sahs-archives/us-central1');
 };
 
-export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
+export async function getNewsPosts(
+  maxItems: number = 20,
+  opts: { includePastEvents?: boolean } = {}
+): Promise<Post[]> {
+  const { includePastEvents = true } = opts;
   try {
     // Fetch all published posts once to avoid missing documents due to Firestore's requirement that
     // any field used in orderBy/where-range must exist. Imported posts may lack fields.
-    const q = query(
-      collection(db, 'posts'),
-      where('status', '==', 'published')
-    );
+    // (Equality filters are safe under that constraint, so when events are excluded
+    // we can filter to news server-side and skip downloading event docs entirely.)
+    const q = includePastEvents
+      ? query(collection(db, 'posts'), where('status', '==', 'published'))
+      : query(collection(db, 'posts'), where('status', '==', 'published'), where('type', '==', 'news'));
     const snapshot = await getDocs(q);
     const allPosts = snapshot.docs.map(toPost);
-    const now = new Date();
-    
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0); // Same boundary as getEventsSplit: today's events are upcoming, not past
+
     return allPosts
       .filter(post => {
         if (post.type === 'event') {
+          if (!includePastEvents) return false;
           // Include events if they are in the past OR if they are missing an event date
           if (!post.eventDate) return true;
-          return post.eventDate.toDate() < now;
+          return post.eventDate.toDate() < cutoff;
         }
         return post.type === 'news';
       })
@@ -51,7 +58,13 @@ export async function getNewsPosts(maxItems: number = 20): Promise<Post[]> {
   }
 }
 
-export async function getEvents(maxItems: number = 20): Promise<Post[]> {
+/**
+ * Fetch every published event once and partition around a single midnight
+ * cutoff: an event happening today counts as upcoming, and an event can
+ * never appear in both lists. Undated events are treated as past.
+ * `upcoming` is soonest-first; `past` is most-recent-first.
+ */
+export async function getEventsSplit(): Promise<{ upcoming: Post[]; past: Post[] }> {
   try {
     const q = query(
       collection(db, 'posts'),
@@ -60,47 +73,35 @@ export async function getEvents(maxItems: number = 20): Promise<Post[]> {
     );
     const snapshot = await getDocs(q);
     const allEvents = snapshot.docs.map(toPost);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0); // Include events happening today
-    
-    return allEvents
-      .filter(post => post.eventDate && post.eventDate.toDate() >= now)
-      .sort((a, b) => {
-        const dateA = a.eventDate?.toMillis() || 0;
-        const dateB = b.eventDate?.toMillis() || 0;
-        return dateA - dateB;
-      })
-      .slice(0, maxItems);
-  } catch (err) {
-    console.error('Error fetching Upcoming Events:', err);
-    return [];
-  }
-}
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0); // Include events happening today in upcoming
 
-export async function getPastEvents(maxItems: number = 50): Promise<Post[]> {
-  try {
-    const q = query(
-      collection(db, 'posts'),
-      where('status', '==', 'published'),
-      where('type', '==', 'event')
-    );
-    const snapshot = await getDocs(q);
-    const allEvents = snapshot.docs.map(toPost);
-    const now = new Date();
-    
-    return allEvents
-      .filter(post => !post.eventDate || post.eventDate.toDate() < now)
+    const upcoming = allEvents
+      .filter(post => post.eventDate && post.eventDate.toDate() >= cutoff)
+      .sort((a, b) => (a.eventDate?.toMillis() || 0) - (b.eventDate?.toMillis() || 0));
+
+    const past = allEvents
+      .filter(post => !post.eventDate || post.eventDate.toDate() < cutoff)
       .sort((a, b) => {
         // Sort descending by eventDate, falling back to publishDate
         const dateA = a.eventDate?.toMillis() || a.publishDate?.toMillis() || a.createdAt?.toMillis() || 0;
         const dateB = b.eventDate?.toMillis() || b.publishDate?.toMillis() || b.createdAt?.toMillis() || 0;
         return dateB - dateA;
-      })
-      .slice(0, maxItems);
+      });
+
+    return { upcoming, past };
   } catch (err) {
-    console.error('Error fetching Past Events:', err);
-    return [];
+    console.error('Error fetching Events:', err);
+    return { upcoming: [], past: [] };
   }
+}
+
+export async function getEvents(maxItems: number = 20): Promise<Post[]> {
+  return (await getEventsSplit()).upcoming.slice(0, maxItems);
+}
+
+export async function getPastEvents(maxItems: number = 50): Promise<Post[]> {
+  return (await getEventsSplit()).past.slice(0, maxItems);
 }
 
 export async function getGalleries(): Promise<Gallery[]> {
@@ -356,7 +357,11 @@ export async function getVolunteerSheetById(id: string): Promise<VolunteerSheet 
     if (!snap.exists() || snap.data().status !== 'active') return null;
     return { id: snap.id, ...snap.data() } as VolunteerSheet;
   } catch (err) {
-    console.error('Error fetching volunteer sheet by ID:', err);
+    // Security rules only allow public reads of active sheets, so
+    // permission-denied is the expected outcome for draft/closed sheets.
+    if ((err as FirestoreError)?.code !== 'permission-denied') {
+      console.error('Error fetching volunteer sheet by ID:', err);
+    }
     return null;
   }
 }
