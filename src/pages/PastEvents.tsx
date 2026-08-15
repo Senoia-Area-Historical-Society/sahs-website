@@ -55,7 +55,7 @@ export default function PastEvents() {
                   </div>
                 ) : (
                   <div className="h-56 w-full bg-tan/10 flex items-center justify-center">
-                    <img src="/sahs-logo.png" alt="SAHS Logo" className="h-28 opacity-20" />
+                    <img src="/favicon.png" alt="SAHS Logo" className="h-28 opacity-20" />
                   </div>
                 )}
                 <div className="p-8 flex flex-col flex-grow">
