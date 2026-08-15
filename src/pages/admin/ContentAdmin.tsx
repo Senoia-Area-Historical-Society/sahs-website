@@ -67,6 +67,10 @@ export default function ContentAdmin() {
       ...post,
       eventStartDate: post.eventDate ? timestampToLocalISO(post.eventDate) : post.eventStartDate || '',
       eventEndDate: post.eventEndDate || '',
+      // Mirror the stored location into its display field. Without this the
+      // input renders blank and handleSave writes location back as '', wiping
+      // the venue off any event that gets opened and saved.
+      eventLocation: post.eventLocation ?? post.location ?? '',
       publishDateDisplay: post.publishDate ? timestampToLocalISO(post.publishDate) : '',
       _ticketPriceDisplay: post.ticketPrice ? (post.ticketPrice / 100).toFixed(2) : '',
       _enableTicketing: !!post.ticketPrice,
