@@ -75,6 +75,9 @@ export async function startTicketCheckout({
   }
 
   if (!embedded) {
+    // A caller may have reserved a tab and then not asked for embedded mode;
+    // don't strand it on the placeholder while we navigate in place.
+    reservedTab?.close();
     window.location.href = url;
     return { status: 'redirected' };
   }

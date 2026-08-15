@@ -28,6 +28,7 @@ export default function EmbedTickets() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manualUrl, setManualUrl] = useState<string | null>(null);
+  const [awaitingReturn, setAwaitingReturn] = useState(false);
 
   // The host page supplies the background; a solid body would paint a hard edge
   // inside the iframe.
@@ -35,9 +36,32 @@ export default function EmbedTickets() {
     const { body, documentElement } = document;
     const prev = body.style.backgroundColor;
     body.style.backgroundColor = 'transparent';
+    const prevRoot = documentElement.style.backgroundColor;
     documentElement.style.backgroundColor = 'transparent';
-    return () => { body.style.backgroundColor = prev; };
+    return () => {
+      body.style.backgroundColor = prev;
+      documentElement.style.backgroundColor = prevRoot;
+    };
   }, []);
+
+  // Checkout happens in another tab, so this page stays mounted and would sit
+  // on a dead spinner forever if the buyer abandons Stripe. visibilityState is
+  // inherited from the top-level tab, so it flips back to 'visible' in here the
+  // moment they return — that is our cue to allow another attempt.
+  useEffect(() => {
+    if (!awaitingReturn) return;
+    const reset = () => {
+      if (document.visibilityState !== 'visible') return;
+      setAwaitingReturn(false);
+      setIsProcessing(false);
+    };
+    document.addEventListener('visibilitychange', reset);
+    window.addEventListener('focus', reset);
+    return () => {
+      document.removeEventListener('visibilitychange', reset);
+      window.removeEventListener('focus', reset);
+    };
+  }, [awaitingReturn]);
 
   // An iframe cannot size itself to its content and the host cannot measure
   // across origins, so publish our height and let the host snippet apply it.
@@ -96,9 +120,11 @@ export default function EmbedTickets() {
       if (outcome.status === 'manual') {
         setManualUrl(outcome.url);
         setIsProcessing(false);
+      } else {
+        // Buyer is in the checkout tab. Hold the spinner so we don't invite a
+        // duplicate purchase, but re-enable as soon as they come back.
+        setAwaitingReturn(true);
       }
-      // On 'redirected' the buyer is in the checkout tab; keep the spinner so
-      // the widget doesn't invite a duplicate purchase.
     } catch (err) {
       console.error('Ticket error:', err);
       setError('We couldn’t start checkout. Please try again.');

@@ -27,7 +27,8 @@ const KEY_FILE = path.join(
   '.config/gcloud/sahs-firebase-deploy.json'
 );
 
-// Artwork lives outside the repo; override with POKER_RUN_ART_DIR.
+// Artwork is committed alongside the script so re-runs are reproducible from a
+// fresh clone; override the location with POKER_RUN_ART_DIR.
 const ART_DIR = process.env.POKER_RUN_ART_DIR || path.join(__dirname, '../.artwork/poker-run');
 const ART = [
   { field: 'bannerImage', file: 'poker-run-banner-1920x1080.jpg' },
