@@ -26,7 +26,6 @@ export interface Post {
   slug: string;
   content: string;
   author: string;
-  category: 'Blog' | 'News' | 'Event';
   status: 'draft' | 'published' | 'archived';
   eventStartDate?: string;
   eventEndDate?: string;
@@ -94,11 +93,13 @@ export function buildPostData(
   editingPost: Partial<Post>,
   { slug, fallbackAuthor, now, isNew }: BuildPostDataOptions
 ) {
-  const isEvent = editingPost.category === 'Event';
-
   const postData: Record<string, any> = {
     ...editingPost,
-    type: isEvent ? 'event' : 'news',
+    // Every post is an event. The news/event split is gone: `getEventsSplit`
+    // partitions by date alone, so a post with no `eventDate` is simply one
+    // that already happened. Legacy documents still carry `type: 'news'`;
+    // nothing reads it, and re-saving one normalizes it here.
+    type: 'event',
     slug,
     author: editingPost.author || fallbackAuthor,
     status: editingPost.status || 'draft',
@@ -116,38 +117,33 @@ export function buildPostData(
     postData.publishDate = now;
   }
 
-  if (isEvent) {
-    // Both writes are unconditional. Gating them on `eventStartDate` used to mean an
-    // event with no start date never got its typed venue promoted to `location` (the
-    // field every public page reads), and that blanking an existing start date left a
-    // stale `eventDate` behind.
-    postData.eventDate = editingPost.eventStartDate ? new Date(editingPost.eventStartDate) : null;
-    postData.location = editingPost.eventLocation || '';
-  }
+  // Both writes are unconditional. Gating them on `eventStartDate` used to mean an
+  // event with no start date never got its typed venue promoted to `location` (the
+  // field every public page reads), and that blanking an existing start date left a
+  // stale `eventDate` behind.
+  postData.eventDate = editingPost.eventStartDate ? new Date(editingPost.eventStartDate) : null;
+  postData.location = editingPost.eventLocation || '';
 
   delete postData.publishDateDisplay;
 
   // Ticketing config — convert display price ($) to cents for Stripe
-  if (isEvent) {
-    const enableTicketing = editingPost._enableTicketing;
-    if (enableTicketing && editingPost._ticketPriceDisplay) {
-      postData.ticketPrice = Math.round(parseFloat(editingPost._ticketPriceDisplay) * 100);
-      postData.capacity = parseInt(String(editingPost.capacity)) || null;
-    } else if (!enableTicketing) {
-      postData.ticketPrice = null;
-      postData.capacity = null;
-    }
-    // Never overwrite ticketsSold from the editor
-    delete postData.ticketsSold;
-
-    // Volunteer signup link
-    postData.volunteerSheetId = editingPost._enableVolunteer && editingPost.volunteerSheetId
-      ? editingPost.volunteerSheetId
-      : null;
+  const enableTicketing = editingPost._enableTicketing;
+  if (enableTicketing && editingPost._ticketPriceDisplay) {
+    postData.ticketPrice = Math.round(parseFloat(editingPost._ticketPriceDisplay) * 100);
+    postData.capacity = parseInt(String(editingPost.capacity)) || null;
+  } else if (!enableTicketing) {
+    postData.ticketPrice = null;
+    postData.capacity = null;
   }
+  // Never overwrite ticketsSold from the editor
+  delete postData.ticketsSold;
 
-  // Editor-only fields never belong in Firestore, event or not. These deletes used to
-  // live inside `if (isEvent)`, so every News/Blog post persisted them.
+  // Volunteer signup link
+  postData.volunteerSheetId = editingPost._enableVolunteer && editingPost.volunteerSheetId
+    ? editingPost.volunteerSheetId
+    : null;
+
+  // Editor-only fields never belong in Firestore.
   delete postData._enableTicketing;
   delete postData._ticketPriceDisplay;
   delete postData._enableVolunteer;

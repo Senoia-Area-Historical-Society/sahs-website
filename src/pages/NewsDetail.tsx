@@ -34,7 +34,7 @@ export default function NewsDetail() {
           const docSnap = snapshot.docs[0];
           const loadedPost = { id: docSnap.id, ...docSnap.data() } as Post;
           setPost(loadedPost);
-          if (loadedPost.type === 'event' && loadedPost.volunteerSheetId) {
+          if (loadedPost.volunteerSheetId) {
             const sheet = await getVolunteerSheetById(loadedPost.volunteerSheetId);
             setVolunteerSheet(sheet);
           }
@@ -66,25 +66,28 @@ export default function NewsDetail() {
     );
   }
 
-  const dateToDisplay = post.type === 'event' && post.eventDate ? post.eventDate : post.publishDate;
+  // Every post is an event; whether it has a *date* is what varies. A post with
+  // an eventDate shows when it happened, otherwise fall back to when it was posted.
+  const hasEventDate = !!post.eventDate;
+  const dateToDisplay = post.eventDate ?? post.publishDate;
   const formattedDate = dateToDisplay ? dateToDisplay.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
 
   return (
     <article className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
       <div className="max-w-4xl mx-auto">
         <Link to="/news" className="inline-flex items-center text-sm font-sans text-tan uppercase tracking-wide hover:text-charcoal transition-colors mb-8">
-          <span className="mr-2">←</span> Back to News &amp; Events
+          <span className="mr-2">←</span> Back to Events
         </Link>
 
         <header className="mb-8">
           {formattedDate && (
             <div className="text-sm font-sans text-tan font-semibold tracking-wider uppercase mb-4">
-              {post.type === 'event' ? `Event Date: ${formattedDate}` : `Published: ${formattedDate}`}
+              {hasEventDate ? `Event Date: ${formattedDate}` : `Published: ${formattedDate}`}
             </div>
           )}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-8">{post.title}</h1>
           <div className="flex flex-wrap gap-6 mb-8 text-charcoal/60 font-sans text-sm">
-            {post.type === 'event' && formattedDate && (
+            {hasEventDate && formattedDate && (
               <div className="flex items-center gap-2"><Calendar size={18} className="text-tan" /><span>{formattedDate}</span></div>
             )}
             {post.location && (
@@ -112,7 +115,7 @@ export default function NewsDetail() {
         
         <SocialShare slug={post.slug} title={post.title} />
 
-        {post.type === 'event' && post.ticketPrice && (
+        {post.ticketPrice && (
           <div className="mb-12">
             <TicketPurchaseWidget post={post} user={user} />
           </div>

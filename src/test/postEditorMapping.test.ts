@@ -74,14 +74,15 @@ const adminCreatedEvent = (): Post => ({
 });
 
 /**
- * A non-event post. `buildPostData` takes a different branch for these (all the
- * ticketing/volunteer handling is skipped), so the invariant needs its own fixture
- * or a rename affecting only News/Blog posts would slip through.
+ * A legacy news article: `type: 'news'`, a dead `category`, no event date. These
+ * predate the removal of the news/event split and still sit in Firestore, so the
+ * round-trip invariant has to cover them — opening one in the editor and saving
+ * must not drop its fields on the floor.
  */
-const newsPost = (): Post => ({
+const legacyNewsPost = (): Post => ({
   id: 'news-1',
   type: 'news',
-  category: 'News',
+  category: 'News', // dead field; must still survive an open-then-save untouched
   status: 'published',
   title: 'Museum reopens after renovation',
   slug: 'museum-reopens',
@@ -103,6 +104,7 @@ const EXEMPT = new Set([
   'createdAt', // server sentinel
   'updatedAt', // server sentinel
   'ticketsSold', // deliberately omitted so the server-side counter wins
+  'type', // deliberately normalized to 'event' — see the dedicated test below
 ]);
 
 describe('buildEditorState -> buildPostData round-trip', () => {
@@ -111,7 +113,7 @@ describe('buildEditorState -> buildPostData round-trip', () => {
   it.each([
     ['seed-script event (location, no eventLocation)', seedScriptEvent()],
     ['admin-created event (both location and eventLocation)', adminCreatedEvent()],
-    ['news post (non-event branch)', newsPost()],
+    ['legacy news post (no event date)', legacyNewsPost()],
   ])('preserves every stored field of a %s', (_label, stored) => {
     const saved = buildPostData(buildEditorState(stored), { ...SAVE_OPTS, slug: stored.slug });
 
@@ -143,7 +145,7 @@ describe('buildEditorState -> buildPostData round-trip', () => {
   it.each([
     ['seed-script event', seedScriptEvent()],
     ['admin-created event', adminCreatedEvent()],
-    ['news post', newsPost()],
+    ['legacy news post', legacyNewsPost()],
   ])('emits no undefined values for a %s', (_label, stored) => {
     const saved = buildPostData(buildEditorState(stored), { ...SAVE_OPTS, slug: stored.slug });
     const undefinedKeys = Object.keys(saved).filter(k => saved[k] === undefined);
@@ -235,10 +237,44 @@ describe('buildPostData — event date and location are written independently', 
     expect(saved.location).toBe('SAHS Museum');
   });
 
-  it('leaves location alone for non-events', () => {
-    const stored = newsPost();
+  // There is no non-event branch any more: a post with no start date is simply
+  // one that already happened, and getEventsSplit puts it in the past bucket on
+  // the strength of `eventDate` being null. Writing null explicitly is what makes
+  // that classification reliable rather than dependent on the field's absence.
+  it('writes a null eventDate for a post with no start date', () => {
+    const stored = legacyNewsPost();
     const saved = buildPostData(buildEditorState(stored), { ...SAVE_OPTS, slug: stored.slug });
-    expect(saved).not.toHaveProperty('eventDate');
+    expect(saved.eventDate).toBeNull();
+    expect(saved.location).toBe('');
+  });
+});
+
+describe('every post is an event', () => {
+  // The news/event split is gone. Whatever a document says today, saving it
+  // through the editor normalizes it — otherwise legacy docs would keep a
+  // `type` that no longer means anything.
+  it.each([
+    ['a legacy news post', legacyNewsPost()],
+    ['an event', seedScriptEvent()],
+  ])('normalizes %s to type "event" on save', (_label, stored) => {
+    const saved = buildPostData(buildEditorState(stored), { ...SAVE_OPTS, slug: stored.slug });
+    expect(saved.type).toBe('event');
+  });
+
+  it('gives a brand-new post type "event" with no category involved', () => {
+    const saved = buildPostData({ title: 'Fresh' }, { ...SAVE_OPTS, slug: 'fresh', isNew: true });
+    expect(saved.type).toBe('event');
+  });
+
+  // Ticketing and volunteer handling used to sit behind `category === 'Event'`,
+  // so a post saved as News silently dropped both. Now they always apply.
+  it('applies ticketing to a post that was stored as news', () => {
+    const stored = legacyNewsPost();
+    const saved = buildPostData(
+      { ...buildEditorState(stored), _enableTicketing: true, _ticketPriceDisplay: '15.00' },
+      { ...SAVE_OPTS, slug: stored.slug }
+    );
+    expect(saved.ticketPrice).toBe(1500);
   });
 });
 
@@ -279,8 +315,8 @@ describe('buildPostData', () => {
   // The `_` deletes used to sit inside `if (isEvent)`, so every News/Blog save
   // persisted editor state into Firestore.
   it.each([
-    ['news post', newsPost()],
-    ['blog post', { ...newsPost(), category: 'Blog' as const }],
+    ['legacy news post', legacyNewsPost()],
+    ['undated post', { ...legacyNewsPost(), eventDate: null }],
   ])('strips editor-only fields from a %s too', (_label, stored) => {
     const saved = buildPostData(buildEditorState(stored), { ...SAVE_OPTS, slug: stored.slug });
     expect(Object.keys(saved).filter(k => k.startsWith('_'))).toEqual([]);
@@ -298,12 +334,12 @@ describe('buildPostData', () => {
 
   it('stamps createdAt and publishDate with the server sentinel for a new post', () => {
     const saved = buildPostData(
-      { title: 'Fresh', category: 'News' },
+      { title: 'Fresh' },
       { ...SAVE_OPTS, slug: 'fresh', isNew: true }
     );
     expect(saved.createdAt).toBe(SAVE_OPTS.now);
     expect(saved.publishDate).toBe(SAVE_OPTS.now);
-    expect(saved.type).toBe('news');
+    expect(saved.type).toBe('event');
     expect(saved.status).toBe('draft');
     expect(saved.author).toBe('fallback@senoiahistory.com');
   });

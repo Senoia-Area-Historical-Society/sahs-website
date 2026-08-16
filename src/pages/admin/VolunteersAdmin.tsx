@@ -64,10 +64,11 @@ export default function VolunteersAdmin() {
       // Fetch all posts and sort in memory — Firestore's orderBy excludes documents
       // missing the ordered field entirely, which would silently drop legacy event
       // posts without an eventDate (see conductor/fix-news-events.md).
+      // No type filter: every post is an event now, so the whole collection is
+      // eligible to have a volunteer sheet attached.
       const snap = await getDocs(collection(db, 'posts'));
       const events = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as any))
-        .filter((p: any) => p.type === 'event' || p.category === 'Event')
         .map((p: any) => ({ id: p.id, title: p.title, eventDate: p.eventDate, location: p.location || p.eventLocation }))
         .sort((a, b) => (a.eventDate?.toMillis() || 0) - (b.eventDate?.toMillis() || 0));
       setEventOptions(events);
