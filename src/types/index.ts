@@ -3,7 +3,12 @@ import { Timestamp, GeoPoint } from 'firebase/firestore';
 export interface Post {
   id: string; 
   legacyWebflowId?: string; 
-  type: 'news' | 'event';
+  /**
+   * Always `'event'` on anything saved since the news/event split was removed.
+   * `'news'` survives on legacy documents only — no read path branches on this
+   * field; `getEventsSplit` partitions by date instead.
+   */
+  type: 'event' | 'news';
   title: string; 
   slug: string;
   status: 'draft' | 'published' | 'archived';

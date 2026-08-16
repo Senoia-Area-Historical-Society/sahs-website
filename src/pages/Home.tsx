@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarX } from 'lucide-react';
-import { getNewsPosts, getEvents } from '../services/api';
+import { getPastEvents, getEvents } from '../services/api';
 import { excerptFromHtml } from '../lib/text';
 import CalendarSubscribe from '../components/public/CalendarSubscribe';
 import EventCard from '../components/public/EventCard';
@@ -10,20 +10,20 @@ import carmichaelImg from '../assets/images/carmichael-house-drawing.jpg';
 import meetingRoomImg from '../assets/images/meeting-room-interior.jpg';
 
 export default function Home() {
-  const [news, setNews] = useState<Post[]>([]);
+  const [past, setPast] = useState<Post[]>([]);
   const [events, setEvents] = useState<Post[]>([]);
 
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [newsData, eventsData] = await Promise.all([
-          // The news list is now a compact sidebar, so it can carry more rows
+        const [pastData, eventsData] = await Promise.all([
+          // The past list is a compact sidebar, so it can carry more rows
           // without out-running the taller Upcoming Events column beside it.
-          getNewsPosts(5),
+          getPastEvents(5),
           getEvents(3)
         ]);
-        setNews(newsData);
+        setPast(pastData);
         setEvents(eventsData);
       } catch (err) {
         console.error("Failed to load home page data", err);
@@ -111,16 +111,20 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Sidebar: News & Past Events */}
-          {/* No "View All" link: /news is the Events page and there is no
-              page that lists news articles. */}
+          {/* Sidebar: Past Events — finished events and legacy news articles,
+              one bucket, most recent first. */}
           <div className="bg-white p-8 rounded-lg border border-tan/10 shadow-sm self-start">
-            <h2 className="text-2xl font-bold mb-8 border-b border-tan/20 pb-4">News &amp; Past Events</h2>
+            <div className="flex justify-between items-end mb-8 border-b border-tan/20 pb-4">
+              <h2 className="text-2xl font-bold">Past Events</h2>
+              <Link to="/past-sahs-events" className="font-sans font-bold uppercase tracking-widest text-tan text-[11px] hover:text-tan-dark transition-colors">
+                View All
+              </Link>
+            </div>
             <div className="space-y-6">
-              {news.length === 0 ? (
-                <p className="italic text-charcoal/40 font-sans">No news yet... keep an eye out!</p>
+              {past.length === 0 ? (
+                <p className="italic text-charcoal/40 font-sans">Nothing in the archive yet.</p>
               ) : (
-                news.map(post => (
+                past.map(post => (
                   <Link key={post.id} to={`/news/${post.slug}`} className="group flex gap-4">
                     <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-cream border border-tan/20 flex items-center justify-center">
                       {post.mainImage ? (

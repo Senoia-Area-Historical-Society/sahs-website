@@ -6,11 +6,11 @@ import EventCard from '../components/public/EventCard';
 import CalendarSubscribe from '../components/public/CalendarSubscribe';
 import type { Post } from '../types';
 
-const PREVIOUS_EVENTS_SHOWN = 8;
+const PAST_EVENTS_SHOWN = 8;
 
 export default function News() {
   const [events, setEvents] = useState<Post[]>([]);
-  const [previousEvents, setPreviousEvents] = useState<Post[]>([]);
+  const [pastEvents, setPastEvents] = useState<Post[]>([]);
   const [activeVolunteerSheets, setActiveVolunteerSheets] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +19,7 @@ export default function News() {
       try {
         const { upcoming, past } = await getEventsSplit();
         setEvents(upcoming);
-        setPreviousEvents(past.slice(0, PREVIOUS_EVENTS_SHOWN));
+        setPastEvents(past.slice(0, PAST_EVENTS_SHOWN));
 
         // Only advertise volunteering when the linked sheet is still active
         // (getVolunteerSheetById returns null for draft/closed sheets).
@@ -69,7 +69,7 @@ export default function News() {
                   </div>
                   <p className="font-sans text-sm text-charcoal/60 mt-8">
                     In the meantime, browse our{' '}
-                    <Link to="/past-sahs-events" className="text-tan font-bold hover:text-tan-dark transition-colors">previous events archive</Link>.
+                    <Link to="/past-sahs-events" className="text-tan font-bold hover:text-tan-dark transition-colors">past events archive</Link>.
                   </p>
                 </div>
               ) : (
@@ -103,11 +103,12 @@ export default function News() {
               )}
             </section>
 
-            {/* Previous Events (muted) */}
-            {previousEvents.length > 0 && (
-              <section aria-labelledby="previous-events-heading" className="border-t border-tan/20 pt-12">
+            {/* Past Events (muted) — finished events and legacy news articles
+                in one bucket; getEventsSplit partitions by date, not by type. */}
+            {pastEvents.length > 0 && (
+              <section aria-labelledby="past-events-heading" className="border-t border-tan/20 pt-12">
                 <div className="flex justify-between items-end border-b border-tan/20 pb-2 mb-8">
-                  <h2 id="previous-events-heading" className="text-2xl font-bold text-charcoal/60">Previous Events</h2>
+                  <h2 id="past-events-heading" className="text-2xl font-bold text-charcoal/60">Past Events</h2>
                   <Link
                     to="/past-sahs-events"
                     className="text-tan font-sans font-bold uppercase tracking-widest text-sm hover:text-tan-dark transition-colors"
@@ -116,7 +117,7 @@ export default function News() {
                   </Link>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                  {previousEvents.map(event => (
+                  {pastEvents.map(event => (
                     <EventCard key={event.id} post={event} variant="past" />
                   ))}
                 </div>
