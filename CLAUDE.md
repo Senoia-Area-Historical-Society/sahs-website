@@ -63,7 +63,7 @@ Flow: Stripe Checkout → `stripeWebhook` function → Resend welcome email → 
 
 | Collection | Description | Access |
 |---|---|---|
-| `posts` | News articles and events (TipTap HTML content, ticketing fields) | Public read published; editors+ write |
+| `posts` | Events (TipTap HTML content, ticketing fields). No news/event split — see Gotchas | Public read published; editors+ write |
 | `galleries` | Photo galleries with cover image, ordered by `sortOrder` | Public read; editors+ write |
 | `historical_places` | Museum exhibit database with coordinates | Public read; editors+ write |
 | `organization_entities` | Board members (`board_member`), corporate sponsors (`corporate_sponsor`), event sponsors (`event_sponsor`) | Public read; editors+ write |
@@ -191,12 +191,30 @@ node scripts/<name>.cjs     # One-off CJS Firestore scripts
 
 ## Deployment
 
+**Merging to `main` deploys to production.** `.github/workflows/deploy.yml` runs on every
+push to `main` and ships hosting **and** functions **and** Firestore/Storage rules to
+`sahs-archives` via OIDC. Merging a PR is a production release — there is no separate
+"deploy" step to run afterwards, and running one by hand races the Actions run.
+
+The workflow's steps, in order: guard `firebase.json`'s Firestore target
+(`scripts/check-firestore-database-target.cjs`) → build → deploy hosting + functions →
+dry-run validate rules → deploy rules. Watch a run with:
+
+```bash
+gh run watch "$(gh run list --workflow=deploy.yml --limit 1 --json databaseId -q '.[0].databaseId')"
+```
+
+Manual deploys are for when CI is unavailable, or for `firestore:indexes` — which the
+workflow deliberately never deploys, because `firebase deploy --only firestore:indexes`
+is declarative and deletes any production index missing from `firestore.indexes.json`:
+
 ```bash
 npm run build
 firebase deploy --only hosting        # dist/ → Firebase Hosting (both targets)
 firebase deploy --only functions      # Cloud Functions (website codebase)
 firebase deploy --only firestore:rules
 firebase deploy --only storage        # Storage rules
+firebase deploy --only firestore:indexes   # manual and deliberate only — see above
 ```
 
 ## Gotchas
@@ -224,3 +242,30 @@ firebase deploy --only storage        # Storage rules
 **Lightbox CSS must be imported explicitly** — `import 'yet-another-react-lightbox/styles.css'`. Each plugin (e.g. Counter) has its own import.
 
 **Volunteer slot capacity is maintained via transaction** — `filledCount` on `VolunteerSlot` is incremented atomically via Firestore transaction on public signup. Never write it directly outside that path.
+
+**Never write `undefined` to Firestore — use `null`** — `src/lib/firebase.ts` uses a bare `getFirestore(app)`, so the SDK throws `Unsupported field value: undefined` and the entire write fails. A UI handler that clears a field with `x: undefined` therefore breaks the whole save, not just that field. Do **not** "fix" this with `ignoreUndefinedProperties: true`: that makes the SDK *skip* undefined keys, so a Remove button would stop throwing but also stop removing, silently keeping the old value. `src/lib/postEditorMapping.ts` normalizes `undefined` → `null` as the last step of `buildPostData`.
+
+**`datetime-local` strings have no timezone — never `.toISOString()` them in a Cloud Function** — `eventStartDate` / `eventEndDate` are naive wall-clock strings typed in Eastern (`"2026-07-04T22:00"`). Cloud Run's local zone is UTC, so `new Date(str).toISOString()` reads 10 PM Eastern as 10 PM UTC (6 PM Eastern) and can put an event's end *before* its start — which `calendar.events.insert` rejects with a 400 that gets caught and logged, so the sync silently does nothing. Pass naive values through unchanged and let the request's `timeZone: 'America/New_York'` interpret them; see `functions/src/calendarTime.ts`. A Firestore `Timestamp` (`eventDate`) is absolute and is safe to `.toISOString()`.
+
+**The post editor round-trips through display-only fields** — `ContentAdmin` edits `eventLocation`, `eventStartDate`, `publishDateDisplay` and `_ticketPriceDisplay`, and `buildPostData` writes the *stored* fields (`location`, `eventDate`, `publishDate`, `ticketPrice`) from them. Any new field renamed between the form and Firestore must be seeded from its stored counterpart in `buildEditorState`, or saving a post silently blanks it. `src/test/postEditorMapping.test.ts` enforces this with a generic round-trip invariant — every stored field on the fixture must survive `buildPostData(buildEditorState(doc))` unchanged.
+
+**There is no news/event split — every post is an event** — `posts` documents used to
+carry `type: 'news' | 'event'`, and read paths branched on it. They no longer do.
+`getEventsSplit` partitions **by date**: a post whose `eventDate` is in the future is
+`upcoming`, and everything else — finished events and the pre-2025 news articles alike —
+is `past`, sorted by `eventDate ?? publishDate ?? createdAt` descending. A post with no
+`eventDate` is therefore always past, which is the intent: it is a write-up of something
+that already happened. All three surfaces (Home sidebar, `/news`, `/past-sahs-events`)
+read that one bucket. `buildPostData` writes `type: 'event'` unconditionally, so re-saving
+a legacy document normalizes it. Do **not** reintroduce a `type` filter in a query — that
+is what made a 2023 article appear in Home's sidebar but not in `/past-sahs-events`.
+Anything that used to key off `type === 'event'` should key off `!!post.eventDate` instead.
+
+**`onPostWritten` will happily put a years-old event on the public calendar** — the
+Google Calendar insert path is gated only on the post lacking a `googleCalendarEventId`,
+so re-saving an old write-up (or a migration that touches one) is indistinguishable from
+publishing a new event. `isLongPast` in `functions/src/calendarTime.ts` suppresses inserts
+for anything that started more than 48 hours ago. The window is generous on purpose: naive
+Eastern strings are parsed as UTC there, a five-hour error at worst, and an event from
+earlier today must still sync. Patching an entry that already exists is deliberately not
+guarded — keeping a real calendar entry accurate is right whatever its date.

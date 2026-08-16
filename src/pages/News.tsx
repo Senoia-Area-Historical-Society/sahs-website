@@ -1,33 +1,24 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, CalendarX } from 'lucide-react';
-import { format } from 'date-fns';
-import { getNewsPosts, getEventsSplit, getVolunteerSheetById } from '../services/api';
-import { excerptFromHtml } from '../lib/text';
+import { CalendarX } from 'lucide-react';
+import { getEventsSplit, getVolunteerSheetById } from '../services/api';
 import EventCard from '../components/public/EventCard';
 import CalendarSubscribe from '../components/public/CalendarSubscribe';
 import type { Post } from '../types';
 import Seo from '../components/Seo';
 
-const PAST_EVENTS_SHOWN = 4;
+const PAST_EVENTS_SHOWN = 8;
 
 export default function News() {
-  const [news, setNews] = useState<Post[]>([]);
   const [events, setEvents] = useState<Post[]>([]);
   const [pastEvents, setPastEvents] = useState<Post[]>([]);
   const [activeVolunteerSheets, setActiveVolunteerSheets] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 6;
 
   useEffect(() => {
     async function loadContent() {
       try {
-        const [newsData, { upcoming, past }] = await Promise.all([
-          getNewsPosts(200, { includePastEvents: false }),
-          getEventsSplit()
-        ]);
-        setNews(newsData);
+        const { upcoming, past } = await getEventsSplit();
         setEvents(upcoming);
         setPastEvents(past.slice(0, PAST_EVENTS_SHOWN));
 
@@ -40,20 +31,13 @@ export default function News() {
         );
         setActiveVolunteerSheets(Object.fromEntries(sheetChecks));
       } catch (err) {
-        console.error("Failed to load news & events", err);
+        console.error("Failed to load events", err);
       } finally {
         setLoading(false);
       }
     }
     loadContent();
   }, []);
-
-  const currentNews = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return news.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [news, currentPage]);
-
-  const totalPages = Math.ceil(news.length / ITEMS_PER_PAGE);
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8 font-serif text-charcoal">
@@ -62,9 +46,9 @@ export default function News() {
         description="Upcoming events, exhibits, and news from the Senoia Area Historical Society in Senoia, Georgia."
       />
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">News & Events</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-4">Events</h1>
         <p className="text-lg text-charcoal/80 mb-12 max-w-2xl font-sans">
-          Stay up to date with the latest announcements, upcoming programs, and newsletters from the Senoia Area Historical Society.
+          Programs, tours, and celebrations hosted by the Senoia Area Historical Society — what's coming up next, and what we've hosted before.
         </p>
 
         {loading ? (
@@ -89,7 +73,7 @@ export default function News() {
                     <CalendarSubscribe />
                   </div>
                   <p className="font-sans text-sm text-charcoal/60 mt-8">
-                    {news.length > 0 ? 'In the meantime, catch up on the latest news below or browse our' : 'In the meantime, browse our'}{' '}
+                    In the meantime, browse our{' '}
                     <Link to="/past-sahs-events" className="text-tan font-bold hover:text-tan-dark transition-colors">past events archive</Link>.
                   </p>
                 </div>
@@ -124,83 +108,8 @@ export default function News() {
               )}
             </section>
 
-            {/* Latest News */}
-            <section aria-labelledby="latest-news-heading">
-              <h2 id="latest-news-heading" className="text-2xl font-bold border-b border-tan pb-2 mb-8">Latest News</h2>
-              {news.length === 0 ? (
-                <p className="text-sm font-sans italic text-charcoal/70">Check back soon for latest news.</p>
-              ) : (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {currentNews.map(item => (
-                      <article key={item.id} className="flex flex-col bg-white rounded-lg shadow-sm border border-tan/20 overflow-hidden hover:shadow-md transition-shadow">
-                        {item.mainImage ? (
-                          <div className="relative h-48 w-full overflow-hidden">
-                            <img src={item.mainImage} alt={item.title} className="w-full h-full object-cover transition-transform hover:scale-105 duration-500" />
-                            {(item.galleryImages?.length ?? 0) > 0 && (
-                              <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 text-white text-xs font-sans font-bold px-2 py-1 rounded-full backdrop-blur-sm">
-                                <Camera size={11} />
-                                <span>{item.galleryImages!.length} photos</span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="h-48 w-full bg-tan/10 flex items-center justify-center">
-                            <img src="/favicon.png" alt="SAHS Logo" className="h-24 opacity-20" />
-                          </div>
-                        )}
-                        <div className="p-6 flex flex-col flex-grow">
-                          <div className="text-xs font-sans text-charcoal/60 mb-2">
-                            {item.publishDate && (
-                              <time dateTime={format(item.publishDate.toDate(), 'yyyy-MM-dd')}>
-                                {format(item.publishDate.toDate(), 'MMMM d, yyyy')}
-                              </time>
-                            )}
-                          </div>
-                          <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                          <p className="text-charcoal/60 font-sans text-sm mb-4 line-clamp-3 flex-grow">
-                            {item.excerpt || excerptFromHtml(item.content, 150)}
-                          </p>
-                          <div className="mt-auto">
-                            <Link
-                              to={`/news/${item.slug}`}
-                              aria-label={`Read more about ${item.title}`}
-                              className="text-charcoal font-bold font-sans text-sm uppercase tracking-wide hover:text-tan transition-colors"
-                            >
-                              Read More →
-                            </Link>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  {totalPages > 1 && (
-                    <div className="flex justify-between items-center mt-12 pt-8 border-t border-tan/20">
-                      <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="px-6 py-2 border border-charcoal/20 rounded font-sans text-sm font-bold uppercase tracking-widest hover:border-tan hover:text-tan disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        ← Previous
-                      </button>
-                      <span className="font-sans text-sm text-charcoal/60">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="px-6 py-2 border border-charcoal/20 rounded font-sans text-sm font-bold uppercase tracking-widest hover:border-tan hover:text-tan disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Next →
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-
-            {/* Past Events (muted) */}
+            {/* Past Events (muted) — finished events and legacy news articles
+                in one bucket; getEventsSplit partitions by date, not by type. */}
             {pastEvents.length > 0 && (
               <section aria-labelledby="past-events-heading" className="border-t border-tan/20 pt-12">
                 <div className="flex justify-between items-end border-b border-tan/20 pb-2 mb-8">

@@ -41,7 +41,7 @@ export default function NewsDetail() {
           // Firestore allows public read of every post, so this is the only gate.
           if (loadedPost.status !== 'published' && !isSAHSUser) return;
           setPost(loadedPost);
-          if (loadedPost.type === 'event' && loadedPost.volunteerSheetId) {
+          if (loadedPost.volunteerSheetId) {
             const sheet = await getVolunteerSheetById(loadedPost.volunteerSheetId);
             setVolunteerSheet(sheet);
           }
@@ -73,7 +73,10 @@ export default function NewsDetail() {
     );
   }
 
-  const dateToDisplay = post.type === 'event' && post.eventDate ? post.eventDate : post.publishDate;
+  // Every post is an event; whether it has a *date* is what varies. A post with
+  // an eventDate shows when it happened, otherwise fall back to when it was posted.
+  const hasEventDate = !!post.eventDate;
+  const dateToDisplay = post.eventDate ?? post.publishDate;
   const formattedDate = dateToDisplay ? dateToDisplay.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
 
   return (
@@ -83,24 +86,26 @@ export default function NewsDetail() {
         description={
           post.excerpt ||
           excerptFromHtml(post.content, 155) ||
-          `${post.type === 'event' ? 'Event' : 'News'} from the Senoia Area Historical Society.`
+          // Deliberately doesn't branch on post.type: since the news/event split was
+          // removed that field is 'event' on everything new and meaningless on legacy docs.
+          `${post.title} — news and events from the Senoia Area Historical Society.`
         }
         image={post.mainImage || undefined}
       />
       <div className="max-w-4xl mx-auto">
         <Link to="/news" className="inline-flex items-center text-sm font-sans text-tan uppercase tracking-wide hover:text-charcoal transition-colors mb-8">
-          <span className="mr-2">←</span> Back to News &amp; Events
+          <span className="mr-2">←</span> Back to Events
         </Link>
 
         <header className="mb-8">
           {formattedDate && (
             <div className="text-sm font-sans text-tan font-semibold tracking-wider uppercase mb-4">
-              {post.type === 'event' ? `Event Date: ${formattedDate}` : `Published: ${formattedDate}`}
+              {hasEventDate ? `Event Date: ${formattedDate}` : `Published: ${formattedDate}`}
             </div>
           )}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-8">{post.title}</h1>
           <div className="flex flex-wrap gap-6 mb-8 text-charcoal/60 font-sans text-sm">
-            {post.type === 'event' && formattedDate && (
+            {hasEventDate && formattedDate && (
               <div className="flex items-center gap-2"><Calendar size={18} className="text-tan" /><span>{formattedDate}</span></div>
             )}
             {post.location && (
@@ -128,7 +133,7 @@ export default function NewsDetail() {
         
         <SocialShare slug={post.slug} title={post.title} />
 
-        {post.type === 'event' && post.ticketPrice && (
+        {post.ticketPrice && (
           <div className="mb-12">
             <TicketPurchaseWidget post={post} user={user} />
           </div>

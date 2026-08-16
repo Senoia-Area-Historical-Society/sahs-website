@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getHistoricalPlaces } from '../services/api';
+import { excerptFromHtml } from '../lib/text';
 import type { HistoricalPlace } from '../types';
 import Seo from '../components/Seo';
 
@@ -88,7 +89,7 @@ export default function HistoricalPlaces() {
                       </div>
                       <h3 className="text-2xl font-bold mb-3">{place.title}</h3>
                       <p className="text-gray-600 font-sans text-sm mb-6 flex-grow line-clamp-3">
-                        {place.excerpt || place.description.replace(/<[^>]*>?/gm, '').substring(0, 150) + '...'}
+                        {place.excerpt || excerptFromHtml(place.description, 150)}
                       </p>
                       
                       <a 

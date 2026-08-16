@@ -65,3 +65,6 @@ conductor/
 
 # Local emulator scripts
 start-emulators.sh
+
+# Poker Run artwork staged for local emulator runs (source lives in .artwork/)
+public/poker-run-art/

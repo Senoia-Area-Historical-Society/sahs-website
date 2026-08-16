@@ -267,8 +267,12 @@ export default function Header() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-tan/60 px-2">Events & News</h3>
-              <Link to="/news" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Latest Updates</Link>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-tan/60 px-2">Events</h3>
+              <div className="space-y-1">
+                <Link to="/news" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Upcoming Events</Link>
+                <Link to="/box-office" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Box Office</Link>
+                <Link to="/past-sahs-events" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Previous Events</Link>
+              </div>
             </div>
 
             <div className="space-y-3">

@@ -1,7 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
 import Stripe from 'stripe';
 import * as QRCode from 'qrcode';
@@ -10,10 +10,11 @@ import { Resend } from 'resend';
 import { render } from 'react-email';
 import * as React from 'react';
 import { WelcomeEmail } from './emails/WelcomeEmail';
+import { resolveEventWindow, isLongPast } from './calendarTime';
 import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
 
 admin.initializeApp();
-const db = admin.firestore();
+const db = getFirestore();
 
 const CALENDAR_ID = 'c_188962a8uva3ijbpl6cdtc9621g6m@resource.calendar.google.com';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://senoiahistory.com';
@@ -451,19 +452,31 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
         const auth = getCalendarAuth();
         const calendar = google.calendar({ version: 'v3', auth });
         
-        // Case A: Newly published event (was not published, or newly created and published)
-        if (isPublished && !wasPublished) {
+        // Case A: Published event with no calendar entry yet. Gated on the missing
+        // googleCalendarEventId rather than on `!wasPublished` so that an event whose
+        // earlier sync was skipped — published before its date was filled in — still
+        // gets onto the calendar once the date arrives. (A published event that never
+        // gets a date re-enters here on every write and simply warns.)
+        if (isPublished && !afterData.googleCalendarEventId) {
             try {
-                if (afterData.googleCalendarEventId) return;
-                
-                const startDateTime = afterData.eventDate 
-                    ? new Date(afterData.eventDate.toDate()).toISOString() 
-                    : (afterData.eventStartDate ? new Date(afterData.eventStartDate).toISOString() : new Date().toISOString());
-                    
-                const endDateTime = afterData.eventEndDate 
-                    ? new Date(afterData.eventEndDate).toISOString() 
-                    : new Date(new Date(startDateTime).getTime() + 2 * 60 * 60 * 1000).toISOString();
-                
+                const window = resolveEventWindow(afterData);
+                if (!window) {
+                    console.warn(`Skipping calendar insert for post ${event.params.postId}: no usable event date`);
+                    return;
+                }
+                const { startDateTime, endDateTime } = window;
+
+                // Never create an entry for an event that is already over. This path
+                // is gated only on the post lacking a googleCalendarEventId, so
+                // re-saving an old write-up — or a migration touching one — is
+                // indistinguishable from publishing a new event. Patching an entry
+                // that already exists (Case B) stays allowed: keeping a real entry
+                // accurate is right whatever its date.
+                if (isLongPast(startDateTime)) {
+                    console.log(`Skipping calendar insert for post ${event.params.postId}: event already past (${startDateTime})`);
+                    return;
+                }
+
                 const calendarEvent = {
                     summary: `SAHS Event: ${afterData.title}`,
                     description: afterData.excerpt || afterData.content?.replace(/<[^>]*>/g, '').substring(0, 300) || '',
@@ -484,17 +497,16 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
                 console.error('Error creating Google Calendar event:', err);
             }
         }
-        // Case B: Edited details of an already published event
-        else if (isPublished && wasPublished && afterData.googleCalendarEventId) {
+        // Case B: Edited details of a published event that already has a calendar entry
+        else if (isPublished && afterData.googleCalendarEventId) {
             try {
-                const startDateTime = afterData.eventDate 
-                    ? new Date(afterData.eventDate.toDate()).toISOString() 
-                    : (afterData.eventStartDate ? new Date(afterData.eventStartDate).toISOString() : new Date().toISOString());
-                    
-                const endDateTime = afterData.eventEndDate 
-                    ? new Date(afterData.eventEndDate).toISOString() 
-                    : new Date(new Date(startDateTime).getTime() + 2 * 60 * 60 * 1000).toISOString();
-                
+                const window = resolveEventWindow(afterData);
+                if (!window) {
+                    console.warn(`Skipping calendar patch for post ${event.params.postId}: no usable event date`);
+                    return;
+                }
+                const { startDateTime, endDateTime } = window;
+
                 await calendar.events.patch({
                     calendarId: CALENDAR_ID,
                     eventId: afterData.googleCalendarEventId,
@@ -518,7 +530,7 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
                     eventId: afterData.googleCalendarEventId
                 });
                 await event.data?.after.ref.update({
-                    googleCalendarEventId: admin.firestore.FieldValue.delete()
+                    googleCalendarEventId: FieldValue.delete()
                 });
             } catch (err) {
                 console.error('Error deleting Google Calendar event for unpublished post:', err);

@@ -34,6 +34,7 @@ import VolunteerSignup from './pages/VolunteerSignup';
 import TicketSuccess from './pages/TicketSuccess';
 import BoxOffice from './pages/BoxOffice';
 import MemberPortal from './pages/MemberPortal';
+import EmbedTickets from './pages/EmbedTickets';
 
 // Admin Pages
 import Login from './pages/admin/Login';
@@ -90,10 +91,16 @@ function HostnameRedirect() {
 }
 
 function App() {
+  // Embedded widgets are framed on partner sites, so they must not inherit the
+  // app shell's opaque background, full-height stretch, or skip link.
+  const isEmbed = useLocation().pathname.startsWith('/embed/');
+
   return (
     <AuthProvider>
-      <div className="flex flex-col min-h-screen bg-cream selection:bg-tan selection:text-white">
-        <a href="#content" className="skip-link visually-hidden fixed top-4 left-4 z-[100]">Skip to main content</a>
+      <div className={isEmbed ? '' : 'flex flex-col min-h-screen bg-cream selection:bg-tan selection:text-white'}>
+        {!isEmbed && (
+          <a href="#content" className="skip-link visually-hidden fixed top-4 left-4 z-[100]">Skip to main content</a>
+        )}
         <HostnameRedirect />
         <ScrollToTop />
         <AnalyticsTracker />
@@ -190,6 +197,9 @@ function App() {
           <Route path="/past-sahs-events" element={<PublicLayout><PastEvents /></PublicLayout>} />
           <Route path="/volunteer/:token" element={<PublicLayout><VolunteerSignup /></PublicLayout>} />
           <Route path="/tickets/success" element={<PublicLayout><TicketSuccess /></PublicLayout>} />
+
+          {/* Embeddable widgets for partner sites — intentionally no PublicLayout */}
+          <Route path="/embed/tickets/:slug" element={<EmbedTickets />} />
           <Route path="/membership-status" element={<PublicLayout><MemberPortal /></PublicLayout>} />
           
           {/* Status Pages */}

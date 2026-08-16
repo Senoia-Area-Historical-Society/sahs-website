@@ -17,81 +17,50 @@ const getFunctionsBaseUrl = () => {
       : 'http://127.0.0.1:5001/sahs-archives/us-central1');
 };
 
-export async function getNewsPosts(
-  maxItems: number = 20,
-  opts: { includePastEvents?: boolean } = {}
-): Promise<Post[]> {
-  const { includePastEvents = true } = opts;
-  try {
-    // Fetch all published posts once to avoid missing documents due to Firestore's requirement that
-    // any field used in orderBy/where-range must exist. Imported posts may lack fields.
-    // (Equality filters are safe under that constraint, so when events are excluded
-    // we can filter to news server-side and skip downloading event docs entirely.)
-    const q = includePastEvents
-      ? query(collection(db, 'posts'), where('status', '==', 'published'))
-      : query(collection(db, 'posts'), where('status', '==', 'published'), where('type', '==', 'news'));
-    const snapshot = await getDocs(q);
-    const allPosts = snapshot.docs.map(toPost);
-    const cutoff = new Date();
-    cutoff.setHours(0, 0, 0, 0); // Same boundary as getEventsSplit: today's events are upcoming, not past
-
-    return allPosts
-      .filter(post => {
-        if (post.type === 'event') {
-          if (!includePastEvents) return false;
-          // Include events if they are in the past OR if they are missing an event date
-          if (!post.eventDate) return true;
-          return post.eventDate.toDate() < cutoff;
-        }
-        return post.type === 'news';
-      })
-      .sort((a, b) => {
-        // Sort descending by publishDate, falling back to createdAt
-        const dateA = a.publishDate?.toMillis() || a.createdAt?.toMillis() || 0;
-        const dateB = b.publishDate?.toMillis() || b.createdAt?.toMillis() || 0;
-        return dateB - dateA;
-      })
-      .slice(0, maxItems);
-  } catch (err) {
-    console.error('Error fetching News & Past Events:', err);
-    return [];
-  }
+/**
+ * When a post happened. `eventDate` is the real date for anything scheduled;
+ * legacy news articles carry only a `publishDate`, and a handful of imported
+ * documents carry neither, so `createdAt` is the last resort.
+ */
+function occurredAt(post: Post): number {
+  return post.eventDate?.toMillis() || post.publishDate?.toMillis() || post.createdAt?.toMillis() || 0;
 }
 
 /**
- * Fetch every published event once and partition around a single midnight
- * cutoff: an event happening today counts as upcoming, and an event can
- * never appear in both lists. Undated events are treated as past.
- * `upcoming` is soonest-first; `past` is most-recent-first.
+ * Every published post, partitioned around a single midnight cutoff.
+ *
+ * **The split is by date, not by `type`.** There is no longer a news/event
+ * distinction: the `type` field survives on legacy documents but no read path
+ * branches on it. A post is `upcoming` only if it carries an `eventDate` that
+ * has not passed; everything else — finished events and the pre-2025 news
+ * articles alike — lands in `past` as one bucket, most recent first. An
+ * undated post is therefore always past, which is what we want: it is a
+ * write-up of something that already happened.
+ *
+ * A post can never appear in both lists. `upcoming` is soonest-first.
  */
 export async function getEventsSplit(): Promise<{ upcoming: Post[]; past: Post[] }> {
   try {
-    const q = query(
-      collection(db, 'posts'),
-      where('status', '==', 'published'),
-      where('type', '==', 'event')
-    );
+    // Fetch all published posts once. Firestore requires any field used in an
+    // orderBy/where-range to exist on the document, and imported posts are
+    // missing fields, so the ordering and the cutoff are applied client-side.
+    const q = query(collection(db, 'posts'), where('status', '==', 'published'));
     const snapshot = await getDocs(q);
-    const allEvents = snapshot.docs.map(toPost);
+    const allPosts = snapshot.docs.map(toPost);
     const cutoff = new Date();
-    cutoff.setHours(0, 0, 0, 0); // Include events happening today in upcoming
+    cutoff.setHours(0, 0, 0, 0); // An event happening today still counts as upcoming
 
-    const upcoming = allEvents
+    const upcoming = allPosts
       .filter(post => post.eventDate && post.eventDate.toDate() >= cutoff)
       .sort((a, b) => (a.eventDate?.toMillis() || 0) - (b.eventDate?.toMillis() || 0));
 
-    const past = allEvents
+    const past = allPosts
       .filter(post => !post.eventDate || post.eventDate.toDate() < cutoff)
-      .sort((a, b) => {
-        // Sort descending by eventDate, falling back to publishDate
-        const dateA = a.eventDate?.toMillis() || a.publishDate?.toMillis() || a.createdAt?.toMillis() || 0;
-        const dateB = b.eventDate?.toMillis() || b.publishDate?.toMillis() || b.createdAt?.toMillis() || 0;
-        return dateB - dateA;
-      });
+      .sort((a, b) => occurredAt(b) - occurredAt(a));
 
     return { upcoming, past };
   } catch (err) {
-    console.error('Error fetching Events:', err);
+    console.error('Error fetching posts:', err);
     return { upcoming: [], past: [] };
   }
 }
@@ -100,6 +69,7 @@ export async function getEvents(maxItems: number = 20): Promise<Post[]> {
   return (await getEventsSplit()).upcoming.slice(0, maxItems);
 }
 
+/** Finished events and legacy news articles, most recent first — one bucket. */
 export async function getPastEvents(maxItems: number = 50): Promise<Post[]> {
   return (await getEventsSplit()).past.slice(0, maxItems);
 }

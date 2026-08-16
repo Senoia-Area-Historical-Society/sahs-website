@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPastEvents } from '../services/api';
+import { excerptFromHtml } from '../lib/text';
 import type { Post } from '../types';
 import Seo from '../components/Seo';
 
@@ -38,7 +39,7 @@ export default function PastEvents() {
         <header className="mb-12 border-b border-tan pb-8">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Past SAHS Events</h1>
           <p className="text-lg text-charcoal/80 max-w-2xl font-sans">
-            Explore a history of programs and events hosted by the Senoia Area Historical Society, celebrating our community's heritage.
+            Everything the Senoia Area Historical Society has hosted or announced, most recent first — programs, tours, celebrations, and news from the archive.
           </p>
         </header>
 
@@ -48,7 +49,7 @@ export default function PastEvents() {
           </div>
         ) : events.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-lg border border-tan/20">
-            <p className="text-lg font-sans italic text-charcoal/60">No past events found in the archives.</p>
+            <p className="text-lg font-sans italic text-charcoal/60">Nothing in the archives yet.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -69,7 +70,7 @@ export default function PastEvents() {
                   </div>
                   <h3 className="text-2xl font-bold mb-4 leading-tight">{event.title}</h3>
                   <p className="text-charcoal/70 font-sans text-sm mb-6 line-clamp-4 flex-grow italic leading-relaxed">
-                    {event.excerpt || (event.content ? event.content.replace(/<[^>]*>?/gm, '').substring(0, 160) + '...' : 'Heritage event preservation and community program.')}
+                    {event.excerpt || excerptFromHtml(event.content, 160) || 'Heritage event preservation and community program.'}
                   </p>
                   <div className="mt-auto">
                     <Link to={`/news/${event.slug}`} className="text-charcoal font-bold font-sans text-sm gap-2 inline-flex items-center group">

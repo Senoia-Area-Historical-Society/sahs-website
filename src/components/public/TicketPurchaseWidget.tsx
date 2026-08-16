@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { submitTicketRequest } from '../../services/api';
+import { startTicketCheckout } from '../../lib/ticketCheckout';
 import type { Post } from '../../types';
 import { Ticket, Loader2, User, Mail, Minus, Plus, AlertCircle } from 'lucide-react';
 
@@ -26,16 +26,10 @@ export default function TicketPurchaseWidget({ post, user }: TicketPurchaseWidge
     setIsProcessing(true);
     setError(null);
     try {
-      const { url } = await submitTicketRequest({
-        eventId: post.id,
-        title: post.title,
-        price: post.ticketPrice!,
-        quantity,
-        email,
-        customerName: name,
-        slug: post.slug,
+      await startTicketCheckout({
+        post,
+        buyer: { name, email, quantity },
       });
-      window.location.href = url;
     } catch (err) {
       console.error('Ticket error:', err);
       setError('There was an error starting the checkout. Please try again.');
