@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toRfc3339, addHours, isNaiveLocal, resolveEventWindow } from '../../functions/src/calendarTime';
+import { toRfc3339, addHours, isNaiveLocal, resolveEventWindow, isLongPast } from '../../functions/src/calendarTime';
 
 /**
  * The bug these guard: `eventEndDate` is a naive `datetime-local` string typed in
@@ -93,5 +93,53 @@ describe('resolveEventWindow', () => {
   it('returns null when there is no usable date, so callers skip rather than invent one', () => {
     expect(resolveEventWindow({})).toBeNull();
     expect(resolveEventWindow({ eventDate: null, eventStartDate: '' })).toBeNull();
+  });
+});
+
+/**
+ * `onPostWritten`'s insert path is gated only on the post having no
+ * `googleCalendarEventId`, so re-saving an old write-up looks exactly like
+ * publishing a new event. `isLongPast` is what stops years-old posts from
+ * landing on the public calendar when that happens.
+ */
+describe('isLongPast', () => {
+  const NOW = new Date('2026-08-16T12:00:00.000Z');
+
+  // The three legacy documents that carry both a publishDate and a stale
+  // eventDate — the exact posts that made this guard necessary.
+  it.each([
+    ['Coweta Community Foundation Grant', '2023-12-21T17:00:00.000Z'],
+    ['Carmichael Initiative Ribbon Cutting', '2024-01-13T18:00:00.000Z'],
+    ['Meeting Room Rental', '2024-03-07T14:00:00.000Z'],
+  ])('suppresses the calendar insert for %s', (_label, start) => {
+    expect(isLongPast(start, NOW)).toBe(true);
+  });
+
+  it('lets a future event through', () => {
+    expect(isLongPast('2026-09-25T22:00:00.000Z', NOW)).toBe(false);
+  });
+
+  // The boundary that matters: an event earlier today must still sync. Someone
+  // publishing a morning program at noon should not silently get no entry.
+  it('lets an event from earlier today through', () => {
+    expect(isLongPast('2026-08-16T02:00:00.000Z', NOW)).toBe(false);
+  });
+
+  it('lets yesterday through but not last week', () => {
+    expect(isLongPast('2026-08-15T12:00:00.000Z', NOW)).toBe(false);
+    expect(isLongPast('2026-08-09T12:00:00.000Z', NOW)).toBe(true);
+  });
+
+  // A naive Eastern string is parsed as UTC, a five-hour error at worst. The
+  // grace window has to absorb that without misclassifying either direction.
+  it('handles naive Eastern strings on both sides of the window', () => {
+    expect(isLongPast('2023-12-21T17:00:00', NOW)).toBe(true);
+    expect(isLongPast('2026-08-16T19:00', NOW)).toBe(false);
+  });
+
+  // Suppression guard: uncertainty must not swallow a real event.
+  it('returns false for unparseable input rather than suppressing', () => {
+    expect(isLongPast('not-a-date', NOW)).toBe(false);
+    expect(isLongPast('', NOW)).toBe(false);
   });
 });

@@ -10,7 +10,7 @@ import { Resend } from 'resend';
 import { render } from 'react-email';
 import * as React from 'react';
 import { WelcomeEmail } from './emails/WelcomeEmail';
-import { resolveEventWindow } from './calendarTime';
+import { resolveEventWindow, isLongPast } from './calendarTime';
 import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
 
 admin.initializeApp();
@@ -465,6 +465,17 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
                     return;
                 }
                 const { startDateTime, endDateTime } = window;
+
+                // Never create an entry for an event that is already over. This path
+                // is gated only on the post lacking a googleCalendarEventId, so
+                // re-saving an old write-up — or a migration touching one — is
+                // indistinguishable from publishing a new event. Patching an entry
+                // that already exists (Case B) stays allowed: keeping a real entry
+                // accurate is right whatever its date.
+                if (isLongPast(startDateTime)) {
+                    console.log(`Skipping calendar insert for post ${event.params.postId}: event already past (${startDateTime})`);
+                    return;
+                }
 
                 const calendarEvent = {
                     summary: `SAHS Event: ${afterData.title}`,

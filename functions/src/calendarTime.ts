@@ -88,3 +88,33 @@ export function resolveEventWindow(data: {
 
   return { startDateTime, endDateTime };
 }
+
+/**
+ * How long after an event starts it stops being calendar-worthy.
+ *
+ * Deliberately generous. A naive Eastern string is parsed as UTC below, which
+ * can be off by up to five hours, and an event that ran earlier today should
+ * still be allowed onto the calendar. Two days sits comfortably between "just
+ * happened" and the years-old documents this guard exists to keep out.
+ */
+const PAST_EVENT_GRACE_HOURS = 48;
+
+/**
+ * True when an event started long enough ago that adding it to the calendar
+ * would only create clutter.
+ *
+ * This exists because `onPostWritten` fires on *any* write, and its insert path
+ * is gated only on the post having no `googleCalendarEventId` yet. Re-saving an
+ * old post — or a migration that touches one — therefore looks identical to
+ * publishing a brand-new event. Without this check, editing a 2023 write-up
+ * would drop a 2023 entry onto the public SAHS calendar.
+ *
+ * Unparseable input returns false: this is a suppression guard, so when in
+ * doubt let the caller proceed rather than silently swallowing a real event.
+ */
+export function isLongPast(startDateTime: string, now: Date = new Date()): boolean {
+  const absolute = isNaiveLocal(startDateTime) ? `${startDateTime}Z` : startDateTime;
+  const parsed = new Date(absolute);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed.getTime() < now.getTime() - PAST_EVENT_GRACE_HOURS * 60 * 60 * 1000;
+}
