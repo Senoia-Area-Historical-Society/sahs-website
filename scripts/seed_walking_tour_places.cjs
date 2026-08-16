@@ -1,5 +1,5 @@
 /**
- * Seeds historical_places with ten homes from the Senoia Walking Tour.
+ * Seeds historical_places from the Senoia Walking Tour.
  *
  * Source: "Senoia Walking Tour Script.docx" in the Society's Google Drive (the
  * WalknTours audio tour script). Text is adapted from that script — walking
@@ -7,9 +7,11 @@
  * stripped, since they make sense in an audio tour and not on a web page.
  * Nothing here is invented; every date, name, and detail comes from the script.
  *
- * Photos are NOT set. The tour photos live in Drive named by stop number and
- * address (e.g. "4_101 Main St.jpg"), so each record below names the file that
- * belongs to it — upload it in /admin/places, which is a one-field edit per home.
+ * Photos come from the Society's "Senoia Walking Tour Photos" folders, converted
+ * to webp and committed under public/images/. They are served by Firebase Hosting
+ * alongside the site rather than uploaded to Storage, so they are versioned with
+ * the code and need no production write to seed. Admin uploads still go to
+ * Storage — mainImage is just a URL either way.
  *
  * Coordinates are left null deliberately. The script gives street addresses but
  * no lat/lng, and guessing a pin for a private residence is worse than no pin.
@@ -36,13 +38,52 @@ if (require('firebase-admin').apps.length === 0) {
 const db = getFirestore();
 
 const p = (...paragraphs) => paragraphs.map(t => `<p>${t}</p>`).join('\n');
+const tour = file => `/images/walking-tour/${file}.webp`;
+const archive = file => `/images/senoia-archive/${file}.webp`;
 
 const PLACES = [
+  {
+    slug: 'senoia-welcome-center',
+    title: 'The Senoia Welcome Center',
+    type: 'Business',
+    historical_address: '68 Main Street, Senoia, GA 30276',
+    mainImage: tour('01-68-main-st'),
+    galleryImages: [archive('welcome-center')],
+    excerpt: 'Once home to the Senoia Police Department — older locals still remember the jail cell inside.',
+    description: p(
+      'The City of Senoia Welcome Center at 68 Main Street was once home to the Senoia Police Department. Senior locals remember when it had a jail cell inside.',
+      'The Welcome Center is operated and maintained by the Senoia Downtown Development Authority, and carries travel brochures and local maps. Look down as you walk this stretch of Main Street: the plaques set into the sidewalk commemorate the movies and television shows filmed in Senoia.'
+    ),
+  },
+  {
+    slug: 'buggy-shop-museum',
+    title: 'The Buggy Shop Museum',
+    type: 'Business',
+    historical_address: '74 Main Street, Senoia, GA 30276',
+    mainImage: tour('02-74-main-st'),
+    excerpt: 'Built in 1872 and thought to be one of the oldest continuously operated commercial buildings in Georgia.',
+    description: p(
+      'Built in 1872, this building is considered one of the oldest continuously operated commercial buildings in the state of Georgia.',
+      'The wooden structure, now a museum, was formerly a business operated by Walter and Warren Baggarly, the twin sons of Rev. and Mrs. Francis Warren Baggarly. The brothers sold wagons, buggies, horse collars, and plows.'
+    ),
+  },
+  {
+    slug: 'senoia-church-of-god-of-prophecy',
+    title: 'Senoia Church of God of Prophecy',
+    type: 'Place or Thing',
+    historical_address: 'Main Street at Johnson Street, Senoia, GA 30276',
+    mainImage: tour('03-87-main-st'),
+    excerpt: 'A yellow brick church at the corner of Main and Johnson, known for its sanctuary.',
+    description: p(
+      'The yellow brick church at the corner of Main Street and Johnson is the Senoia Church of God of Prophecy, known locally for its beautiful sanctuary.'
+    ),
+  },
   {
     slug: 'couch-morgan-house',
     title: 'The Couch-Morgan House',
     historical_address: '101 Main Street, Senoia, GA 30276',
-    photo: '4_101 Main St.jpg',
+    mainImage: tour('04-101-main-st'),
+    galleryImages: [archive('101-main-street'), archive('m-h-couch')],
     excerpt:
       'A Queen Anne home of about 1890, with a wraparound porch, eight fireplaces, and a cast-iron fire escape running through the back porches.',
     description: p(
@@ -55,7 +96,8 @@ const PLACES = [
     slug: 'baggarly-home',
     title: 'The Baggarly Home',
     historical_address: '100 Baggarly Way, Senoia, GA 30276',
-    photo: '5_100 Baggarly Way.jpg',
+    mainImage: tour('05-100-baggarly-way'),
+    galleryImages: [archive('100-baggarly-way')],
     excerpt:
       'Built in the early 1870s and later home to the family of Rev. Francis Warren Baggarly, who bought the tract of land that became Senoia.',
     description: p(
@@ -64,10 +106,44 @@ const PLACES = [
     ),
   },
   {
+    slug: 'first-baptist-church-of-senoia',
+    title: 'First Baptist Church of Senoia',
+    type: 'Place or Thing',
+    historical_address: '41 Johnson Street, Senoia, GA 30276',
+    mainImage: tour('06-41-johnson-st'),
+    excerpt: 'Constituted in July 1867 as “The Baptist Church of Christ,” founded by a presbytery of three men.',
+    description: p(
+      'On July 6, 1867, Reverend Henry S. Reese, J. C. Camp, and James Sperling formed a presbytery to found and constitute what was originally named “The Baptist Church of Christ.”'
+    ),
+  },
+  {
+    slug: 'jones-humphrey-house',
+    title: 'The Jones-Humphrey House',
+    historical_address: '9 Johnson Street, Senoia, GA 30276',
+    mainImage: tour('07-9-johnson-st'),
+    excerpt: 'Built in the early 1850s by the Jones family — a two-storey version of the Gabled Ell, common in 19th-century Georgia.',
+    description: p(
+      'This home was built between 1850 and 1855 by its original owners, the Jones family. The War family were the second owners, and placed a large swing on the front porch for the father. The Enloe family followed; Mr. Enloe was an elder in the Presbyterian Church. The Humphreys moved into the home in 1956 and raised their four sons here.',
+      'The house is a two-story version of a very common late nineteenth century architectural style in Georgia known as the Gabled Ell.'
+    ),
+  },
+  {
+    slug: 'former-senoia-presbyterian-church',
+    title: 'The Former Senoia Presbyterian Church',
+    type: 'Place or Thing',
+    historical_address: '386 Pylant Street, Senoia, GA 30276',
+    mainImage: tour('08-386-pylant-st'),
+    excerpt: 'Begun in 1892 and dedicated in 1894; the only historic church in Senoia with a burial on its grounds.',
+    description: p(
+      'Construction of the Senoia Presbyterian Church began on December 5, 1892. The building was finished and dedicated in 1894.',
+      'Thomas Hightower Peavy, who lived between 1826 and 1871 and served during the Civil War, is the only person buried on the grounds of this church — and the only known person buried at any of the historic churches in Senoia. After serving as a Presbyterian church for many years, the building was used as a wedding chapel.'
+    ),
+  },
+  {
     slug: 'hutchinson-house-pylant',
     title: 'The Hutchinson House',
     historical_address: '368 Pylant Street, Senoia, GA 30276',
-    photo: '9_368 Pylant St.jpg',
+    mainImage: tour('09-368-pylant-st'),
     excerpt:
       'An 1892 Gabled Ell Cottage, once home to Jimmy Hutchinson, who became Georgia’s youngest mayor at twenty-five.',
     description: p(
@@ -76,10 +152,34 @@ const PLACES = [
     ),
   },
   {
+    slug: 'hand-house',
+    title: 'The Hand House',
+    historical_address: '371 Pylant Street, Senoia, GA 30276',
+    mainImage: tour('10-371-pylant-st'),
+    excerpt: 'Built in 1907 by the R.D. Cole Manufacturing Company for Lee Hand and his bride, Coral, with an iron fence salvaged from Chattanooga’s Union Station.',
+    description: p(
+      'Mr. Lee Hand had this home built in 1907 by the R.D. Cole Manufacturing Company of Newnan for his bride, Coral. The Neoclassical structure, with its central pedimented portico and Doric columns, was designed to imitate the earlier Federal style popular in this region in the 1830s.',
+      'The old iron fence was purchased from Union Station in Chattanooga when it was being demolished. Mr. Hand owned a general store, started a bank, and was in the peach business.'
+    ),
+  },
+  {
+    slug: 'brandenburg-house',
+    title: 'The Brandenburg House',
+    historical_address: '163 Seavy Street, Senoia, GA 30276',
+    mainImage: tour('11-163-seavy-st'),
+    galleryImages: [archive('163-seavy-street')],
+    excerpt: 'An 1873 Victorian Gothic house of Georgia heart pine and Senoia Brickworks brick, supported by 22-foot crossbeams.',
+    description: p(
+      'Built in 1873 by George P. Hodnett, this house is an excellent example of the Victorian Gothic style popular immediately after the Civil War. It was constructed with native Georgia heart of pine and bricks from the one-time Senoia Brickworks, and is supported by 22-foot crossbeams.',
+      'The three gables characteristic of the style create a “picturesque” irregularity. Victorian Gothic was popularised by A. J. Downing, a landscape architect who published several books on building cottages to ornament a natural setting. The home has four fireplaces upstairs and four down.'
+    ),
+  },
+  {
     slug: 'gibson-house',
     title: 'The Gibson House',
     historical_address: '352 Pylant Street, Senoia, GA 30276',
-    photo: '12_352 Pylant St.jpg',
+    mainImage: tour('12-352-pylant-st'),
+    galleryImages: [archive('352-pylant')],
     excerpt:
       'A seven-room Early Classical Revival house built by a cotton broker between 1870 and 1880, with an unusual U-shaped plan.',
     description: p(
@@ -89,10 +189,25 @@ const PLACES = [
     ),
   },
   {
+    slug: 'duke-house',
+    title: 'The Duke House',
+    historical_address: '304 Pylant Street, Senoia, GA 30276',
+    mainImage: tour('13-304-pylant-st'),
+    excerpt: 'A circa 1907 bungalow, meticulously renovated, retaining its heart pine floors and beadboard walls.',
+    description: p(
+      'This circa 1907 bungalow has been meticulously renovated, with an attached garage and modern upgrades added. The home retains its original heart pine floors, beadboard walls and ceilings, and original windows.'
+    ),
+  },
+  {
     slug: 'arnall-house-291-pylant',
     title: 'The Arnall House',
     historical_address: '291 Pylant Street, Senoia, GA 30276',
-    photo: '14_291 Pylant St.jpg',
+    mainImage: tour('14-291-pylant-st'),
+    galleryImages: [
+      archive('291-pylant'),
+      archive('ellamaefreemanarnalland-charles-henry-arnall'),
+      archive('freemanarnall-marriage-announcement'),
+    ],
     excerpt:
       'Built in 1913 with twelve rooms, seven coal-burning fireplaces, and 57 windows containing 847 individual panes of glass.',
     description: p(
@@ -101,10 +216,67 @@ const PLACES = [
     ),
   },
   {
+    slug: 'freeman-house',
+    title: 'The Freeman House',
+    historical_address: '279 Pylant Street, Senoia, GA 30276',
+    mainImage: tour('15-279-pylant-st'),
+    excerpt: 'A 1924 Craftsman bungalow designed by Leila Ross Wilburn, one of Georgia’s first female architects.',
+    description: p(
+      'This Craftsman bungalow, built in 1924, was designed by Leila Ross Wilburn, one of the first female architects in Georgia.',
+      'Wilburn designed arts and crafts houses in a range of styles across Atlanta’s most desirable older neighbourhoods, including Decatur, Midtown, Candler Park, and Ansley Park.'
+    ),
+  },
+  {
+    slug: 'linch-house',
+    title: 'The Linch House',
+    historical_address: '270 Pylant Street, Senoia, GA 30276',
+    mainImage: tour('16-270-pylant-st'),
+    galleryImages: [archive('270-pylant')],
+    excerpt: 'An 1889 farmhouse built by Captain William D. Linch, one of the county’s largest landowners and cotton producers.',
+    description: p(
+      'This 1889 home was built by Captain William D. Linch and is an example of the 19th Century Farmhouse style.',
+      'Captain Linch was one of the largest landowners and cotton producers in the county. He fought in the Civil War at Manassas, the Seven Days’ fight at Richmond, Malvern Hill, Cold Harbor, Knoxville, the Wilderness, Fair Oaks, Sharpsburg, and Gettysburg.'
+    ),
+  },
+  {
+    slug: 'mcknight-house',
+    title: 'The McKnight House',
+    historical_address: '258 Pylant Street, Senoia, GA 30276',
+    mainImage: tour('17-258-pylant-st'),
+    galleryImages: [archive('258-pylant')],
+    excerpt: 'A circa 1905 Neoclassical house built as a wedding gift for Mary McKnight — with its front door set off centre for her grand piano.',
+    description: p(
+      'This circa 1905 Neoclassical house was built as a wedding gift for Mary McKnight by her father, Captain W. D. Linch. It was built by the R.D. Cole Manufacturing Company, the same firm that built the Hand House earlier on this tour.',
+      'It is said that Miss Mary directed the front door to be placed off centre in order to accommodate her grand piano in the room to the right.'
+    ),
+  },
+  {
+    slug: 'arnall-house-244-pylant',
+    title: 'The Arnall House (244 Pylant)',
+    historical_address: '244 Pylant Street, Senoia, GA 30276',
+    mainImage: tour('18-244-pylant-st'),
+    excerpt: 'Built about 1892 for a daughter whose fiancé never returned from the Spanish-American War; later used as a children’s hospital.',
+    description: p(
+      'This circa 1892 home was originally built by a man for his daughter, who was engaged to be married. Her fiancé went off to fight in the Spanish-American War and, tragically, never returned.',
+      'The distraught daughter’s father then let the home be used as a children’s hospital — a home for children with ailments such as chicken pox, which were far more serious then than now.'
+    ),
+  },
+  {
+    slug: 'cleveland-house',
+    title: 'The Cleveland House',
+    historical_address: '230 Pylant Street, Senoia, GA 30276',
+    mainImage: tour('19-230-pylant-st'),
+    excerpt: 'A restored Craftsman bungalow with Prairie Style stained glass sidelights.',
+    description: p(
+      'This classic Craftsman bungalow has been beautifully restored. Features include Prairie Style stained glass sidelights, original wood floors, and a sideboard designed to showcase leaded glass windows found in the crawlspace under the house.'
+    ),
+  },
+  {
     slug: 'massengale-house',
     title: 'The Massengale House',
     historical_address: '225 Pylant Street, Senoia, GA 30276',
-    photo: '20_225 Pylant St.jpg',
+    mainImage: tour('20-225-pylant-st'),
+    galleryImages: [archive('225-pylant')],
     excerpt:
       'Built in 1867 and left abandoned for years, this house was bought in 2012 and brought back over a year-long restoration.',
     description: p(
@@ -113,10 +285,33 @@ const PLACES = [
     ),
   },
   {
+    slug: 'mann-house',
+    title: 'The Mann House',
+    historical_address: '239 Pylant Street, Senoia, GA 30276',
+    mainImage: tour('21-239-pylant-st'),
+    excerpt: 'A 1909 American Four Square ordered from a Sears, Roebuck catalog by cotton and peach farmer — and one-time mayor — Oscar Mann.',
+    description: p(
+      'This 1909 house was built by Oscar Mann, a local cotton and peach farmer and one-time Mayor of Senoia. The home is of the American Four Square design and was acquired through a Sears, Roebuck and Company catalog.',
+      'It features a wraparound front porch and both swamp maple and heart of pine flooring, with oak, walnut, and pine fireplace mantels.'
+    ),
+  },
+  {
+    slug: 'southern-living-idea-house',
+    title: 'The 2012 Southern Living Idea House',
+    type: 'Place or Thing',
+    historical_address: '57 Morgan Street, Senoia, GA 30276',
+    mainImage: tour('22-57-morgan-st'),
+    excerpt: 'Senoia’s second turn as a Southern Living Idea House, after the 2010 house drew some 20,000 paying visitors.',
+    description: p(
+      'The 2012 Southern Living Idea House stands at 57 Morgan Street, at the intersection of Lower Creek Trail.',
+      'Senoia had hosted the magazine before: the corner townhouse at 119 McKnight Drive was professionally decorated by Southern Living and named the 2010 Idea House. It was open for tours from June to December that year, and roughly 20,000 visitors paid to see it.'
+    ),
+  },
+  {
     slug: 'sims-house',
     title: 'The Sims House',
     historical_address: '36 Broad Street, Senoia, GA 30276',
-    photo: '23_36 Broad St.jpg',
+    mainImage: tour('23-36-broad-st'),
     excerpt:
       'Built of heart pine in 1871 by Iverson W. Sims, and home to his three daughters, who ran a millinery shop that drew customers from Atlanta.',
     description: p(
@@ -128,7 +323,7 @@ const PLACES = [
     slug: 'culpepper-house',
     title: 'The Culpepper House',
     historical_address: '35 Broad Street, Senoia, GA 30276',
-    photo: '24_35 Broad St.jpg',
+    mainImage: tour('24-35-broad-st'),
     excerpt:
       'Built about 1871 by a returning Confederate soldier, and bought in 1902 by Dr. Wilbur Fiske Culpepper as a gift for his wife.',
     description: p(
@@ -138,10 +333,22 @@ const PLACES = [
     ),
   },
   {
+    slug: 'senoia-beer-company-building',
+    title: 'The Nolan Building (Senoia Beer Company)',
+    type: 'Business',
+    historical_address: '1 Main Street, Senoia, GA 30276',
+    mainImage: tour('25-1-main-st'),
+    excerpt: 'The corner where Ben Nolan’s grocery stood and the Enterprise Gazette was printed; rebuilt in the 1920s.',
+    description: p(
+      'This corner is the early site of a wooden building that housed Ben Nolan’s grocery store. The local newspaper, the <em>Enterprise Gazette</em>, was published from a brick building attached to the back of the grocery.',
+      'In the 1920s Ben Nolan replaced the old wooden building with the structure that stands here now.'
+    ),
+  },
+  {
     slug: 'travis-house-bridge-street',
     title: 'The Travis House',
     historical_address: '204 Bridge Street, Senoia, GA 30276',
-    photo: '26_204 Bridge St.jpg',
+    mainImage: tour('26-204-bridge-st'),
     excerpt:
       'Built about 1910 from a plan Mrs. Travis found in a magazine, and known locally as the “Fried Green Tomato House.”',
     description: p(
@@ -151,10 +358,44 @@ const PLACES = [
     ),
   },
   {
+    slug: 'nolan-house',
+    title: 'The Nolan House',
+    historical_address: '207 Bridge Street, Senoia, GA 30276',
+    mainImage: tour('27-207-bridge-st'),
+    excerpt: 'Built by Benjamin A. Nolan, who owned the general store and ran the Enterprise-Gazette newspaper.',
+    description: p(
+      'This home, across from the Fried Green Tomato house, was built by Mr. Benjamin A. Nolan, who owned the general store and ran the <em>Enterprise-Gazette</em> newspaper.',
+      'It has undergone extensive renovation over the past two decades, and retains five original fireplaces and mantels, original beadboard ceilings, crown molding, and wainscoting.'
+    ),
+  },
+  {
+    slug: 'addy-hollberg-house',
+    title: 'The Addy-Hollberg House',
+    historical_address: '222 Bridge Street, Senoia, GA 30276',
+    mainImage: tour('28-222-bridge-st'),
+    excerpt: 'A heavy timber house joined with wooden pegs, built by John Addy and John Mays and remodeled in 1930.',
+    description: p(
+      'Built by John Addy and John Mays, this home is of heavy timber construction with wooden peg joints. The two-story house was originally one room deep, with exterior end chimneys, and was extensively remodeled in 1930.',
+      'The house was heated only by wood. When the C. F. Hollberg Jr. family moved in in 1942, they hired someone to dig a basement.'
+    ),
+  },
+  {
+    slug: 'senoia-united-methodist-church',
+    title: 'Senoia United Methodist Church',
+    type: 'Place or Thing',
+    historical_address: 'Bridge Street at Seavy Street, Senoia, GA 30276',
+    mainImage: tour('29-229-bridge-st'),
+    excerpt: 'Founded in 1861 by Rev. Francis Warren Baggarly, whose first meetings were held in a brush arbor.',
+    description: p(
+      'Rev. Francis Warren Baggarly founded the Methodist Episcopal Church South in 1861, holding the first meetings in a brush arbor. The congregation next used the upstairs of the Rock House as its first “permanent” site.',
+      'The sanctuary standing today was built in 1897.'
+    ),
+  },
+  {
     slug: 'atkinson-house',
     title: 'The Atkinson House',
     historical_address: '351 Seavy Street, Senoia, GA 30276',
-    photo: '30_351 Seavy St.jpg',
+    mainImage: tour('30-351-seavy-st'),
     excerpt:
       'A house that began as a single story — said to date to about 1842 — with a second storey added roughly a decade later.',
     description: p(
@@ -162,31 +403,102 @@ const PLACES = [
       'The Atkinsons bought the home from the original family around 1960 and lived here for some forty-two years. Joe Atkinson planted almost everything in the yard from seed, except the pecan trees, which are very old.'
     ),
   },
+  {
+    slug: 'hutchinson-house-seavy',
+    title: 'The Hutchinson House (365 Seavy)',
+    historical_address: '365 Seavy Street, Senoia, GA 30276',
+    mainImage: tour('31-365-seavy-st'),
+    excerpt: 'A 1904 Craftsman built from a Sears, Roebuck kit delivered in crates, and in the Hutchinson family for over eighty years.',
+    description: p(
+      'This two-story frame home was in the Hutchinson family for over eighty years, from its construction in 1904 by L. L. Hutchinson — owner of Hutchinson Hardware, and Mayor of Senoia in 1912 when the Brantley Institute was rebuilt.',
+      'The Craftsman style home was built from a Sears, Roebuck catalog kit delivered in crates.'
+    ),
+  },
+  {
+    slug: 'the-blue-house',
+    title: 'The Blue House',
+    historical_address: '354 Seavy Street, Senoia, GA 30276',
+    mainImage: tour('32-354-seavy-st'),
+    excerpt: 'A circa 1870 Greek Revival cottage, named for its long-time paint colour, with rooms unusually added to the front.',
+    description: p(
+      'Locals call 354 Seavy Street the “Blue House” for its long-time paint colour. This circa 1870 Greek Revival cottage has a center hall plan with three fireplaces and heart pine floors.',
+      'The three front rooms were built onto the front of the house — unusual, as rooms are normally added to the side or the back. The front door dates from the 1870s rather than the later Victorian period when those front rooms were added.'
+    ),
+  },
+  {
+    slug: 'travis-house-seavy',
+    title: 'The Travis House (348 Seavy)',
+    historical_address: '348 Seavy Street, Senoia, GA 30276',
+    mainImage: tour('33-348-seavy-st'),
+    excerpt: 'A Victorian cottage built by merchant and farmer Stoddard C. Travis, who bought a four-acre “town square” in 1906.',
+    description: p(
+      'This Victorian Cottage was built by Stoddard C. Travis, a Senoia merchant and farmer.',
+      'In 1906 he purchased what was called a town square — four lots totalling a little over four acres, bounded by Clark Street to the west, Johnson to the north, and Seavy to the south.'
+    ),
+  },
+  {
+    slug: 'hardy-house',
+    title: 'The Hardy House',
+    historical_address: '298 Seavy Street, Senoia, GA 30276',
+    mainImage: tour('34-298-seavy-st'),
+    excerpt: 'A circa 1885 Queen Anne home built by Joseph Hardy.',
+    description: p(
+      'This circa 1885 Queen Anne-style home was built by Joseph Hardy.'
+    ),
+  },
+  {
+    slug: 'barnes-house',
+    title: 'The Barnes House',
+    historical_address: '271 Seavy Street, Senoia, GA 30276',
+    mainImage: tour('35-271-seavy-st'),
+    galleryImages: [archive('271-seavy-street')],
+    excerpt: 'A circa 1850 home of the Barnes family, among the earliest settlers to migrate from Newberry, South Carolina.',
+    description: p(
+      'Among the area’s earliest settlers migrating from Newberry, South Carolina, was the Barnes family — the original occupants of this circa 1850 home.',
+      'Senoia was incorporated as a town in 1866, with William Cunningham Barnes and Rev. Francis Baggarly among its commissioners, after the first railroad was resumed and completed to Newnan. In 1867 William Cunningham Barnes and his family sold the easement for that line.'
+    ),
+  },
+  {
+    slug: 'former-hollberg-hotel',
+    title: 'The Former Hollberg Hotel',
+    type: 'Business',
+    historical_address: '252 Seavy Street, Senoia, GA 30276',
+    mainImage: tour('36-252-seavy-st'),
+    galleryImages: [
+      archive('hollberg-hotel-confederate-soldiers-and-their-wives'),
+      archive('c-f-hollberg-with-1910-studebaker'),
+    ],
+    excerpt:
+      'Built in 1906–07 by C. F. Hollberg, Sr., and among the first buildings in Coweta County with electricity. Now the Veranda Historic Inn.',
+    description: p(
+      'Listed on the National Register of Historic Places, this mansion operates today as The Veranda Historic Inn.',
+      'Built in 1906–1907 by C. F. Hollberg, Sr., the Hollberg Hotel was one of the first buildings in Coweta County to have electricity, generated by the nearby Starr’s Mill hydro-electric plant.'
+    ),
+  },
 ];
 
 async function seed() {
   const target = PRODUCTION ? 'PRODUCTION' : 'the emulator';
-  console.log(`Seeding ${PLACES.length} walking-tour homes into ${target}…\n`);
+  console.log(`Seeding ${PLACES.length} walking-tour places into ${target}…\n`);
 
   for (const place of PLACES) {
-    const { photo, ...fields } = place;
     await db.collection('historical_places').doc(place.slug).set(
       {
-        ...fields,
         type: 'Home',
-        mainImage: '',
         galleryImages: [],
         coordinates: null,
+        ...place,
         updatedAt: FieldValue.serverTimestamp(),
         createdAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
-    console.log(`  ${place.title.padEnd(28)} → /historic-structures-and-places/${place.slug}`);
-    console.log(`  ${''.padEnd(28)}   photo to upload: ${photo}`);
+    console.log(`  ${place.title}`);
   }
 
-  console.log(`\nDone. Next: add a photo and a map pin for each in /admin/places.`);
+  const homes = PLACES.filter(x => !x.type || x.type === 'Home').length;
+  console.log(`\nDone — ${homes} homes, ${PLACES.length - homes} other places.`);
+  console.log('Photos are served from public/images/; add map pins in /admin/places.');
   if (!PRODUCTION) console.log('This run wrote to the emulator only. Re-run with --production for the live site.');
   process.exit(0);
 }
