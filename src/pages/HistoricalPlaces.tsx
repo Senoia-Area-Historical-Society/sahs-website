@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getHistoricalPlaces } from '../services/api';
 import { excerptFromHtml } from '../lib/text';
 import type { HistoricalPlace } from '../types';
+import Seo from '../components/Seo';
 
 export default function HistoricalPlaces() {
   const [places, setPlaces] = useState<HistoricalPlace[]>([]);
@@ -26,6 +27,10 @@ export default function HistoricalPlaces() {
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="Historic Structures & Places"
+        description="Explore the historic homes, buildings, and landmarks of Senoia, Georgia — a town with more than 113 sites on the National Register of Historic Places."
+      />
       <div className="max-w-7xl mx-auto">
         <header className="mb-12 border-b border-tan pb-8 text-center md:text-left">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Historical Structures & Places</h1>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import Seo from '../components/Seo';
 
 export default function Contact() {
   const [name, setName] = useState('');
@@ -41,6 +42,10 @@ export default function Contact() {
 
   return (
     <div className="max-w-3xl mx-auto py-16 px-8 text-left">
+      <Seo
+        title="Contact Us"
+        description="Get in touch with the Senoia Area Historical Society — questions about the museum, research requests, donations of artifacts, and volunteering."
+      />
       <h1 className="text-4xl font-serif text-charcoal mb-8">Contact Us</h1>
       <p className="text-lg text-charcoal mb-8">
         Contact us via email or use the form below.

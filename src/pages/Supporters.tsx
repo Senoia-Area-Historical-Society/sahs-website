@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import SponsorsList from '../components/SponsorsList';
+import Seo from '../components/Seo';
 
 export default function Supporters() {
   const partners = [
@@ -14,6 +15,10 @@ export default function Supporters() {
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="Our Supporters"
+        description="The businesses, sponsors, and members whose support keeps the Senoia Area Historical Society museum free and open to the public."
+      />
       <div className="max-w-5xl mx-auto">
         <header className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold mb-6">SAHS Supporters</h1>

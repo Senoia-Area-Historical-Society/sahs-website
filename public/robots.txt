@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Admin portal and post-checkout landing pages carry no public content.
+Disallow: /admin/
+Disallow: /membership-status
+Disallow: /support-sahs/success
+Disallow: /support-sahs/cancel
+Disallow: /meeting-room/success
+Disallow: /meeting-room/cancel
+Disallow: /tickets/success
+Disallow: /volunteer/
+Disallow: /401
+
+Sitemap: https://senoiahistory.com/sitemap.xml

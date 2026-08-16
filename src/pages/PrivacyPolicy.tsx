@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom';
+import Seo from '../components/Seo';
 
 export default function PrivacyPolicy() {
   return (
     <div className="max-w-4xl mx-auto py-16 px-8 text-left">
+      <Seo
+        title="Privacy Policy"
+        description="How the Senoia Area Historical Society handles your information."
+      />
       <h1 className="text-4xl font-serif text-charcoal mb-8">Privacy Policy</h1>
       <div className="prose prose-lg text-charcoal max-w-none">
         <p className="mb-6 leading-relaxed">

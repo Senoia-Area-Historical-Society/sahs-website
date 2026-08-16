@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { getTicketBySessionId } from '../services/api';
 import type { Ticket } from '../types';
 import { CheckCircle, Ticket as TicketIcon, Calendar, Users, Printer } from 'lucide-react';
+import Seo from '../components/Seo';
 
 type Status = 'loading' | 'found' | 'timeout';
 
@@ -72,6 +73,7 @@ export default function TicketSuccess() {
 
   return (
     <div className="min-h-screen bg-cream py-12 px-4">
+      <Seo title="Tickets Confirmed" description="Your event tickets are confirmed." noindex />
       <div className="max-w-lg mx-auto">
         {/* Success header */}
         <div className="text-center mb-8">

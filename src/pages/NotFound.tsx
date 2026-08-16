@@ -1,8 +1,14 @@
 import { Link } from 'react-router-dom';
+import Seo from '../components/Seo';
 
 export default function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center py-24 px-4 sm:px-6 lg:px-8 text-center">
+      <Seo
+        title="Page Not Found"
+        description="This page could not be found on the Senoia Area Historical Society website."
+        noindex
+      />
       <h1 className="text-6xl font-serif text-charcoal mb-4">404</h1>
       <h2 className="text-3xl font-bold text-charcoal mb-6">Page Not Found</h2>
       <p className="text-lg text-charcoal-light max-w-2xl mb-10">

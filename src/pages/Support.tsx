@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { CreditCard } from 'lucide-react';
 import SponsorsList from '../components/SponsorsList';
+import Seo from '../components/Seo';
 
 export default function Support() {
   useEffect(() => {
@@ -18,6 +19,10 @@ export default function Support() {
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="Become a Member & Support SAHS"
+        description="Join the Senoia Area Historical Society or make a donation. Memberships and gifts fund the museum, exhibits, and preservation of Senoia’s history."
+      />
       <div className="max-w-7xl mx-auto">
         <header className="mb-16 border-b border-tan pb-8">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Support SAHS</h1>

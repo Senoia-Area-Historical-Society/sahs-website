@@ -5,6 +5,7 @@ import { getEventsSplit, getVolunteerSheetById } from '../services/api';
 import EventCard from '../components/public/EventCard';
 import CalendarSubscribe from '../components/public/CalendarSubscribe';
 import type { Post } from '../types';
+import Seo from '../components/Seo';
 
 const PAST_EVENTS_SHOWN = 8;
 
@@ -40,6 +41,10 @@ export default function News() {
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="News & Events"
+        description="Upcoming events, exhibits, and news from the Senoia Area Historical Society in Senoia, Georgia."
+      />
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl md:text-5xl font-bold mb-4">Events</h1>
         <p className="text-lg text-charcoal/80 mb-12 max-w-2xl font-sans">

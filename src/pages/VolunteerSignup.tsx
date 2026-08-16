@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { getVolunteerSheetByToken, getVolunteerSlots, submitVolunteerSignup } from '../services/api';
 import type { VolunteerSheet, VolunteerSlot } from '../types';
 import { MapPin, Calendar, Users, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import Seo from '../components/Seo';
 
 export default function VolunteerSignup() {
   const { token } = useParams<{ token: string }>();
@@ -91,6 +92,7 @@ export default function VolunteerSignup() {
   if (sheet.status !== 'active') {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center px-4">
+        <Seo title="Volunteer Signup" description="Sign up to volunteer with the Senoia Area Historical Society." noindex />
         <div className="text-center max-w-md">
           <Users size={48} className="mx-auto text-tan/50 mb-4" />
           <h1 className="text-2xl font-serif text-charcoal mb-2">{sheet.title}</h1>
