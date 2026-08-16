@@ -13,9 +13,10 @@
  * the code and need no production write to seed. Admin uploads still go to
  * Storage — mainImage is just a URL either way.
  *
- * Coordinates are left null deliberately. The script gives street addresses but
- * no lat/lng, and guessing a pin for a private residence is worse than no pin.
- * Add them in /admin/places (right-click the spot in Google Maps to copy them).
+ * Coordinates are geocoded from the addresses and verified — see COORDINATES
+ * below for how results are filtered. 34 of the 36 stops have a pin; the two
+ * churches are identified by intersection rather than street number and have no
+ * usable geocoder record, so they stay null and can be pinned in /admin/places.
  *
  * Safe by default: writes to the emulator unless you pass --production, matching
  * the convention in seed_july4_event.cjs. Idempotent — the doc ID is derived from
@@ -25,7 +26,7 @@
  *   node scripts/seed_walking_tour_places.cjs --production   # real site
  */
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, GeoPoint } = require('firebase-admin/firestore');
 
 const PRODUCTION = process.argv.includes('--production');
 if (!PRODUCTION) {
@@ -477,6 +478,53 @@ const PLACES = [
   },
 ];
 
+/**
+ * Coordinates geocoded from the addresses above via OpenStreetMap's Nominatim,
+ * then filtered: a result is only kept if its returned house number matches the
+ * address exactly and it falls inside a bounding box around Senoia. That rejects
+ * the street- and town-centroid fallbacks a geocoder returns when it can't find a
+ * building — which would put a confident-looking pin on the wrong house.
+ *
+ * The two churches are absent because they're identified by intersection rather
+ * than street number and Nominatim has no record of them; add those pins by hand.
+ */
+const COORDINATES = {
+  'senoia-welcome-center': [33.3017826, -84.5542032],
+  'buggy-shop-museum': [33.3019151, -84.5541928],
+  'couch-morgan-house': [33.3027224, -84.5541203],
+  'baggarly-home': [33.303181, -84.5546655],
+  'first-baptist-church-of-senoia': [33.3025615, -84.5555018],
+  'jones-humphrey-house': [33.3025827, -84.5559012],
+  'former-senoia-presbyterian-church': [33.3022836, -84.5563045],
+  'hutchinson-house-pylant': [33.3018586, -84.5563729],
+  'hand-house': [33.3022288, -84.5561148],
+  'brandenburg-house': [33.3012425, -84.5555465],
+  'gibson-house': [33.301277, -84.556455],
+  'duke-house': [33.300256, -84.556742],
+  'arnall-house-291-pylant': [33.2998455, -84.5570823],
+  'freeman-house': [33.2996061, -84.5575275],
+  'linch-house': [33.2997624, -84.557609],
+  'mcknight-house': [33.2995937, -84.5579185],
+  'arnall-house-244-pylant': [33.299301, -84.558474],
+  'cleveland-house': [33.2991439, -84.5588161],
+  'massengale-house': [33.2987673, -84.5591436],
+  'mann-house': [33.2989306, -84.5588526],
+  'southern-living-idea-house': [33.298308, -84.556355],
+  'sims-house': [33.297657, -84.5539785],
+  'culpepper-house': [33.2975063, -84.5537922],
+  'senoia-beer-company-building': [33.299983, -84.5539674],
+  'travis-house-bridge-street': [33.2998353, -84.5521564],
+  'nolan-house': [33.2997975, -84.551963],
+  'addy-hollberg-house': [33.3002689, -84.5520999],
+  'atkinson-house': [33.300866, -84.54972],
+  'hutchinson-house-seavy': [33.3008438, -84.5494423],
+  'the-blue-house': [33.3010349, -84.5497624],
+  'travis-house-seavy': [33.3010459, -84.5499006],
+  'hardy-house': [33.301174, -84.551725],
+  'barnes-house': [33.3010461, -84.5524087],
+  'former-hollberg-hotel': [33.3012227, -84.5526237],
+};
+
 async function seed() {
   const target = PRODUCTION ? 'PRODUCTION' : 'the emulator';
   console.log(`Seeding ${PLACES.length} walking-tour places into ${target}…\n`);
@@ -486,8 +534,10 @@ async function seed() {
       {
         type: 'Home',
         galleryImages: [],
-        coordinates: null,
         ...place,
+        coordinates: COORDINATES[place.slug]
+          ? new GeoPoint(COORDINATES[place.slug][0], COORDINATES[place.slug][1])
+          : null,
         updatedAt: FieldValue.serverTimestamp(),
         createdAt: FieldValue.serverTimestamp(),
       },
@@ -497,7 +547,8 @@ async function seed() {
   }
 
   const homes = PLACES.filter(x => !x.type || x.type === 'Home').length;
-  console.log(`\nDone — ${homes} homes, ${PLACES.length - homes} other places.`);
+  const pinned = PLACES.filter(x => COORDINATES[x.slug]).length;
+  console.log(`\nDone — ${homes} homes, ${PLACES.length - homes} other places, ${pinned} with map pins.`);
   console.log('Photos are served from public/images/; add map pins in /admin/places.');
   if (!PRODUCTION) console.log('This run wrote to the emulator only. Re-run with --production for the live site.');
   process.exit(0);
