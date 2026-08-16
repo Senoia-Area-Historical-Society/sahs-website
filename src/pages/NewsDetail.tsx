@@ -19,7 +19,7 @@ import { excerptFromHtml } from '../lib/text';
 // ── Main NewsDetail Page ───────────────────────────────────────────────────
 export default function NewsDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const { user } = useAuth();
+  const { user, isSAHSUser } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
   const [volunteerSheet, setVolunteerSheet] = useState<VolunteerSheet | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +35,11 @@ export default function NewsDetail() {
         if (!snapshot.empty) {
           const docSnap = snapshot.docs[0];
           const loadedPost = { id: docSnap.id, ...docSnap.data() } as Post;
+          // This query intentionally matches on slug alone so signed-in staff can
+          // preview a draft before it goes live. For everyone else — including
+          // crawlers — anything not published must read as though it doesn't exist.
+          // Firestore allows public read of every post, so this is the only gate.
+          if (loadedPost.status !== 'published' && !isSAHSUser) return;
           setPost(loadedPost);
           if (loadedPost.volunteerSheetId) {
             const sheet = await getVolunteerSheetById(loadedPost.volunteerSheetId);
@@ -48,7 +53,7 @@ export default function NewsDetail() {
       }
     }
     loadPost();
-  }, [slug]);
+  }, [slug, isSAHSUser]);
 
   if (loading) {
     return (
@@ -81,7 +86,9 @@ export default function NewsDetail() {
         description={
           post.excerpt ||
           excerptFromHtml(post.content, 155) ||
-          `${post.type === 'event' ? 'Event' : 'News'} from the Senoia Area Historical Society.`
+          // Deliberately doesn't branch on post.type: since the news/event split was
+          // removed that field is 'event' on everything new and meaningless on legacy docs.
+          `${post.title} — news and events from the Senoia Area Historical Society.`
         }
         image={post.mainImage || undefined}
       />

@@ -15,6 +15,7 @@ import {
   X,
   LayoutDashboard,
   Mail,
+  Landmark,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -44,6 +45,7 @@ export default function AdminHeader() {
       items: [
         { label: 'Dashboard', path: '/admin', icon: LayoutDashboard, description: 'Stats overview and quick links' },
         { label: 'Site Content', path: '/admin/content', icon: FileText, description: 'Manage news, events, and pages' },
+        { label: 'Historic Places', path: '/admin/places', icon: Landmark, description: 'Historic structures, homes, and landmarks' },
         { label: 'Wiki', path: '/admin/wiki', icon: BookOpen, description: 'Internal knowledge base' },
         { label: 'Short Links', path: '/admin/shortlinks', icon: LinkIcon, description: 'Manage custom URLs' },
         { label: 'Newsletter', path: '/admin/newsletter', icon: Mail, description: 'Compose and send member emails' },

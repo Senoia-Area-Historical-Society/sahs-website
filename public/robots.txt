@@ -12,4 +12,8 @@ Disallow: /tickets/success
 Disallow: /volunteer/
 Disallow: /401
 
+# Ticket widgets are meant to be framed on partner sites; indexing them would
+# duplicate the event page they point at.
+Disallow: /embed/
+
 Sitemap: https://senoiahistory.com/sitemap.xml
