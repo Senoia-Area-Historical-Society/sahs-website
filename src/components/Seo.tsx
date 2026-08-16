@@ -43,7 +43,10 @@ export default function Seo({ title, description, image, noindex }: SeoProps) {
     setMeta('property', 'og:title', fullTitle);
     setMeta('property', 'og:description', description);
     setMeta('property', 'og:url', canonical);
-    setMeta('property', 'og:image', image ?? DEFAULT_IMAGE);
+    // og:image must be absolute — site-relative paths (as used by the walking-tour
+    // photos in public/images/) are meaningless to a scraper fetching the raw HTML.
+    const rawImage = image ?? DEFAULT_IMAGE;
+    setMeta('property', 'og:image', rawImage.startsWith('/') ? `${ORIGIN}${rawImage}` : rawImage);
     setLink('canonical', canonical);
 
     if (noindex) {
