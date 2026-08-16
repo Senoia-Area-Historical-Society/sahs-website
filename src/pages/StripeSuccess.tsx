@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
+import Seo from '../components/Seo';
 
 export default function StripeSuccess() {
   return (
     <div className="bg-cream min-h-screen pt-32 pb-16 px-4 flex justify-center items-start font-serif">
+      <Seo title="Thank You" description="Thank you for supporting the Senoia Area Historical Society." noindex />
       <div className="max-w-xl w-full bg-white p-12 rounded-lg border border-tan/20 shadow-lg text-center">
         <div className="w-16 h-16 bg-tan/10 rounded-full flex items-center justify-center mx-auto mb-6">
           <svg className="w-8 h-8 text-tan" fill="none" stroke="currentColor" viewBox="0 0 24 24">

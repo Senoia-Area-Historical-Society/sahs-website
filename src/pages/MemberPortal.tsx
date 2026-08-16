@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Search, CheckCircle, XCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import Seo from '../components/Seo';
 
 const FUNCTION_URL = 'https://us-central1-sahs-archives.cloudfunctions.net/getMembershipByEmail';
 
@@ -87,6 +88,7 @@ export default function MemberPortal() {
 
   return (
     <div className="min-h-screen bg-cream pt-24 pb-20 px-4 font-serif text-charcoal">
+      <Seo title="Membership Status" description="Look up your Senoia Area Historical Society membership." noindex />
       <div className="max-w-xl mx-auto">
         <header className="text-center mb-10">
           <p className="text-xs font-sans font-bold uppercase tracking-widest text-tan mb-3">Member Self-Service</p>

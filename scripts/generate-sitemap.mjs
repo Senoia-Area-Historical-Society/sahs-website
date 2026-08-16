@@ -135,13 +135,28 @@ function toISODate(value) {
   return undefined;
 }
 
+/**
+ * ContentAdmin restricts slugs to [a-z0-9-], but historical_places has no such
+ * admin-side sanitizer and scripts/ write to Firestore directly. One unescaped
+ * `&` would make the whole document invalid XML — Google rejects a malformed
+ * sitemap wholesale, and this script is fail-soft, so nothing would flag it.
+ */
+function escapeXml(value) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function renderSitemap(routes) {
   const today = new Date().toISOString().slice(0, 10);
   const entries = routes
     .map(([path, priority, lastmod]) =>
       [
         '  <url>',
-        `    <loc>${ORIGIN}${path}</loc>`,
+        `    <loc>${escapeXml(ORIGIN + path)}</loc>`,
         `    <lastmod>${lastmod ?? today}</lastmod>`,
         `    <priority>${priority.toFixed(1)}</priority>`,
         '  </url>',

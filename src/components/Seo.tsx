@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const SITE_NAME = 'Senoia Area Historical Society';
@@ -31,7 +31,10 @@ interface SeoProps {
 export default function Seo({ title, description, image, noindex }: SeoProps) {
   const { pathname } = useLocation();
 
-  useEffect(() => {
+  // Layout effect, not passive: AnalyticsTracker is an earlier sibling than
+  // <Routes> in App.tsx, so its passive effect would otherwise read document.title
+  // before this ran and log every page_view under the previous page's title.
+  useLayoutEffect(() => {
     const fullTitle = title === SITE_NAME ? title : `${title} | ${SITE_NAME}`;
     const canonical = `${ORIGIN}${pathname === '/' ? '/' : pathname.replace(/\/$/, '')}`;
 
