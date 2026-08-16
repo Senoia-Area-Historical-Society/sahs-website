@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getGalleries } from '../services/api';
 import type { Gallery } from '../types';
+import Seo from '../components/Seo';
 
 export default function Media() {
   const [galleries, setGalleries] = useState<Gallery[]>([]);
@@ -22,6 +23,10 @@ export default function Media() {
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="Photo Galleries"
+        description="Historic and contemporary photo galleries from the Senoia Area Historical Society archives in Senoia, Georgia."
+      />
       <div className="max-w-7xl mx-auto">
         <header className="mb-12 border-b border-tan pb-8">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Photo Galleries</h1>

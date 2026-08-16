@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom';
 import meetingRoomImg from '../assets/images/meeting-room-interior.jpg';
+import Seo from '../components/Seo';
 
 export default function MeetingRoom() {
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="Meeting Room Rental"
+        description="Rent the Senoia Area Historical Society meeting room in downtown Senoia, GA for meetings, classes, and small gatherings. Check availability and book online."
+      />
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 mb-12 items-center">
           <div className="lg:col-span-3">

@@ -1,10 +1,15 @@
 import { Heart, Mic, HelpCircle, ArrowRight, Share2, Award, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import logoImg from '../assets/senoia-stories-logo.png';
+import Seo from '../components/Seo';
 
 export default function SenoiaStories() {
   return (
     <div className="bg-cream min-h-screen pt-24 pb-20 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="Senoia Stories"
+        description="Share your memories of Senoia, Georgia. Senoia Stories collects first-hand accounts and oral histories from the people who lived them."
+      />
       <div className="max-w-6xl mx-auto">
         
         {/* Banner Heritage Hero */}

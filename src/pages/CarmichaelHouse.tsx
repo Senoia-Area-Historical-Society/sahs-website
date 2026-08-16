@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom';
+import Seo from '../components/Seo';
 
 export default function CarmichaelHouse() {
   return (
     <div className="max-w-4xl mx-auto py-16 px-8 text-left">
+      <Seo
+        title="The Carmichael House"
+        description="The story of the 1870s Carmichael House, home of the Senoia Area Historical Society museum and one of Senoia, Georgia’s landmark historic structures."
+      />
       <h1 className="text-4xl font-serif text-charcoal mb-8">Keeping Senoia’s History Alive: The Carmichael House</h1>
       <div className="mb-8">
         <img 

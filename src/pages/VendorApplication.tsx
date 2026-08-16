@@ -1,6 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { useState } from 'react';
 import { submitApplication } from '../services/api';
+import Seo from '../components/Seo';
 
 type VendorFormData = {
   businessName: string;
@@ -55,6 +56,10 @@ export default function VendorApplication() {
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="Vendor Application"
+        description="Apply to be a vendor at a Senoia Area Historical Society event in Senoia, Georgia."
+      />
       <div className="max-w-2xl mx-auto">
         <h1 className="text-4xl font-bold mb-4">Vendor Application</h1>
         <p className="text-lg font-sans text-charcoal/70 mb-12">

@@ -5,6 +5,7 @@ import type { Post } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { Ticket, Calendar, MapPin, Loader2 } from 'lucide-react';
 import TicketPurchaseWidget from '../components/public/TicketPurchaseWidget';
+import Seo from '../components/Seo';
 
 export default function BoxOffice() {
   const { user } = useAuth();
@@ -41,6 +42,10 @@ export default function BoxOffice() {
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="Event Tickets"
+        description="Buy tickets to Senoia Area Historical Society events, tours, and fundraisers in Senoia, Georgia."
+      />
       <div className="max-w-5xl mx-auto">
         <header className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-tan/10 rounded-full mb-4">

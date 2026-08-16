@@ -6,6 +6,7 @@ import type { Post } from '../types';
 import { format } from 'date-fns';
 import carmichaelImg from '../assets/images/carmichael-house-drawing.jpg';
 import meetingRoomImg from '../assets/images/meeting-room-interior.jpg';
+import Seo from '../components/Seo';
 
 export default function Home() {
   const [news, setNews] = useState<Post[]>([]);
@@ -30,6 +31,10 @@ export default function Home() {
 
   return (
     <div className="bg-cream min-h-screen font-serif text-charcoal">
+      <Seo
+        title="Senoia Area Historical Society"
+        description="Securing, preserving, and promoting the social and cultural history of the Senoia, Georgia area since 1976. Visit our free museum at 6 Couch St."
+      />
       {/* Hero Section */}
       <section className="relative h-[80vh] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">

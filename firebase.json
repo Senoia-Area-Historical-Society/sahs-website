@@ -15,6 +15,33 @@
         "**/.*",
         "**/node_modules/**"
       ],
+      "redirects": [
+        {
+          "source": "/museum",
+          "destination": "/location-and-hours",
+          "type": 301
+        },
+        {
+          "source": "/about",
+          "destination": "/about-sahs",
+          "type": 301
+        },
+        {
+          "source": "/contact",
+          "destination": "/contact-sahs",
+          "type": 301
+        },
+        {
+          "source": "/support",
+          "destination": "/support-sahs",
+          "type": 301
+        },
+        {
+          "source": "/events",
+          "destination": "/news",
+          "type": 301
+        }
+      ],
       "rewrites": [
         {
           "source": "**",

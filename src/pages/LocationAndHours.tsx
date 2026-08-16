@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom';
+import Seo from '../components/Seo';
 
 export default function LocationAndHours() {
   return (
     <div className="max-w-4xl mx-auto py-16 px-8 text-left">
+      <Seo
+        title="Museum Hours & Location"
+        description="The SAHS Museum is at 6 Couch St., Senoia, GA 30276, open Saturday and Sunday from 1:00 to 4:00 PM. Admission is free and donations are appreciated."
+      />
       <h1 className="text-4xl font-serif text-charcoal mb-8">SAHS Museum Hours and Location</h1>
       <div className="bg-white rounded-xl shadow-sm border border-tan-light p-8 mb-12">
         <h2 className="text-2xl font-bold text-charcoal mb-4">Hours of Operation</h2>

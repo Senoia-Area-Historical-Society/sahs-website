@@ -13,6 +13,8 @@ import 'yet-another-react-lightbox/plugins/counter.css';
 import TicketPurchaseWidget from '../components/public/TicketPurchaseWidget';
 
 import SocialShare from '../components/public/SocialShare';
+import Seo from '../components/Seo';
+import { excerptFromHtml } from '../lib/text';
 
 // ── Main NewsDetail Page ───────────────────────────────────────────────────
 export default function NewsDetail() {
@@ -71,6 +73,15 @@ export default function NewsDetail() {
 
   return (
     <article className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title={post.title}
+        description={
+          post.excerpt ||
+          excerptFromHtml(post.content, 155) ||
+          `${post.type === 'event' ? 'Event' : 'News'} from the Senoia Area Historical Society.`
+        }
+        image={post.mainImage || undefined}
+      />
       <div className="max-w-4xl mx-auto">
         <Link to="/news" className="inline-flex items-center text-sm font-sans text-tan uppercase tracking-wide hover:text-charcoal transition-colors mb-8">
           <span className="mr-2">←</span> Back to News &amp; Events

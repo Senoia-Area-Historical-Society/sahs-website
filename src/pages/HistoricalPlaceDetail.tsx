@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { HistoricalPlace } from '../types';
+import Seo from '../components/Seo';
+import { excerptFromHtml } from '../lib/text';
 
 export default function HistoricalPlaceDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -56,8 +58,17 @@ export default function HistoricalPlaceDetail() {
 
   return (
     <article className="bg-cream min-h-screen pt-24 pb-16 px-4 md:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title={place.title}
+        description={
+          place.excerpt ||
+          excerptFromHtml(place.description, 155) ||
+          `${place.title} — a historic ${place.type.toLowerCase()} in the Senoia, Georgia area.`
+        }
+        image={place.mainImage || undefined}
+      />
       <div className="max-w-4xl mx-auto">
-        
+
         <Link to="/historic-structures-and-places" className="inline-flex items-center text-sm font-sans text-tan uppercase tracking-wide hover:text-charcoal transition-colors mb-8">
           <span className="mr-2">←</span> Back to Historical Places
         </Link>

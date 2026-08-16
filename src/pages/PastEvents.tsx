@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPastEvents } from '../services/api';
 import type { Post } from '../types';
+import Seo from '../components/Seo';
 
 export default function PastEvents() {
   const [events, setEvents] = useState<Post[]>([]);
@@ -29,6 +30,10 @@ export default function PastEvents() {
 
   return (
     <div className="bg-cream min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8 font-serif text-charcoal">
+      <Seo
+        title="Past Events"
+        description="A look back at past exhibits, tours, and programs hosted by the Senoia Area Historical Society."
+      />
       <div className="max-w-7xl mx-auto">
         <header className="mb-12 border-b border-tan pb-8">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Past SAHS Events</h1>
