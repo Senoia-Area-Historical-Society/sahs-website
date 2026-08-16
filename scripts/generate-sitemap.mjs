@@ -30,6 +30,7 @@ const STATIC_ROUTES = [
   ['/senoia-stories', 0.8],
   ['/location-and-hours', 0.9],
   ['/carmichael-house', 0.8],
+  ['/filming-in-senoia', 0.9],
   ['/contact-sahs', 0.7],
   ['/news', 0.9],
   ['/box-office', 0.7],

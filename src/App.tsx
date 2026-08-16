@@ -11,6 +11,7 @@ import About from './pages/About';
 import SenoiaStories from './pages/SenoiaStories';
 import LocationAndHours from './pages/LocationAndHours';
 import CarmichaelHouse from './pages/CarmichaelHouse';
+import FilmingInSenoia from './pages/FilmingInSenoia';
 import Contact from './pages/Contact';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import News from './pages/News';
@@ -41,6 +42,7 @@ import MembershipsAdmin from './pages/admin/MembershipsAdmin';
 import TicketsAdmin from './pages/admin/TicketsAdmin';
 import ContentAdmin from './pages/admin/ContentAdmin';
 import WikiAdmin from './pages/admin/WikiAdmin';
+import PlacesAdmin from './pages/admin/PlacesAdmin';
 import VolunteersAdmin from './pages/admin/VolunteersAdmin';
 import TicketScanner from './pages/admin/TicketScanner';
 
@@ -133,6 +135,11 @@ function App() {
               <WikiAdmin />
             </ProtectedRoute>
           } />
+          <Route path="/admin/places" element={
+            <ProtectedRoute>
+              <PlacesAdmin />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/volunteers" element={
             <ProtectedRoute>
               <VolunteersAdmin />
@@ -160,6 +167,7 @@ function App() {
           <Route path="/senoia-stories" element={<PublicLayout><SenoiaStories /></PublicLayout>} />
           <Route path="/location-and-hours" element={<PublicLayout><LocationAndHours /></PublicLayout>} />
           <Route path="/carmichael-house" element={<PublicLayout><CarmichaelHouse /></PublicLayout>} />
+          <Route path="/filming-in-senoia" element={<PublicLayout><FilmingInSenoia /></PublicLayout>} />
           <Route path="/contact-sahs" element={<PublicLayout><Contact /></PublicLayout>} />
           <Route path="/privacy-policy" element={<PublicLayout><PrivacyPolicy /></PublicLayout>} />
           

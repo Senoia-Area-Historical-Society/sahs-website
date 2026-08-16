@@ -160,6 +160,7 @@ export default function Header() {
                 >
                   <Link to="/about-sahs" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">About the Society</Link>
                   <Link to="/location-and-hours" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Location & Hours</Link>
+                  <Link to="/filming-in-senoia" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan transition-all">Filming in Senoia</Link>
                   <Link to="/meeting-room" role="menuitem" className="block px-6 py-3 text-sm text-charcoal hover:bg-cream hover:text-tan font-bold">Meeting Room Booking</Link>
                 </div>
               )}
@@ -253,6 +254,7 @@ export default function Header() {
               <div className="space-y-1">
                 <Link to="/about-sahs" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">About the Society</Link>
                 <Link to="/location-and-hours" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Location & Hours</Link>
+                <Link to="/filming-in-senoia" className="block px-4 py-3 text-lg text-charcoal hover:bg-tan/5 rounded-lg transition-colors">Filming in Senoia</Link>
                 <Link to="/meeting-room" className="block px-4 py-3 text-lg font-bold text-tan-dark hover:bg-tan/5 rounded-lg transition-colors">Meeting Room Booking</Link>
               </div>
             </div>
