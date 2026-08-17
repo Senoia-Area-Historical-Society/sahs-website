@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
@@ -22,10 +22,19 @@ const icon = L.icon({
   shadowSize: [41, 41],
 });
 
-/** Keeps the viewport on whatever is currently plotted as the filter changes. */
-function FitBounds({ bounds }: { bounds: L.LatLngBoundsExpression | null }) {
+/**
+ * Keeps the viewport on whatever is currently plotted as the filter changes.
+ *
+ * The fit runs in an effect rather than during render: moving the map is a side
+ * effect on something outside React, and doing it in the render body would fire
+ * on every render — including StrictMode's double invocation, and any render
+ * React starts but never commits — which would yank a panned viewport back.
+ */
+function FitBounds({ bounds }: { bounds: L.LatLngBounds | null }) {
   const map = useMap();
-  if (bounds) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+  useEffect(() => {
+    if (bounds) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+  }, [map, bounds]);
   return null;
 }
 

@@ -3,6 +3,7 @@ import { getHistoricalPlaces } from '../services/api';
 import { excerptFromHtml } from '../lib/text';
 import type { HistoricalPlace } from '../types';
 import Seo from '../components/Seo';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { LayoutGrid, MapPin } from 'lucide-react';
 
 // Leaflet and its CSS are a substantial download; keep them out of the initial
@@ -89,15 +90,33 @@ export default function HistoricalPlaces() {
                 <p className="font-sans text-charcoal/70 italic">No historical places found in this category.</p>
               </div>
             ) : view === 'map' ? (
-              <Suspense
+              // The map is lazy-loaded, and React.lazy rejects when a chunk fails to
+              // download. Without a boundary that error would blank the whole page
+              // rather than this one panel, so the grid stays available as a fallback.
+              <ErrorBoundary
+                label="PlacesMap"
                 fallback={
-                  <div className="flex justify-center items-center h-96 bg-white rounded-lg border border-tan/20">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-charcoal"></div>
+                  <div className="bg-white rounded-lg border border-tan/20 py-16 px-6 text-center">
+                    <p className="font-sans text-charcoal/70 mb-4">The map couldn’t be loaded.</p>
+                    <button
+                      onClick={() => setView('grid')}
+                      className="font-sans text-sm font-bold uppercase tracking-widest text-tan hover:text-tan-dark"
+                    >
+                      Browse the list instead →
+                    </button>
                   </div>
                 }
               >
-                <PlacesMap places={filteredPlaces} />
-              </Suspense>
+                <Suspense
+                  fallback={
+                    <div className="flex justify-center items-center h-96 bg-white rounded-lg border border-tan/20">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-charcoal"></div>
+                    </div>
+                  }
+                >
+                  <PlacesMap places={filteredPlaces} />
+                </Suspense>
+              </ErrorBoundary>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {filteredPlaces.map(place => (
