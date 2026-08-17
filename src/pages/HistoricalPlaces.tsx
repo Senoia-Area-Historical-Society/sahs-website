@@ -1,13 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { getHistoricalPlaces } from '../services/api';
 import { excerptFromHtml } from '../lib/text';
 import type { HistoricalPlace } from '../types';
 import Seo from '../components/Seo';
+import { LayoutGrid, MapPin } from 'lucide-react';
+
+// Leaflet and its CSS are a substantial download; keep them out of the initial
+// bundle so visitors who never open the map never pay for it.
+const PlacesMap = lazy(() => import('../components/public/PlacesMap'));
 
 export default function HistoricalPlaces() {
   const [places, setPlaces] = useState<HistoricalPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'All' | 'Home' | 'Business' | 'Place or Thing'>('All');
+  const [view, setView] = useState<'grid' | 'map'>('grid');
 
   useEffect(() => {
     async function loadPlaces() {
@@ -45,26 +51,53 @@ export default function HistoricalPlaces() {
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap gap-4 mb-8 justify-center md:justify-start">
-              {['All', 'Home', 'Business', 'Place or Thing'].map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setFilter(type as any)}
-                  className={`px-6 py-2 rounded-full font-sans text-sm font-semibold tracking-wider uppercase transition-colors border ${
-                    filter === type 
-                      ? 'bg-tan text-white border-tan shadow-sm' 
-                      : 'bg-white text-charcoal border-tan-light hover:border-tan hover:bg-tan/5'
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
+            <div className="flex flex-wrap gap-4 mb-8 justify-center md:justify-between items-center">
+              <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+                {['All', 'Home', 'Business', 'Place or Thing'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setFilter(type as any)}
+                    className={`px-6 py-2 rounded-full font-sans text-sm font-semibold tracking-wider uppercase transition-colors border ${
+                      filter === type
+                        ? 'bg-tan text-white border-tan shadow-sm'
+                        : 'bg-white text-charcoal border-tan-light hover:border-tan hover:bg-tan/5'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex rounded-full border border-tan-light overflow-hidden bg-white" role="group" aria-label="View as">
+                {([['grid', 'Grid', LayoutGrid], ['map', 'Map', MapPin]] as const).map(([key, label, Icon]) => (
+                  <button
+                    key={key}
+                    onClick={() => setView(key)}
+                    aria-pressed={view === key}
+                    className={`px-5 py-2 font-sans text-sm font-semibold tracking-wider uppercase transition-colors inline-flex items-center gap-2 ${
+                      view === key ? 'bg-tan text-white' : 'text-charcoal hover:bg-tan/5'
+                    }`}
+                  >
+                    <Icon size={15} /> {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {filteredPlaces.length === 0 ? (
               <div className="text-center py-12 bg-white rounded-lg border border-tan/20">
                 <p className="font-sans text-charcoal/70 italic">No historical places found in this category.</p>
               </div>
+            ) : view === 'map' ? (
+              <Suspense
+                fallback={
+                  <div className="flex justify-center items-center h-96 bg-white rounded-lg border border-tan/20">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-charcoal"></div>
+                  </div>
+                }
+              >
+                <PlacesMap places={filteredPlaces} />
+              </Suspense>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {filteredPlaces.map(place => (
