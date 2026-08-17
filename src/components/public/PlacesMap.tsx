@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
@@ -40,9 +40,12 @@ function FitBounds({ bounds }: { bounds: L.LatLngBounds | null }) {
 
 interface PlacesMapProps {
   places: HistoricalPlace[];
+  /** Lets the tile-failure notice offer the list as a way out. */
+  onShowList: () => void;
 }
 
-export default function PlacesMap({ places }: PlacesMapProps) {
+export default function PlacesMap({ places, onShowList }: PlacesMapProps) {
+  const [tilesFailed, setTilesFailed] = useState(false);
   // Only places that were actually geocoded can be plotted. Two of the tour stops
   // are identified by intersection and have no pin yet.
   const plotted = useMemo(
@@ -71,7 +74,15 @@ export default function PlacesMap({ places }: PlacesMapProps) {
 
   return (
     <div>
-      <div className="rounded-lg overflow-hidden border border-tan/20 shadow-sm">
+      <div className="rounded-lg overflow-hidden border border-tan/20 shadow-sm relative">
+        {tilesFailed && (
+          // Markers and popups keep working without imagery, so the map stays useful
+          // — this just explains the grey rather than leaving it looking broken.
+          <div className="absolute inset-x-0 top-0 z-[1000] bg-charcoal/85 text-cream font-sans text-sm px-4 py-3 text-center">
+            Map imagery isn’t loading right now. The locations below are still marked,
+            or you can <button onClick={onShowList} className="underline font-bold">browse the list instead</button>.
+          </div>
+        )}
         <MapContainer
           center={[33.3007, -84.5545]}
           zoom={16}
@@ -81,6 +92,13 @@ export default function PlacesMap({ places }: PlacesMapProps) {
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            eventHandlers={{
+              // Fires per failed tile. OSM's public servers are donation-funded and
+              // may throttle or block without notice, and rural signal drops tiles
+              // too — either way the visitor should be told, not left staring at grey.
+              tileerror: () => setTilesFailed(true),
+              tileload: () => setTilesFailed(false),
+            }}
           />
           <FitBounds bounds={bounds} />
 
