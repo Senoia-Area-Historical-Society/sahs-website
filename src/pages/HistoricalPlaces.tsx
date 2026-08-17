@@ -114,7 +114,7 @@ export default function HistoricalPlaces() {
                     </div>
                   }
                 >
-                  <PlacesMap places={filteredPlaces} />
+                  <PlacesMap places={filteredPlaces} onShowList={() => setView('grid')} />
                 </Suspense>
               </ErrorBoundary>
             ) : (
