@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { getTicketBySessionId } from '../services/api';
 import type { Ticket } from '../types';
 import { CheckCircle, Ticket as TicketIcon, Calendar, Users, Printer } from 'lucide-react';
 import Seo from '../components/Seo';
+import { pushToDataLayer } from '../lib/gtm';
 
 type Status = 'loading' | 'found' | 'timeout';
 
@@ -12,6 +13,31 @@ export default function TicketSuccess() {
   const sessionId = searchParams.get('session_id');
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [status, setStatus] = useState<Status>('loading');
+  const reportedRef = useRef(false);
+
+  // Fires once, when the ticket first resolves — polling can otherwise re-render
+  // this component several times before `status` settles.
+  useEffect(() => {
+    if (!ticket || reportedRef.current) return;
+    reportedRef.current = true;
+    pushToDataLayer({
+      event: 'purchase',
+      ecommerce: {
+        transaction_id: ticket.confirmationNumber,
+        value: ticket.totalAmount / 100,
+        currency: 'USD',
+        items: [
+          {
+            item_id: ticket.eventId,
+            item_name: ticket.eventTitle,
+            item_category: 'event_ticket',
+            quantity: ticket.quantity,
+            price: ticket.totalAmount / 100 / ticket.quantity,
+          },
+        ],
+      },
+    });
+  }, [ticket]);
 
   useEffect(() => {
     if (!sessionId) { setStatus('timeout'); return; }

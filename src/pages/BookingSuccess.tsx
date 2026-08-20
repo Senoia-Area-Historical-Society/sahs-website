@@ -1,7 +1,27 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import Seo from '../components/Seo';
+import { pushToDataLayer } from '../lib/gtm';
 
 export default function BookingSuccess() {
+  const [searchParams] = useSearchParams();
+  const sessionId = searchParams.get('session_id');
+  const reportedRef = useRef(false);
+
+  useEffect(() => {
+    if (!sessionId || reportedRef.current) return;
+    reportedRef.current = true;
+    pushToDataLayer({
+      event: 'purchase',
+      ecommerce: {
+        transaction_id: sessionId,
+        value: 50, // Fixed room-booking fee — see createBookingCheckoutSession's unit_amount.
+        currency: 'USD',
+        items: [{ item_name: 'Meeting Room Booking', item_category: 'room_booking', quantity: 1, price: 50 }],
+      },
+    });
+  }, [sessionId]);
+
   return (
     <div className="bg-cream min-h-screen pt-32 pb-16 px-4 flex justify-center items-start font-serif">
       <Seo title="Booking Confirmed" description="Your meeting room booking is confirmed." noindex />
