@@ -17,7 +17,12 @@
  * without mocking Firestore. The caller does the read and maps `reason` to a status.
  */
 
-/** Matches `maxQty` in `TicketPurchaseWidget` — the UI never offers more than this. */
+/**
+ * Matches the cap on both buying surfaces — `maxQty` in `TicketPurchaseWidget` and
+ * `MAX_QTY` in `EmbedTickets` — so no quantity the UI offers is refused here. This
+ * bound exists to stop absurd values, not to express a per-order sales policy: if a
+ * surface ever raises its cap, raise this to match rather than letting it 400.
+ */
 export const MAX_TICKET_QUANTITY = 10;
 
 export type TicketOrderRejection =
