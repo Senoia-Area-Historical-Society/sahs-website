@@ -4,7 +4,7 @@ import {
   ticketPageUrl,
   formatEventWhen,
   resolveEventLocation,
-} from '../../functions/src/ticketEmail';
+} from '../../functions/src/ticketEmailContent';
 
 /**
  * Ticket buyers never received an email at all: the confirmation number lived only on the
