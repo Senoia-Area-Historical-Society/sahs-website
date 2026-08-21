@@ -41,10 +41,29 @@
  */
 const fs = require('fs');
 const path = require('path');
-const Stripe = require('../functions/node_modules/stripe');
-const QRCode = require('../functions/node_modules/qrcode');
-const { initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { createRequire } = require('module');
+
+// `stripe`, `qrcode` and `firebase-admin` are dependencies of the functions package, not
+// the site package. Prefer this checkout's copy and fall back to the main checkout's, so
+// this runs from a git worktree that has no node_modules of its own. (Same approach as
+// scripts/backfill_missed_ticket.cjs.)
+const FUNCTIONS_DIR = [
+    path.join(__dirname, '..', 'functions'),
+    path.join(__dirname, '..', '..', '..', '..', 'functions'),
+].find((dir) => fs.existsSync(path.join(dir, 'node_modules', 'firebase-admin')));
+
+if (!FUNCTIONS_DIR) {
+    console.error('Could not find functions/node_modules. Run `npm install` in functions/ first.');
+    process.exit(1);
+}
+
+// Resolved as though from inside functions/, so `exports` subpaths like
+// `firebase-admin/app` resolve — a bare path.join() cannot.
+const req = createRequire(path.join(FUNCTIONS_DIR, 'package.json'));
+const Stripe = req('stripe');
+const QRCode = req('qrcode');
+const { initializeApp } = req('firebase-admin/app');
+const { getFirestore } = req('firebase-admin/firestore');
 
 const argv = process.argv.slice(2);
 const has = (name) => argv.includes(`--${name}`);
@@ -72,6 +91,9 @@ if (!FIXTURE && !process.env.STRIPE_SECRET_KEY) {
 
 initializeApp({ projectId: PROJECT_ID });
 const db = getFirestore();
+
+/** null in --fixture mode, where there is no Stripe to talk to. */
+const stripe = FIXTURE ? null : new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
 
 /** Matches `generateConfirmationNumber` in functions/src/index.ts. */
 function generateConfirmationNumber() {
@@ -103,6 +125,33 @@ function isPaidTicketSession(session) {
         && session.payment_status === 'paid';
 }
 
+/**
+ * Cents refunded against a session, or 0.
+ *
+ * `payment_status` is NOT sufficient on its own: it stays `'paid'` after a refund,
+ * because the refund lives on the Charge, not the Session. Without this check the
+ * backfill happily issues a ticket for an order that was already refunded — and that is
+ * not hypothetical here, since this incident involves duplicate charges being cleaned up.
+ *
+ * One extra API call per candidate order, which is fine at this volume and avoids the
+ * fragile deep `expand` a list call would need.
+ */
+async function refundedCentsFor(session, stripe) {
+    // Fixture mode has no Stripe to ask; `_refundedCents` lets the tests exercise this
+    // branch. Real sessions never carry that field.
+    if (!stripe) return session._refundedCents || 0;
+
+    const paymentIntentId = typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : session.payment_intent?.id;
+    if (!paymentIntentId) return 0;
+
+    const refunds = await stripe.refunds.list({ payment_intent: paymentIntentId, limit: 100 });
+    return refunds.data
+        .filter((r) => r.status === 'succeeded' || r.status === 'pending')
+        .reduce((sum, r) => sum + (r.amount || 0), 0);
+}
+
 /** Every ticket Checkout Session Stripe considers paid, oldest first. */
 async function loadPaidTicketSessions() {
     let all;
@@ -112,7 +161,6 @@ async function loadPaidTicketSessions() {
         all = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
         source = `fixture ${FIXTURE}`;
     } else {
-        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
         const query = { limit: 100 };
         if (SINCE) {
             const gte = Math.floor(new Date(`${SINCE}T00:00:00Z`).getTime() / 1000);
@@ -183,7 +231,30 @@ async function main() {
     console.log('');
 
     const [sessions, recorded] = await Promise.all([loadPaidTicketSessions(), loadRecordedSessionIds()]);
-    const missing = sessions.filter((s) => !recorded.has(s.id)).map(describe);
+    const unrecorded = sessions.filter((s) => !recorded.has(s.id));
+
+    // Refunds are checked only for orders we might actually write, to keep the number of
+    // Stripe calls proportional to the work rather than to the account's history.
+    const missing = [];
+    const refunded = [];
+    for (const session of unrecorded) {
+        const refundedCents = await refundedCentsFor(session, stripe);
+        if (refundedCents > 0) {
+            refunded.push({ ...describe(session), refundedCents });
+        } else {
+            missing.push(describe(session));
+        }
+    }
+
+    if (refunded.length) {
+        // Surfaced rather than silently dropped: a partial refund may mean some of the
+        // order still stands, which is a judgment call for a human, not this script.
+        console.log(`\n${refunded.length} unrecorded order(s) SKIPPED as refunded — review these by hand:\n`);
+        for (const o of refunded) {
+            console.log(`  ${fmtDate(o.created)}  ${fmtMoney(o.totalAmount)} paid, ` +
+                `${fmtMoney(o.refundedCents)} refunded  ${o.email}  ${o.sessionId}`);
+        }
+    }
 
     if (missing.length === 0) {
         console.log('\nNo unrecorded paid ticket orders. Nothing to recover.');
