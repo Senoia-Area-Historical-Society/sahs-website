@@ -2,10 +2,17 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { getTicketBySessionId } from '../services/api';
 import type { Ticket } from '../types';
-import { CheckCircle, Ticket as TicketIcon, Calendar, Users, Printer } from 'lucide-react';
+import { CheckCircle, Ticket as TicketIcon, Calendar, Users, Printer, Mail, HelpCircle } from 'lucide-react';
 import Seo from '../components/Seo';
+import { logEvent } from 'firebase/analytics';
+import { analytics } from '../lib/firebase';
 
-type Status = 'loading' | 'found' | 'timeout';
+// 'pending' means: Stripe redirected the buyer here, so the payment succeeded, but no
+// `tickets` document exists yet for this Checkout Session. That is either a webhook still
+// in flight or a webhook that never ran at all — indistinguishable from the browser. Never
+// tell the buyer the ticket was issued from this state; a silent claim of success is exactly
+// what hid a months-long stripeWebhook outage from ~25 paying customers.
+type Status = 'loading' | 'found' | 'pending' | 'no-session';
 
 export default function TicketSuccess() {
   const [searchParams] = useSearchParams();
@@ -14,13 +21,16 @@ export default function TicketSuccess() {
   const [status, setStatus] = useState<Status>('loading');
 
   useEffect(() => {
-    if (!sessionId) { setStatus('timeout'); return; }
+    if (!sessionId) { setStatus('no-session'); return; }
 
+    let cancelled = false;
     let attempts = 0;
     const maxAttempts = 4;
 
     const poll = async () => {
+      if (cancelled) return;
       const found = await getTicketBySessionId(sessionId);
+      if (cancelled) return;
       if (found) {
         setTicket(found);
         setStatus('found');
@@ -30,17 +40,35 @@ export default function TicketSuccess() {
       if (attempts < maxAttempts) {
         setTimeout(poll, 1500);
       } else {
-        setStatus('timeout');
+        // getTicketBySessionId swallows its own errors and returns null, so this covers a
+        // genuine miss, a rules rejection and a network failure alike — hence "unresolved".
+        // The console line is a breadcrumb for whoever reproduces the report; the analytics
+        // event is the part SAHS can actually see, in the Firebase console, without a buyer
+        // having to complain first. That asymmetry is the whole point: the last outage stayed
+        // invisible for months because nothing but the buyer's own browser knew about it.
+        console.error(
+          `[TicketSuccess] No ticket document resolved for Checkout Session after ${maxAttempts} attempts. ` +
+          `The buyer paid but has no confirmation number. session_id=${sessionId}`
+        );
+        if (analytics) {
+          logEvent(analytics, 'ticket_confirmation_unresolved', {
+            session_id: sessionId,
+            attempts: maxAttempts,
+          });
+        }
+        setStatus('pending');
       }
     };
 
     // Start polling after a brief initial delay to allow webhook to process
-    setTimeout(poll, 1000);
+    const initial = setTimeout(poll, 1000);
+    return () => { cancelled = true; clearTimeout(initial); };
   }, [sessionId]);
 
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center px-4">
+        <Seo title="Confirming Your Purchase" description="Confirming your event ticket purchase." noindex />
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-tan mx-auto mb-4" />
           <p className="font-serif text-charcoal/60 text-lg">Confirming your purchase...</p>
@@ -50,18 +78,75 @@ export default function TicketSuccess() {
     );
   }
 
-  if (status === 'timeout' || !ticket) {
+  // No session id at all: this visitor did not arrive from a Stripe checkout, so we have no
+  // basis whatsoever for claiming a payment succeeded. Kept separate from 'pending' for that
+  // reason — the reassuring copy below would be flatly false here.
+  if (status === 'no-session') {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center px-4 py-12">
+        <Seo title="Ticket Confirmation" description="Look up an event ticket purchase." noindex />
         <div className="max-w-md w-full bg-white rounded-xl border border-tan/20 shadow-lg p-10 text-center">
-          <CheckCircle size={48} className="mx-auto text-green-500 mb-4" />
-          <h1 className="text-2xl font-serif font-bold text-charcoal mb-3">Payment Successful!</h1>
+          <div className="w-14 h-14 bg-tan/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <HelpCircle size={28} className="text-tan" />
+          </div>
+          <h1 className="text-2xl font-serif font-bold text-charcoal mb-3">No Purchase to Show</h1>
           <p className="text-charcoal/70 font-sans mb-6">
-            Your ticket purchase was confirmed. Check your email for the Stripe receipt, which includes your confirmation details.
+            This page shows your ticket details right after a purchase, and there's no purchase
+            reference in this link. If you've already bought tickets and need your confirmation
+            number, email us at{' '}
+            <a href="mailto:info@senoiahistory.com" className="underline hover:text-tan">info@senoiahistory.com</a>{' '}
+            and we'll look it up.
           </p>
           <Link to="/news" className="inline-block bg-tan text-white px-8 py-3 rounded uppercase font-bold tracking-widest hover:bg-tan-dark transition-all shadow-md text-sm">
-            Back to Events
+            Browse Events
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 'pending', or the defensive case of a 'found' status with no ticket object. Both mean the
+  // same thing to the buyer, so they get the same honest copy: the payment landed, the
+  // confirmation has not been issued yet, here is the reference and how to reach us.
+  if (status === 'pending' || !ticket) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center px-4 py-12">
+        <Seo title="Payment Received" description="Your ticket payment was received." noindex />
+        <div className="max-w-md w-full bg-white rounded-xl border border-tan/20 shadow-lg p-10 text-center">
+          <div className="w-14 h-14 bg-tan/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Mail size={28} className="text-tan" />
+          </div>
+          <h1 className="text-2xl font-serif font-bold text-charcoal mb-3">Payment Received</h1>
+          <p className="text-charcoal/70 font-sans mb-4">
+            Your payment went through and Stripe has emailed you a receipt. Your ticket
+            confirmation number and QR code aren't ready on this page yet.
+          </p>
+          <p className="text-charcoal/70 font-sans mb-6">
+            Please email{' '}
+            <a href="mailto:info@senoiahistory.com" className="underline hover:text-tan font-medium">info@senoiahistory.com</a>{' '}
+            with the reference below and we'll issue your confirmation. If the event arrives
+            first, bring your Stripe receipt — it's proof of purchase and we'll check you in
+            at the door.
+          </p>
+
+          {sessionId && (
+            <div className="text-left bg-cream/60 border border-tan/20 rounded-lg px-4 py-3 mb-6">
+              <p className="text-xs font-bold text-charcoal/40 uppercase tracking-wider mb-1">Your Reference</p>
+              <p className="font-mono text-xs text-charcoal break-all select-all">{sessionId}</p>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a
+              href={`mailto:info@senoiahistory.com?subject=${encodeURIComponent('Missing ticket confirmation')}&body=${encodeURIComponent(`Hello,\n\nI purchased tickets but did not receive a confirmation number.\n\nMy reference: ${sessionId ?? '(none)'}\n\nThank you.`)}`}
+              className="inline-block bg-tan text-white px-6 py-3 rounded uppercase font-bold tracking-widest hover:bg-tan-dark transition-all shadow-md text-sm"
+            >
+              Email Us
+            </a>
+            <Link to="/news" className="inline-block border border-tan text-tan px-6 py-3 rounded uppercase font-bold tracking-widest hover:bg-tan/5 transition-all text-sm">
+              Back to Events
+            </Link>
+          </div>
         </div>
       </div>
     );
