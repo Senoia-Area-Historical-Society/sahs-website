@@ -11,6 +11,7 @@ import { render } from 'react-email';
 import * as React from 'react';
 import { WelcomeEmail } from './emails/WelcomeEmail';
 import { resolveEventWindow, isLongPast } from './calendarTime';
+import { resolveTicketOrder, rejectionStatus } from './ticketPricing';
 import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
 
 admin.initializeApp();
@@ -178,10 +179,20 @@ export const createTicketCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_
     try {
         if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
 
-        const { eventId, title, price, quantity, email, customerName } = req.body;
+        // `price` and `title` may still arrive from an older cached bundle. They are
+        // deliberately not read: the amount comes from Firestore, never the wire.
+        const { eventId, quantity, email, customerName } = req.body;
 
-        if (!eventId || !title || !price || !quantity || !email) {
-            res.status(400).send({ error: 'Missing required fields: eventId, title, price, quantity, email' });
+        if (!eventId || !email) {
+            res.status(400).send({ error: 'Missing required fields: eventId, email' });
+            return;
+        }
+
+        const snap = await db.collection('posts').doc(String(eventId)).get();
+        const order = resolveTicketOrder(snap.exists ? snap.data() : undefined, quantity);
+        if (!order.ok) {
+            console.warn(`Rejected ticket checkout for event ${eventId}: ${order.reason}`);
+            res.status(rejectionStatus(order.reason)).send({ error: order.reason });
             return;
         }
 
@@ -192,24 +203,24 @@ export const createTicketCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_
                 price_data: {
                     currency: 'usd',
                     product_data: {
-                        name: `Tickets: ${title}`,
+                        name: `Tickets: ${order.title}`,
                         description: `Event tickets — Senoia Area Historical Society`
                     },
-                    unit_amount: price,
+                    unit_amount: order.unitAmount,
                 },
-                quantity,
+                quantity: order.quantity,
             }],
             mode: 'payment',
             // Dedicated ticket success page (not the generic membership one)
             success_url: `${FRONTEND_URL}/tickets/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${FRONTEND_URL}/news/${req.body.slug || ''}`,
+            cancel_url: `${FRONTEND_URL}/news/${order.slug}`,
             customer_email: email,
             metadata: {
                 type: 'ticket',
                 eventId,
-                eventTitle: title,
+                eventTitle: order.title,
                 customerName: customerName || '',
-                quantity: quantity.toString(),
+                quantity: order.quantity.toString(),
             }
         });
         res.json({ url: session.url });

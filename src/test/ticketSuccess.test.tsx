@@ -4,16 +4,13 @@ import { MemoryRouter } from 'react-router-dom';
 import TicketSuccess from '../pages/TicketSuccess';
 import type { Ticket } from '../types';
 import { getTicketBySessionId } from '../services/api';
-import { logEvent } from 'firebase/analytics';
+import { pushToDataLayer } from '../lib/gtm';
 
 vi.mock('../services/api', () => ({
   getTicketBySessionId: vi.fn(),
 }));
 
-// `analytics` is null under jsdom (lib/firebase gates it on hostname !== 'localhost'), so the
-// reporting path would never run unmocked. Stand in a truthy instance to exercise it.
-vi.mock('../lib/firebase', () => ({ analytics: { __stub: true } }));
-vi.mock('firebase/analytics', () => ({ logEvent: vi.fn() }));
+vi.mock('../lib/gtm', () => ({ pushToDataLayer: vi.fn() }));
 
 const renderAt = (search: string) =>
   render(
@@ -40,7 +37,7 @@ describe('TicketSuccess', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.mocked(getTicketBySessionId).mockReset();
-    vi.mocked(logEvent).mockReset();
+    vi.mocked(pushToDataLayer).mockReset();
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -105,14 +102,15 @@ describe('TicketSuccess', () => {
     // Breadcrumb for whoever reproduces a buyer's report...
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('cs_test_logged'));
     // ...and the signal SAHS can actually see without waiting for a complaint.
-    expect(logEvent).toHaveBeenCalledWith(
-      expect.anything(),
-      'ticket_confirmation_unresolved',
-      expect.objectContaining({ session_id: 'cs_test_logged' })
+    expect(pushToDataLayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'ticket_confirmation_unresolved',
+        session_id: 'cs_test_logged',
+      })
     );
   });
 
-  it('does not report anything when the ticket is found', async () => {
+  it('reports a purchase and no failure when the ticket is found', async () => {
     vi.mocked(getTicketBySessionId).mockResolvedValue({
       id: 't2', eventId: 'e1', eventTitle: 'Yacht Rock Night', email: 'ada@example.com',
       quantity: 1, totalAmount: 2500, status: 'paid', confirmationNumber: 'SAHS-OK',
@@ -122,8 +120,30 @@ describe('TicketSuccess', () => {
     renderAt('?session_id=cs_test_ok');
     await settle();
 
-    expect(logEvent).not.toHaveBeenCalled();
+    // The GA4 conversion still fires on the happy path...
+    expect(pushToDataLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'purchase' })
+    );
+    // ...and the failure signal must not, or the outage metric becomes noise.
+    expect(pushToDataLayer).not.toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'ticket_confirmation_unresolved' })
+    );
     expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it('fires the purchase conversion exactly once despite re-renders', async () => {
+    vi.mocked(getTicketBySessionId).mockResolvedValue({
+      id: 't3', eventId: 'e1', eventTitle: 'Yacht Rock Night', email: 'ada@example.com',
+      quantity: 2, totalAmount: 5000, status: 'paid', confirmationNumber: 'SAHS-ONCE',
+      purchasedAt: new Date('2026-07-04T18:00:00Z').toISOString(),
+    });
+
+    renderAt('?session_id=cs_test_once');
+    await settle();
+
+    const purchases = vi.mocked(pushToDataLayer).mock.calls
+      .filter(([e]) => (e as { event?: string }).event === 'purchase');
+    expect(purchases).toHaveLength(1);
   });
 
   it('does not claim a payment succeeded when there is no session id at all', async () => {

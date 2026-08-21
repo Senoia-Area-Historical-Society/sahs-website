@@ -1,7 +1,25 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import Seo from '../components/Seo';
+import { pushToDataLayer } from '../lib/gtm';
 
 export default function StripeSuccess() {
+  const [searchParams] = useSearchParams();
+  const sessionId = searchParams.get('session_id');
+  const reportedRef = useRef(false);
+
+  // Donation and membership amounts vary (Individual $35 up to Sustaining $25,000), and this
+  // page never fetches the checkout session, so no `value` is reported here — just the
+  // conversion itself. See createMembershipCheckoutSession / the donation checkout flow.
+  useEffect(() => {
+    if (!sessionId || reportedRef.current) return;
+    reportedRef.current = true;
+    pushToDataLayer({
+      event: 'purchase',
+      ecommerce: { transaction_id: sessionId, currency: 'USD' },
+    });
+  }, [sessionId]);
+
   return (
     <div className="bg-cream min-h-screen pt-32 pb-16 px-4 flex justify-center items-start font-serif">
       <Seo title="Thank You" description="Thank you for supporting the Senoia Area Historical Society." noindex />

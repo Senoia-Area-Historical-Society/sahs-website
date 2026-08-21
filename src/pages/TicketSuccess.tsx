@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { getTicketBySessionId } from '../services/api';
 import type { Ticket } from '../types';
 import { CheckCircle, Ticket as TicketIcon, Calendar, Users, Printer, Mail, HelpCircle } from 'lucide-react';
 import Seo from '../components/Seo';
-import { logEvent } from 'firebase/analytics';
-import { analytics } from '../lib/firebase';
+import { pushToDataLayer } from '../lib/gtm';
 
 // 'pending' means: Stripe redirected the buyer here, so the payment succeeded, but no
 // `tickets` document exists yet for this Checkout Session. That is either a webhook still
@@ -19,6 +18,32 @@ export default function TicketSuccess() {
   const sessionId = searchParams.get('session_id');
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [status, setStatus] = useState<Status>('loading');
+  const reportedRef = useRef(false);
+  const unresolvedRef = useRef(false);
+
+  // Fires once, when the ticket first resolves — polling can otherwise re-render
+  // this component several times before `status` settles.
+  useEffect(() => {
+    if (!ticket || reportedRef.current) return;
+    reportedRef.current = true;
+    pushToDataLayer({
+      event: 'purchase',
+      ecommerce: {
+        transaction_id: ticket.confirmationNumber,
+        value: ticket.totalAmount / 100,
+        currency: 'USD',
+        items: [
+          {
+            item_id: ticket.eventId,
+            item_name: ticket.eventTitle,
+            item_category: 'event_ticket',
+            quantity: ticket.quantity,
+            price: ticket.totalAmount / 100 / ticket.quantity,
+          },
+        ],
+      },
+    });
+  }, [ticket]);
 
   useEffect(() => {
     if (!sessionId) { setStatus('no-session'); return; }
@@ -42,16 +67,22 @@ export default function TicketSuccess() {
       } else {
         // getTicketBySessionId swallows its own errors and returns null, so this covers a
         // genuine miss, a rules rejection and a network failure alike — hence "unresolved".
-        // The console line is a breadcrumb for whoever reproduces the report; the analytics
-        // event is the part SAHS can actually see, in the Firebase console, without a buyer
-        // having to complain first. That asymmetry is the whole point: the last outage stayed
-        // invisible for months because nothing but the buyer's own browser knew about it.
-        console.error(
-          `[TicketSuccess] No ticket document resolved for Checkout Session after ${maxAttempts} attempts. ` +
-          `The buyer paid but has no confirmation number. session_id=${sessionId}`
-        );
-        if (analytics) {
-          logEvent(analytics, 'ticket_confirmation_unresolved', {
+        // The console line is a breadcrumb for whoever reproduces the report; the data layer
+        // event is the part SAHS can actually see, in GA4, without a buyer having to complain
+        // first. That asymmetry is the whole point: the last outage stayed invisible for
+        // months because nothing but the buyer's own browser knew about it.
+        //
+        // This is also the counterpart to the `purchase` event above, which only fires once a
+        // ticket resolves: during the outage GA4 recorded neither a purchase nor a reason for
+        // its absence, so the funnel simply ended with no explanation.
+        if (!unresolvedRef.current) {
+          unresolvedRef.current = true;
+          console.error(
+            `[TicketSuccess] No ticket document resolved for Checkout Session after ${maxAttempts} attempts. ` +
+            `The buyer paid but has no confirmation number. session_id=${sessionId}`
+          );
+          pushToDataLayer({
+            event: 'ticket_confirmation_unresolved',
             session_id: sessionId,
             attempts: maxAttempts,
           });
