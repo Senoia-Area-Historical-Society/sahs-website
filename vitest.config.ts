@@ -8,5 +8,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Unit tests only. `e2e/` holds Playwright specs, which use a `test` fixture
+    // API Vitest cannot run — without this scope its default glob picks them up
+    // and they always report as failing test files. Run those with `npm run test:e2e`.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 });
