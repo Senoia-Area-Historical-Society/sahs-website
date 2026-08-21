@@ -292,50 +292,46 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
 
         if (type === 'membership') {
             const expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-            // Duplicate must suppress the welcome email; an error must not
-            // reach the email at all. The original tri-state existed because the
-            // handler always answered 200, so a failed write could never be
-            // retried and the email was the only thing left to salvage. The
-            // delivery now fails instead, and a retry re-runs both together.
-            let outcome: 'created' | 'duplicate' = 'duplicate';
-            try {
-                // Stripe redelivers events: automatic retries on any non-2xx, and
-                // the Dashboard's manual "Resend". `add()` is not idempotent, so a
-                // redelivery would mint a second membership and a second welcome
-                // email. `session.id` is stable across every delivery of the same
-                // event, so it is the natural key — and the check shares a
-                // transaction with the write, because two concurrent deliveries
-                // would otherwise both see "not found" and both insert.
-                const memberships = db.collection('memberships');
-                const inserted = await db.runTransaction(async (tx) => {
-                    const existing = await tx.get(
-                        memberships.where('paymentId', '==', session.id).limit(1)
-                    );
-                    if (!existing.empty) return false;
-                    tx.set(memberships.doc(), {
-                        email: buyerEmail,
-                        level: session.metadata?.level,
-                        quantity: parseInt(session.metadata?.quantity || '1'),
-                        status: 'active',
-                        expirationDate,
-                        paymentId: session.id,
-                        userId: session.metadata?.userId || null,
-                        updatedAt: new Date().toISOString()
-                    });
-                    return true;
+            // Stripe redelivers events: automatic retries on any non-2xx, and
+            // the Dashboard's manual "Resend". `add()` is not idempotent, so a
+            // redelivery would mint a second membership and a second welcome
+            // email. `session.id` is stable across every delivery of the same
+            // event, so it is the natural key — and the check shares a
+            // transaction with the write, because two concurrent deliveries
+            // would otherwise both see "not found" and both insert.
+            //
+            // Two outcomes reach the email below, not three: a write error now
+            // throws, failing the delivery so Stripe retries the record and the
+            // email together. This was a tri-state back when the handler always
+            // answered 200 and the email was the only thing left to salvage.
+            const memberships = db.collection('memberships');
+            const inserted = await db.runTransaction(async (tx) => {
+                const existing = await tx.get(
+                    memberships.where('paymentId', '==', session.id).limit(1)
+                );
+                if (!existing.empty) return false;
+                tx.set(memberships.doc(), {
+                    email: buyerEmail,
+                    level: session.metadata?.level,
+                    quantity: parseInt(session.metadata?.quantity || '1'),
+                    status: 'active',
+                    expirationDate,
+                    paymentId: session.id,
+                    userId: session.metadata?.userId || null,
+                    updatedAt: new Date().toISOString()
                 });
-                outcome = inserted ? 'created' : 'duplicate';
-                if (outcome === 'duplicate') {
-                    console.log(`Membership already recorded for session ${session.id}; skipping.`);
-                }
-            } catch (err) {
+                return true;
+            }).catch(err => {
                 console.error('Error creating membership record:', err);
                 throw err;
+            });
+            if (!inserted) {
+                console.log(`Membership already recorded for session ${session.id}; skipping.`);
             }
 
             // Send welcome email to new member via Resend — skipped only when this
             // is a redelivery of an event we already handled.
-            if (outcome !== 'duplicate' && buyerEmail) {
+            if (inserted && buyerEmail) {
                 const nameParts = (session.customer_details?.name || '').trim().split(/\s+/).filter(Boolean);
                 const firstName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0] || '';
                 sendWelcomeEmail(buyerEmail, firstName)
