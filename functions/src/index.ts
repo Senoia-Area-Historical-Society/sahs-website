@@ -273,61 +273,68 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
         const stripe = getStripe();
         event = stripe.webhooks.constructEvent((req as any).rawBody, sig as string, STRIPE_WEBHOOK_SECRET);
     } catch (err: any) {
+        console.error('Stripe webhook signature verification failed:', err.message);
         res.status(400).send(`Webhook Error: ${err.message}`);
         return;
     }
 
+    console.log(`Stripe webhook received: ${event.type} (${event.id})`);
+
+    try {
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object as Stripe.Checkout.Session;
         const type = session.metadata?.type;
+        // Checkout populates customer_details from what the buyer actually
+        // confirmed; customer_email is only what we prefilled at session
+        // creation. Prefer the former so the record survives the prefill being
+        // dropped (which is the mitigation for the Link OTP trap).
+        const buyerEmail = session.customer_details?.email || session.customer_email || null;
 
         if (type === 'membership') {
             const expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-            // Tri-state, not a boolean: a *duplicate* must suppress the welcome
-            // email, but an *error* must not. The handler always answers 200, so
-            // Stripe never retries a failed write — suppressing the email there
-            // would leave a paying member with nothing at all.
-            let outcome: 'created' | 'duplicate' | 'error' = 'error';
-            try {
-                // Stripe redelivers events: automatic retries on any non-2xx, and
-                // the Dashboard's manual "Resend". `add()` is not idempotent, so a
-                // redelivery would mint a second membership and a second welcome
-                // email. `session.id` is stable across every delivery of the same
-                // event, so it is the natural key — and the check shares a
-                // transaction with the write, because two concurrent deliveries
-                // would otherwise both see "not found" and both insert.
-                const memberships = db.collection('memberships');
-                const inserted = await db.runTransaction(async (tx) => {
-                    const existing = await tx.get(
-                        memberships.where('paymentId', '==', session.id).limit(1)
-                    );
-                    if (!existing.empty) return false;
-                    tx.set(memberships.doc(), {
-                        email: session.customer_email,
-                        level: session.metadata?.level,
-                        quantity: parseInt(session.metadata?.quantity || '1'),
-                        status: 'active',
-                        expirationDate,
-                        paymentId: session.id,
-                        userId: session.metadata?.userId || null,
-                        updatedAt: new Date().toISOString()
-                    });
-                    return true;
+            // Stripe redelivers events: automatic retries on any non-2xx, and
+            // the Dashboard's manual "Resend". `add()` is not idempotent, so a
+            // redelivery would mint a second membership and a second welcome
+            // email. `session.id` is stable across every delivery of the same
+            // event, so it is the natural key — and the check shares a
+            // transaction with the write, because two concurrent deliveries
+            // would otherwise both see "not found" and both insert.
+            //
+            // Two outcomes reach the email below, not three: a write error now
+            // throws, failing the delivery so Stripe retries the record and the
+            // email together. This was a tri-state back when the handler always
+            // answered 200 and the email was the only thing left to salvage.
+            const memberships = db.collection('memberships');
+            const inserted = await db.runTransaction(async (tx) => {
+                const existing = await tx.get(
+                    memberships.where('paymentId', '==', session.id).limit(1)
+                );
+                if (!existing.empty) return false;
+                tx.set(memberships.doc(), {
+                    email: buyerEmail,
+                    level: session.metadata?.level,
+                    quantity: parseInt(session.metadata?.quantity || '1'),
+                    status: 'active',
+                    expirationDate,
+                    paymentId: session.id,
+                    userId: session.metadata?.userId || null,
+                    updatedAt: new Date().toISOString()
                 });
-                outcome = inserted ? 'created' : 'duplicate';
-                if (outcome === 'duplicate') {
-                    console.log(`Membership already recorded for session ${session.id}; skipping.`);
-                }
-            } catch (err) {
+                return true;
+            }).catch(err => {
                 console.error('Error creating membership record:', err);
+                throw err;
+            });
+            if (!inserted) {
+                console.log(`Membership already recorded for session ${session.id}; skipping.`);
             }
 
             // Send welcome email to new member via Resend — skipped only when this
             // is a redelivery of an event we already handled.
-            if (outcome !== 'duplicate' && session.customer_email) {
+            if (inserted && buyerEmail) {
                 const nameParts = (session.customer_details?.name || '').trim().split(/\s+/).filter(Boolean);
                 const firstName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0] || '';
-                sendWelcomeEmail(session.customer_email, firstName)
+                sendWelcomeEmail(buyerEmail, firstName)
                     .catch(err => console.error('Resend welcome email failed:', err));
             }
 
@@ -368,7 +375,7 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
                         eventId,
                         eventTitle,
                         customerName,
-                        email: session.customer_email,
+                        email: buyerEmail,
                         quantity,
                         totalAmount: session.amount_total || 0,
                         status: 'paid',
@@ -387,6 +394,7 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
                 }
             } catch (err) {
                 console.error('Error creating ticket record:', err);
+                throw err;
             }
 
         } else {
@@ -404,7 +412,14 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
         }
     }
 
-    res.json({ received: true });
+        res.json({ received: true });
+    } catch (err) {
+        // Answering 200 on a failed write is what let this incident stay
+        // invisible: Stripe never retries, so a transient Firestore error loses
+        // a paid ticket permanently and silently. Fail the delivery instead.
+        console.error(`Stripe webhook handler failed for ${event.id} (${event.type}):`, err);
+        res.status(500).send('Webhook handler failed');
+    }
 });
 
 // 7. Verify Ticket (at-the-door scanner)
