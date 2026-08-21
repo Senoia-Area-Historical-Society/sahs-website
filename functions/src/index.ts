@@ -272,23 +272,48 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
 
         if (type === 'membership') {
             const expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+            // Tri-state, not a boolean: a *duplicate* must suppress the welcome
+            // email, but an *error* must not. The handler always answers 200, so
+            // Stripe never retries a failed write — suppressing the email there
+            // would leave a paying member with nothing at all.
+            let outcome: 'created' | 'duplicate' | 'error' = 'error';
             try {
-                await db.collection('memberships').add({
-                    email: session.customer_email,
-                    level: session.metadata?.level,
-                    quantity: parseInt(session.metadata?.quantity || '1'),
-                    status: 'active',
-                    expirationDate,
-                    paymentId: session.id,
-                    userId: session.metadata?.userId || null,
-                    updatedAt: new Date().toISOString()
+                // Stripe redelivers events: automatic retries on any non-2xx, and
+                // the Dashboard's manual "Resend". `add()` is not idempotent, so a
+                // redelivery would mint a second membership and a second welcome
+                // email. `session.id` is stable across every delivery of the same
+                // event, so it is the natural key — and the check shares a
+                // transaction with the write, because two concurrent deliveries
+                // would otherwise both see "not found" and both insert.
+                const memberships = db.collection('memberships');
+                const inserted = await db.runTransaction(async (tx) => {
+                    const existing = await tx.get(
+                        memberships.where('paymentId', '==', session.id).limit(1)
+                    );
+                    if (!existing.empty) return false;
+                    tx.set(memberships.doc(), {
+                        email: session.customer_email,
+                        level: session.metadata?.level,
+                        quantity: parseInt(session.metadata?.quantity || '1'),
+                        status: 'active',
+                        expirationDate,
+                        paymentId: session.id,
+                        userId: session.metadata?.userId || null,
+                        updatedAt: new Date().toISOString()
+                    });
+                    return true;
                 });
+                outcome = inserted ? 'created' : 'duplicate';
+                if (outcome === 'duplicate') {
+                    console.log(`Membership already recorded for session ${session.id}; skipping.`);
+                }
             } catch (err) {
                 console.error('Error creating membership record:', err);
             }
 
-            // Send welcome email to new member via Resend
-            if (session.customer_email) {
+            // Send welcome email to new member via Resend — skipped only when this
+            // is a redelivery of an event we already handled.
+            if (outcome !== 'duplicate' && session.customer_email) {
                 const nameParts = (session.customer_details?.name || '').trim().split(/\s+/).filter(Boolean);
                 const firstName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0] || '';
                 sendWelcomeEmail(session.customer_email, firstName)
@@ -306,26 +331,48 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
                 // Generate QR code encoding the confirmation number
                 const qrCode = await generateQRCode(confirmationNumber);
 
-                // Write ticket record
-                await db.collection('tickets').add({
-                    eventId,
-                    eventTitle,
-                    customerName,
-                    email: session.customer_email,
-                    quantity,
-                    totalAmount: session.amount_total || 0,
-                    status: 'paid',
-                    confirmationNumber,
-                    qrCode,
-                    stripeSessionId: session.id,
-                    purchasedAt: new Date().toISOString(),
-                });
+                const tickets = db.collection('tickets');
+                const postRef = eventId ? db.collection('posts').doc(eventId) : null;
 
-                // Atomically increment ticketsSold on the event post
-                if (eventId) {
-                    await db.collection('posts').doc(eventId).update({
-                        ticketsSold: FieldValue.increment(quantity),
+                // Same redelivery guard as the membership branch above — see the
+                // comment there. It matters more here: a resent event would mint a
+                // duplicate ticket with its own confirmation number *and* double
+                // count `ticketsSold` against the event's capacity. The ticket and
+                // the counter share the transaction so they cannot drift apart.
+                //
+                // Firestore requires every read in a transaction to precede every
+                // write, which is why the post is fetched up here rather than
+                // beside its own update.
+                const created = await db.runTransaction(async (tx) => {
+                    const existing = await tx.get(
+                        tickets.where('stripeSessionId', '==', session.id).limit(1)
+                    );
+                    if (!existing.empty) return false;
+
+                    // A sale against a since-deleted post must still record the
+                    // ticket — someone paid. Only the counter is skipped.
+                    const postSnap = postRef ? await tx.get(postRef) : null;
+
+                    tx.set(tickets.doc(), {
+                        eventId,
+                        eventTitle,
+                        customerName,
+                        email: session.customer_email,
+                        quantity,
+                        totalAmount: session.amount_total || 0,
+                        status: 'paid',
+                        confirmationNumber,
+                        qrCode,
+                        stripeSessionId: session.id,
+                        purchasedAt: new Date().toISOString(),
                     });
+                    if (postRef && postSnap?.exists) {
+                        tx.update(postRef, { ticketsSold: FieldValue.increment(quantity) });
+                    }
+                    return true;
+                });
+                if (!created) {
+                    console.log(`Ticket already exists for session ${session.id}; skipping.`);
                 }
             } catch (err) {
                 console.error('Error creating ticket record:', err);
