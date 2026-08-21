@@ -276,6 +276,42 @@ server-side `priceMap` keyed by tier, `createBookingCheckoutSession` hardcodes 5
 Capacity is deliberately *not* enforced here — overselling needs transaction
 semantics around `ticketsSold` and is a separate problem.
 
+**`stripeWebhook` must answer 5xx when a write fails, and every record is keyed by the
+Checkout Session id** — fulfillment used to wrap each path in a `catch` that only
+`console.error`d, then answered `res.json({ received: true })` unconditionally. Stripe
+saw a successful delivery and never retried, so any throw on the way to the write — QR
+generation, a Firestore blip, an `undefined` field the Admin SDK refuses — destroyed a
+paid order permanently. That cost ~25 ticket buyers their confirmation number over
+several months. Three rules now hold, and all three are load-bearing:
+
+1. `tickets/{session.id}` and `memberships/{session.id}` — never `.add()`. A retry is
+   only safe once the write is idempotent. The ticket doc and the `ticketsSold`
+   increment commit in **one transaction**, because a second write after the ticket
+   write added a seat on every retry. All `tx.get()` calls must precede all writes.
+2. A failed fulfillment returns 500 so Stripe retries on its own backoff and the event
+   shows as failing in the dashboard — that dashboard *is* the dead-letter queue, which
+   is why there is no `webhook_failures` collection.
+3. Traffic that is not ours — an `event.type` we don't handle, or a session with neither
+   a `metadata.type` nor a `bookingId` — returns **200**. An endpoint that 5xxs on
+   unrelated events invites Stripe to disable it, breaking every future purchase.
+
+Booking sessions are identified by `metadata.bookingId` with **no** `type` field, which
+is why dispatch keys on that presence and not on a `switch (type)`. Rewriting it as a
+switch compiles cleanly and silently stops fulfilling every room booking.
+`src/test/checkoutFulfillment.test.ts` pins the dispatch rule and the required-field
+matrix; `scripts/replay_stripe_webhook.cjs` proves the idempotency against the emulator
+with genuinely signed events.
+
+**Emulator secret overrides in `functions/.secret.local` must be NON-EMPTY** — the file
+is gitignored, so a fresh clone has none and the functions emulator fetches the *real*
+values from Secret Manager. An empty assignment (`RESEND_API_KEY=`) does not override
+anything: the emulator ignores it and falls back to Secret Manager, loading the live
+key. Testing the membership path that way sends a genuine welcome email from the
+production Resend account — the only thing that stopped one here was Resend refusing
+`example.com` recipients. Use a non-empty dummy (`re_emulator_disabled_not_a_real_key`)
+and confirm with `grep "Trying to access secret" ` on the emulator log: zero hits means
+the overrides took.
+
 **`onPostWritten` will happily put a years-old event on the public calendar** — the
 Google Calendar insert path is gated only on the post lacking a `googleCalendarEventId`,
 so re-saving an old write-up (or a migration that touches one) is indistinguishable from
