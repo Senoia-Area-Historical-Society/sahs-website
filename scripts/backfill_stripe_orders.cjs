@@ -194,6 +194,9 @@ async function main() {
   }
 }
 
-// Deliberately not process.exit(0) — that would discard the exitCode set when
-// individual records fail, and report a partial backfill as a clean run.
-main().catch(err => { console.error(err); process.exitCode = 1; });
+// firebase-admin holds open gRPC channels, so the event loop never empties and
+// the process would hang after finishing its work. Exit explicitly — but on the
+// code main() set, so a partial backfill isn't reported as a clean run.
+main()
+  .catch(err => { console.error(err); process.exitCode = 1; })
+  .finally(() => process.exit(process.exitCode ?? 0));

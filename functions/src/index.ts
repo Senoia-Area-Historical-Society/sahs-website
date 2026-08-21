@@ -253,6 +253,9 @@ export const listStripeSubscriptions = onRequest({ secrets: ['STRIPE_SECRET_KEY'
     }
 });
 
+/** gRPC status for a .create() against a document that already exists. */
+const ALREADY_EXISTS = 6;
+
 /**
  * Applies one completed Checkout Session to Firestore.
  *
@@ -276,16 +279,25 @@ async function applyCheckoutSession(session: Stripe.Checkout.Session): Promise<v
         if (existing.exists) {
             console.log(`Membership already recorded for session ${session.id}; skipping`);
         } else {
-            await membershipRef.create({
-                email: buyerEmail,
-                level: session.metadata?.level,
-                quantity: parseInt(session.metadata?.quantity || '1'),
-                status: 'active',
-                expirationDate,
-                paymentId: session.id,
-                userId: session.metadata?.userId || null,
-                updatedAt: new Date().toISOString()
-            });
+            try {
+                await membershipRef.create({
+                    email: buyerEmail,
+                    level: session.metadata?.level,
+                    quantity: parseInt(session.metadata?.quantity || '1'),
+                    status: 'active',
+                    expirationDate,
+                    paymentId: session.id,
+                    userId: session.metadata?.userId || null,
+                    updatedAt: new Date().toISOString()
+                });
+            } catch (err: any) {
+                // Concurrent delivery won the race with the get() above.
+                if (err?.code === ALREADY_EXISTS) {
+                    console.log(`Membership already recorded for session ${session.id} by a concurrent delivery; skipping`);
+                    return;
+                }
+                throw err;
+            }
             console.log(`Membership recorded for ${buyerEmail} (session ${session.id})`);
 
             // Send welcome email to new member via Resend. Deliberately inside
@@ -318,7 +330,12 @@ async function applyCheckoutSession(session: Stripe.Checkout.Session): Promise<v
             const confirmationNumber = generateConfirmationNumber();
             const qrCode = await generateQRCode(confirmationNumber);
 
-            await ticketRef.create({
+            // The ticket and the sales counter must move together. Writing them
+            // as two awaits meant a counter failure threw *after* the ticket
+            // existed — the retry would then hit the skip branch above, ack, and
+            // leave ticketsSold permanently short with nothing left to log.
+            const batch = db.batch();
+            batch.create(ticketRef, {
                 eventId,
                 eventTitle,
                 customerName,
@@ -332,12 +349,27 @@ async function applyCheckoutSession(session: Stripe.Checkout.Session): Promise<v
                 purchasedAt: new Date().toISOString(),
             });
 
-            // Only count the sale on the run that actually created the ticket,
-            // or a redelivery would inflate ticketsSold.
-            if (eventId) {
-                await db.collection('posts').doc(eventId).update({
-                    ticketsSold: FieldValue.increment(quantity),
-                });
+            // A batch fails whole if any ref is missing, so a stale eventId would
+            // roll back the ticket too and retry forever. The ticket is worth more
+            // than the counter: record it, and warn loudly about the count.
+            const postRef = eventId ? db.collection('posts').doc(eventId) : null;
+            const countable = postRef ? (await postRef.get()).exists : false;
+            if (postRef && countable) {
+                batch.update(postRef, { ticketsSold: FieldValue.increment(quantity) });
+            } else if (eventId) {
+                console.warn(`Post ${eventId} missing — ticket recorded but ticketsSold not incremented`);
+            }
+
+            try {
+                await batch.commit();
+            } catch (err: any) {
+                // A concurrent delivery won the race between the get() above and
+                // this commit. Nothing to repair — ack rather than retry.
+                if (err?.code === ALREADY_EXISTS) {
+                    console.log(`Ticket already recorded for session ${session.id} by a concurrent delivery; skipping`);
+                    return;
+                }
+                throw err;
             }
             console.log(`Ticket ${confirmationNumber} recorded for ${buyerEmail} (session ${session.id})`);
         }
