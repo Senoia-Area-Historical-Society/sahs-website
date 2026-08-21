@@ -49,7 +49,18 @@ export interface Membership {
   quantity: number;
   autoRenew?: boolean;
   stripeSubscriptionId?: string;
-  
+
+  /**
+   * Welcome-email outcome, written by `stripeWebhook` after the membership record
+   * commits. The email is sent outside the fulfillment transaction and is deliberately
+   * non-fatal — the record is what cannot be reconstructed — so these two fields are
+   * where a silent send failure becomes visible. Exactly one is ever set: an ISO
+   * timestamp on success, a Resend error message on failure. Both stay `null` when the
+   * send was skipped for want of a configured API key.
+   */
+  welcomeEmailSentAt?: string | null;
+  welcomeEmailError?: string | null;
+
   updatedAt?: string;
 }
 

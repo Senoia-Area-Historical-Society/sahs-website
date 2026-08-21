@@ -10,8 +10,18 @@ import { Resend } from 'resend';
 import { render } from 'react-email';
 import * as React from 'react';
 import { WelcomeEmail } from './emails/WelcomeEmail';
+import { TicketConfirmationEmail, TicketConfirmationEmailProps } from './emails/TicketConfirmationEmail';
 import { resolveEventWindow, isLongPast } from './calendarTime';
 import { resolveTicketOrder, rejectionStatus } from './ticketPricing';
+import { sendTicketConfirmation, formatEventWhen, resolveEventLocation } from './ticketEmail';
+import {
+    classifyCheckoutSession,
+    parseTicketOrder,
+    parseMembershipOrder,
+    parseBookingPayment,
+    CheckoutKind,
+    FulfillmentRejection,
+} from './checkoutFulfillment';
 import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
 
 admin.initializeApp();
@@ -29,10 +39,19 @@ const getStripe = () => {
 
 const getResend = () => new Resend(process.env.RESEND_API_KEY);
 
-async function sendWelcomeEmail(email: string, firstName: string): Promise<void> {
+/**
+ * Throws on a send failure rather than logging it, so `fulfillMembership` can record the
+ * outcome on the membership document. Resend reports failures in the response body
+ * instead of rejecting, which is how the previous version could log an error and still
+ * look, to its caller, exactly like a successful send.
+ */
+async function sendWelcomeEmail(email: string, firstName: string): Promise<'sent' | 'skipped'> {
     if (!process.env.RESEND_API_KEY) {
+        // Not an error: the emulator and any local run have no Resend key, and a
+        // membership must still be recorded there. Reported back as 'skipped' rather
+        // than 'sent' so the membership document does not claim an email that never left.
         console.warn('RESEND_API_KEY not configured — skipping welcome email');
-        return;
+        return 'skipped';
     }
     const resend = getResend();
     const html = await render(React.createElement(WelcomeEmail, { firstName }));
@@ -43,8 +62,9 @@ async function sendWelcomeEmail(email: string, firstName: string): Promise<void>
         html,
     });
     if (error) {
-        console.error('Resend welcome email failed:', error);
+        throw new Error(`Resend rejected the welcome email: ${error.message}`);
     }
+    return 'sent';
 }
 
 // Configure Google Auth for Calendar API
@@ -265,146 +285,285 @@ export const listStripeSubscriptions = onRequest({ secrets: ['STRIPE_SECRET_KEY'
 });
 
 // 6. Stripe Webhook Handler
+//
+// Two separate defects converged here, and both matter:
+//
+//   • No live-mode webhook endpoint was ever registered in Stripe, so this function was
+//     never invoked at all — zero requests in 90 days of Cloud Run logs, `tickets` and
+//     `memberships` both empty, while 27 ticket orders were paid for. That is a Stripe
+//     account configuration problem, not a code one, and no change in this file fixes
+//     it. Registering the endpoint is what starts delivery.
+//   • Once delivery starts, the handler had to survive it. It did not: every branch was
+//     wrapped in a `catch` that only logged, and the function answered
+//     `res.json({ received: true })` unconditionally, so a throw on the way to the write
+//     looked to Stripe like a successful delivery and was never retried.
+//
+// Fixing only the first would begin delivering 27 replayed events into a handler that
+// silently drops whatever it fails to write. Hence the three rules below.
+//
+// Fulfillment is the only place a purchase becomes real. All three rules exist because
+// breaking them loses a paid order:
+//
+//   1. Every record is keyed by the Checkout Session id, so a replay overwrites nothing
+//      and double-counts nothing. Retries are only safe once this is true. Stripe
+//      redelivers in two ways — automatic retries on any non-2xx, and the Dashboard's
+//      manual "Resend" — and `session.id` is stable across every delivery of the same
+//      event, which is what makes it the natural key. The existence check shares the
+//      write's transaction because two deliveries can arrive concurrently and a plain
+//      read-then-write would let both see "not found" and both insert.
+//   2. A failed write answers 5xx. Stripe then retries on its own backoff for ~3 days
+//      and shows the event as failing in the dashboard. The old handler answered
+//      `res.json({ received: true })` unconditionally, so a throw meant Stripe recorded
+//      a successful delivery and never came back.
+//   3. Traffic that is not ours to fulfill answers 200. An endpoint that 5xxs on
+//      unrelated events invites Stripe to disable it, which would break every future
+//      purchase — a far worse outage than the one being fixed.
+
+/** Distinguishes "a retry cannot fix this" from an ordinary transient write failure. */
+class UnfulfillableSessionError extends Error {
+    constructor(kind: CheckoutKind, reason: FulfillmentRejection) {
+        super(`${kind} session cannot be fulfilled: ${reason}`);
+        this.name = 'UnfulfillableSessionError';
+    }
+}
+
+/**
+ * Records a paid ticket order and its seat count in one atomic commit.
+ *
+ * `'duplicate'` is the retry path: the ticket doc already exists, so neither it nor
+ * `ticketsSold` is touched again. Doing the increment as a second write after the ticket
+ * write — as the original did — would have added a seat on every Stripe retry.
+ */
+async function fulfillTicket(session: Stripe.Checkout.Session): Promise<'created' | 'duplicate'> {
+    const parsed = parseTicketOrder(session);
+    if (!parsed.ok) throw new UnfulfillableSessionError('ticket', parsed.reason);
+    const order = parsed.value;
+
+    // Generated before the transaction: a transaction callback re-runs under contention,
+    // and a fresh confirmation number per attempt would hand the buyer a code that does
+    // not match the one that finally commits.
+    const confirmationNumber = generateConfirmationNumber();
+    const qrCode = await generateQRCode(confirmationNumber);
+
+    const ticketRef = db.collection('tickets').doc(session.id);
+    const postRef = db.collection('posts').doc(order.eventId);
+
+    // Captured out of the transaction so the confirmation email can name the date and
+    // place. Read inside it, assigned here, and used only after it commits.
+    let postData: Record<string, unknown> | undefined;
+
+    const outcome = await db.runTransaction(async (tx) => {
+        // Both reads first — Firestore requires every read in a transaction to precede
+        // every write. The post is read even on the duplicate path, which costs one
+        // wasted lookup and keeps that ordering impossible to get wrong.
+        const existing = await tx.get(ticketRef);
+        const post = await tx.get(postRef);
+        postData = post.exists ? post.data() : undefined;
+
+        if (existing.exists) return 'duplicate' as const;
+
+        tx.set(ticketRef, {
+            eventId: order.eventId,
+            eventTitle: order.eventTitle,
+            customerName: order.customerName,
+            email: order.email,
+            quantity: order.quantity,
+            totalAmount: order.totalAmount,
+            status: 'paid',
+            confirmationNumber,
+            qrCode,
+            // Redundant with the document id, and deliberately kept: the public success
+            // page reads this collection through `allow read: if isCurator() ||
+            // request.query.limit == 1`, which a query satisfies and a document `get()`
+            // does not. An unauthenticated buyer can only reach their ticket by querying
+            // this field, so `getTicketBySessionId` must stay a where(...).limit(1).
+            stripeSessionId: session.id,
+            purchasedAt: new Date().toISOString(),
+        });
+
+        if (post.exists) {
+            tx.update(postRef, { ticketsSold: FieldValue.increment(order.quantity) });
+        } else {
+            // The ticket still commits. Losing a paid order because its event post was
+            // deleted would be the same class of bug as the one this handler fixes.
+            console.warn(`stripeWebhook: recorded ticket ${session.id} but event post ${order.eventId} is missing — ticketsSold not incremented`);
+        }
+
+        return 'created' as const;
+    });
+
+    // Outside the transaction, and only for a genuinely new ticket: a transaction
+    // callback re-runs under contention, so an email sent inside one goes out once per
+    // attempt, and a retry that finds the ticket already present must not mail again.
+    //
+    // Non-fatal by design. The record is what cannot be reconstructed; an email can be
+    // resent from the reconciliation script. Failing the webhook here would return 500,
+    // Stripe would retry, the retry would see 'duplicate' — and the buyer would still
+    // have no email, at the cost of an event that looks broken in the dashboard.
+    if (outcome === 'created') {
+        try {
+            const delivery = await sendTicketConfirmation({
+                email: order.email,
+                customerName: order.customerName,
+                eventTitle: order.eventTitle,
+                quantity: order.quantity,
+                confirmationNumber,
+                qrCode,
+                sessionId: session.id,
+                eventWhen: formatEventWhen(postData),
+                eventLocation: resolveEventLocation(postData),
+            }, FRONTEND_URL);
+            if (delivery === 'sent') {
+                await ticketRef.update({ confirmationEmailSentAt: new Date().toISOString() });
+            }
+            console.log(`stripeWebhook: ticket confirmation ${delivery} for ${session.id}`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`stripeWebhook: ticket confirmation email FAILED for ${session.id} — the ticket is saved; resend with scripts/reconcile_ticket_orders.cjs --send-emails`, err);
+            await ticketRef.update({ confirmationEmailError: message }).catch(() => undefined);
+        }
+    }
+
+    return outcome;
+}
+
+/**
+ * Records a membership, then sends the welcome email outside the transaction.
+ *
+ * The email is intentionally not part of the atomic unit: a transaction callback can
+ * re-run, and an email sent inside one goes out once per attempt. It is also
+ * non-fatal — the membership record is what the society cannot reconstruct, whereas a
+ * welcome email can be resent by hand. Its outcome is written back onto the document so
+ * a failure is visible to a curator rather than only in a log line.
+ *
+ * This replaces the tri-state ('created' | 'duplicate' | 'error') outcome added in #38,
+ * which deliberately sent the email even when the write had FAILED. That was correct
+ * reasoning in a handler that always answered 200: Stripe would never retry, so
+ * suppressing the email on error would have left a paying member with nothing at all.
+ * Returning 500 inverts it — a failed write is now retried, the record is created on a
+ * later delivery, and the email goes out then. Sending on error would instead mail a
+ * member whose membership does not exist, and re-mail them on every retry.
+ */
+async function fulfillMembership(session: Stripe.Checkout.Session): Promise<'created' | 'duplicate'> {
+    const parsed = parseMembershipOrder(session);
+    if (!parsed.ok) throw new UnfulfillableSessionError('membership', parsed.reason);
+    const membership = parsed.value;
+
+    const ref = db.collection('memberships').doc(session.id);
+    const outcome = await db.runTransaction(async (tx) => {
+        const existing = await tx.get(ref);
+        if (existing.exists) return 'duplicate' as const;
+
+        tx.set(ref, {
+            email: membership.email,
+            level: membership.level,
+            quantity: membership.quantity,
+            status: 'active',
+            expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            paymentId: session.id,
+            userId: membership.userId,
+            welcomeEmailSentAt: null,
+            welcomeEmailError: null,
+            updatedAt: new Date().toISOString(),
+        });
+        return 'created' as const;
+    });
+
+    if (outcome === 'created') {
+        try {
+            const delivery = await sendWelcomeEmail(membership.email, membership.firstName);
+            if (delivery === 'sent') {
+                await ref.update({ welcomeEmailSentAt: new Date().toISOString() });
+            }
+            console.log(`stripeWebhook: welcome email ${delivery} for membership ${session.id}`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`stripeWebhook: welcome email FAILED for membership ${session.id} — the record is saved; resend by hand`, err);
+            // Best-effort: if even this update fails the log above still stands, and
+            // throwing here would fail an event whose money-critical write succeeded.
+            await ref.update({ welcomeEmailError: message }).catch(() => undefined);
+        }
+    }
+
+    return outcome;
+}
+
+/**
+ * Attaches the payment intent to the booking a customer just paid for.
+ *
+ * Deliberately does not advance `status` past `pending`: confirmation stays a human
+ * decision in BookingsAdmin, because `onBookingConfirmed` inserts a public Google
+ * Calendar entry on that transition.
+ */
+async function fulfillBooking(session: Stripe.Checkout.Session): Promise<'recorded' | 'duplicate'> {
+    const parsed = parseBookingPayment(session);
+    if (!parsed.ok) throw new UnfulfillableSessionError('booking', parsed.reason);
+    const { bookingId, paymentIntentId } = parsed.value;
+
+    const ref = db.collection('bookings').doc(bookingId);
+    return db.runTransaction(async (tx) => {
+        const existing = await tx.get(ref);
+        if (!existing.exists) {
+            // `createBookingCheckoutSession` writes this document before redirecting to
+            // Stripe, so a missing one means it was deleted mid-checkout. Surfaced as a
+            // failure rather than resurrected: a `set` with merge would leave a stub
+            // booking holding nothing but a payment intent.
+            throw new Error(`booking ${bookingId} no longer exists`);
+        }
+        if (existing.get('paymentIntentId')) return 'duplicate';
+
+        tx.update(ref, { paymentIntentId });
+        return 'recorded';
+    });
+}
+
 export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'RESEND_API_KEY'] }, async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
-    let event;
+    let event: Stripe.Event;
     try {
         const stripe = getStripe();
         event = stripe.webhooks.constructEvent((req as any).rawBody, sig as string, STRIPE_WEBHOOK_SECRET);
     } catch (err: any) {
+        // 400 and no retry: an unverifiable payload will never verify on a second try.
+        console.error('stripeWebhook: signature verification failed', err);
         res.status(400).send(`Webhook Error: ${err.message}`);
         return;
     }
 
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const type = session.metadata?.type;
-
-        if (type === 'membership') {
-            const expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-            // Tri-state, not a boolean: a *duplicate* must suppress the welcome
-            // email, but an *error* must not. The handler always answers 200, so
-            // Stripe never retries a failed write — suppressing the email there
-            // would leave a paying member with nothing at all.
-            let outcome: 'created' | 'duplicate' | 'error' = 'error';
-            try {
-                // Stripe redelivers events: automatic retries on any non-2xx, and
-                // the Dashboard's manual "Resend". `add()` is not idempotent, so a
-                // redelivery would mint a second membership and a second welcome
-                // email. `session.id` is stable across every delivery of the same
-                // event, so it is the natural key — and the check shares a
-                // transaction with the write, because two concurrent deliveries
-                // would otherwise both see "not found" and both insert.
-                const memberships = db.collection('memberships');
-                const inserted = await db.runTransaction(async (tx) => {
-                    const existing = await tx.get(
-                        memberships.where('paymentId', '==', session.id).limit(1)
-                    );
-                    if (!existing.empty) return false;
-                    tx.set(memberships.doc(), {
-                        email: session.customer_email,
-                        level: session.metadata?.level,
-                        quantity: parseInt(session.metadata?.quantity || '1'),
-                        status: 'active',
-                        expirationDate,
-                        paymentId: session.id,
-                        userId: session.metadata?.userId || null,
-                        updatedAt: new Date().toISOString()
-                    });
-                    return true;
-                });
-                outcome = inserted ? 'created' : 'duplicate';
-                if (outcome === 'duplicate') {
-                    console.log(`Membership already recorded for session ${session.id}; skipping.`);
-                }
-            } catch (err) {
-                console.error('Error creating membership record:', err);
-            }
-
-            // Send welcome email to new member via Resend — skipped only when this
-            // is a redelivery of an event we already handled.
-            if (outcome !== 'duplicate' && session.customer_email) {
-                const nameParts = (session.customer_details?.name || '').trim().split(/\s+/).filter(Boolean);
-                const firstName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0] || '';
-                sendWelcomeEmail(session.customer_email, firstName)
-                    .catch(err => console.error('Resend welcome email failed:', err));
-            }
-
-        } else if (type === 'ticket') {
-            try {
-                const eventId = session.metadata?.eventId || '';
-                const eventTitle = session.metadata?.eventTitle || '';
-                const customerName = session.metadata?.customerName || '';
-                const quantity = parseInt(session.metadata?.quantity || '1');
-                const confirmationNumber = generateConfirmationNumber();
-
-                // Generate QR code encoding the confirmation number
-                const qrCode = await generateQRCode(confirmationNumber);
-
-                const tickets = db.collection('tickets');
-                const postRef = eventId ? db.collection('posts').doc(eventId) : null;
-
-                // Same redelivery guard as the membership branch above — see the
-                // comment there. It matters more here: a resent event would mint a
-                // duplicate ticket with its own confirmation number *and* double
-                // count `ticketsSold` against the event's capacity. The ticket and
-                // the counter share the transaction so they cannot drift apart.
-                //
-                // Firestore requires every read in a transaction to precede every
-                // write, which is why the post is fetched up here rather than
-                // beside its own update.
-                const created = await db.runTransaction(async (tx) => {
-                    const existing = await tx.get(
-                        tickets.where('stripeSessionId', '==', session.id).limit(1)
-                    );
-                    if (!existing.empty) return false;
-
-                    // A sale against a since-deleted post must still record the
-                    // ticket — someone paid. Only the counter is skipped.
-                    const postSnap = postRef ? await tx.get(postRef) : null;
-
-                    tx.set(tickets.doc(), {
-                        eventId,
-                        eventTitle,
-                        customerName,
-                        email: session.customer_email,
-                        quantity,
-                        totalAmount: session.amount_total || 0,
-                        status: 'paid',
-                        confirmationNumber,
-                        qrCode,
-                        stripeSessionId: session.id,
-                        purchasedAt: new Date().toISOString(),
-                    });
-                    if (postRef && postSnap?.exists) {
-                        tx.update(postRef, { ticketsSold: FieldValue.increment(quantity) });
-                    }
-                    return true;
-                });
-                if (!created) {
-                    console.log(`Ticket already exists for session ${session.id}; skipping.`);
-                }
-            } catch (err) {
-                console.error('Error creating ticket record:', err);
-            }
-
-        } else {
-            // Booking payment
-            const bookingId = session.metadata?.bookingId;
-            if (bookingId) {
-                try {
-                    await db.collection('bookings').doc(bookingId).update({
-                        paymentIntentId: session.payment_intent as string,
-                    });
-                } catch (err) {
-                    console.error('Error updating booking status:', err);
-                }
-            }
-        }
+    // Rule 3 — anything we are not the system of record for is acknowledged, not failed.
+    if (event.type !== 'checkout.session.completed') {
+        res.json({ received: true, ignored: event.type });
+        return;
     }
 
-    res.json({ received: true });
+    const session = event.data.object as Stripe.Checkout.Session;
+    const kind = classifyCheckoutSession(session);
+    if (kind === 'unrelated') {
+        console.warn(`stripeWebhook: session ${session.id} has no recognizable type or bookingId — ignoring`);
+        res.json({ received: true, ignored: 'unrecognized_session' });
+        return;
+    }
+
+    try {
+        const outcome =
+            kind === 'ticket' ? await fulfillTicket(session)
+            : kind === 'membership' ? await fulfillMembership(session)
+            : await fulfillBooking(session);
+
+        // Logged on success as well as failure, so a purchase that went missing can be
+        // traced in Cloud Functions logs by session id instead of inferred from silence.
+        console.log(`stripeWebhook: ${kind} ${session.id} → ${outcome}`);
+        res.json({ received: true, kind, outcome });
+    } catch (err) {
+        const permanent = err instanceof UnfulfillableSessionError;
+        console.error(
+            `stripeWebhook: FAILED to fulfill ${kind} for session ${session.id} — answering 500 so Stripe retries.` +
+            (permanent ? ' A retry cannot fix this; fulfil it by hand from the Stripe dashboard.' : ''),
+            err
+        );
+        res.status(500).json({ error: 'fulfillment_failed', kind });
+    }
 });
 
 // 7. Verify Ticket (at-the-door scanner)
@@ -650,6 +809,19 @@ export const renderEmailPreview = onRequest({ cors: true, invoker: 'public' }, a
             html = await render(React.createElement(WelcomeEmail, props as { firstName?: string }));
         } else if (template === 'newsletter') {
             html = await render(React.createElement(NewsletterEmail, props as unknown as NewsletterEmailProps));
+        } else if (template === 'ticket') {
+            // Sample values so the preview is legible with an empty props object — this
+            // template is normally populated from a real purchase, not typed by an admin.
+            html = await render(React.createElement(TicketConfirmationEmail, {
+                customerName: 'Cat Nolan',
+                eventTitle: 'Yacht Rock Party',
+                eventWhen: 'Saturday, August 29, 2026 at 7:00 PM',
+                eventLocation: 'Freeman Sasser Building, Senoia, GA',
+                quantity: 2,
+                confirmationNumber: 'SAMPLE01',
+                ticketUrl: `${FRONTEND_URL}/tickets/success?session_id=cs_example`,
+                ...(props as Partial<TicketConfirmationEmailProps>),
+            }));
         } else {
             res.status(400).json({ error: 'Unknown template' });
             return;
