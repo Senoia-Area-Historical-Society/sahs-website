@@ -29,8 +29,10 @@ const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
 const APPLY = process.argv.includes('--apply');
 
 if (!STRIPE_KEY) { console.error('STRIPE_SECRET_KEY not set'); process.exit(1); }
+// Never interpolate any part of the key into output — this runs in terminals and
+// CI logs, and a widened slice would leak key material.
 if (!STRIPE_KEY.startsWith('sk_live_')) {
-  console.warn(`! Key is not sk_live_ — reconciling the ${STRIPE_KEY.slice(0, 7)} account.`);
+  console.warn('! STRIPE_SECRET_KEY is not a live-mode key — reconciling a test/sandbox account.');
 }
 
 const stripe = new Stripe(STRIPE_KEY, { apiVersion: '2024-04-10' });
