@@ -261,6 +261,21 @@ a legacy document normalizes it. Do **not** reintroduce a `type` filter in a que
 is what made a 2023 article appear in Home's sidebar but not in `/past-sahs-events`.
 Anything that used to key off `type === 'event'` should key off `!!post.eventDate` instead.
 
+**Checkout amounts are derived server-side — never from the request body** —
+`createTicketCheckoutSession` builds `line_items[0].price_data.unit_amount` from the
+`ticketPrice` stored on `posts/{eventId}`, not from a `price` field on the wire. That
+amount is a *dynamic* price: Stripe charges whatever the function sends, so forwarding
+a client value let a crafted POST to the public function URL buy a $50 ticket for a
+penny. `functions/src/ticketPricing.ts` owns the whole decision — price, product name,
+`cancel_url` slug, and the quantity bounds — and refuses a post that is missing,
+not `status: 'published'`, or has no positive integer `ticketPrice`. Do **not** re-add
+`price` or `title` to `submitTicketRequest`'s payload; the server ignores them by
+design, and a stale cached bundle that still sends them keeps working. The sibling
+functions are already safe the same way: `createMembershipCheckoutSession` uses a
+server-side `priceMap` keyed by tier, `createBookingCheckoutSession` hardcodes 5000.
+Capacity is deliberately *not* enforced here — overselling needs transaction
+semantics around `ticketsSold` and is a separate problem.
+
 **`onPostWritten` will happily put a years-old event on the public calendar** — the
 Google Calendar insert path is gated only on the post lacking a `googleCalendarEventId`,
 so re-saving an old write-up (or a migration that touches one) is indistinguishable from

@@ -61,12 +61,9 @@ export async function startTicketCheckout({
   try {
     ({ url } = await submitTicketRequest({
       eventId: post.id,
-      title: post.title,
-      price: post.ticketPrice!,
       quantity: buyer.quantity,
       email: buyer.email,
       customerName: buyer.name,
-      slug: post.slug,
     }));
   } catch (err) {
     // Don't strand the placeholder tab on a blank "Redirecting…" screen.
