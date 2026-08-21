@@ -228,7 +228,12 @@ export async function submitMembershipRequest(data: { email: string; level: stri
   }
 }
 
-export async function submitTicketRequest(data: { eventId: string; title: string; price: number; quantity: number; email: string; customerName?: string; slug?: string }): Promise<{ url: string }> {
+/**
+ * The server derives price, title and the cancel-URL slug from `posts/{eventId}`;
+ * sending them from here would be decorative at best and, for `price`, a way to
+ * charge whatever the browser felt like. Only the buyer's own inputs go on the wire.
+ */
+export async function submitTicketRequest(data: { eventId: string; quantity: number; email: string; customerName?: string }): Promise<{ url: string }> {
   try {
     const baseUrl = getFunctionsBaseUrl();
     const functionUrl = `${baseUrl}/createTicketCheckoutSession`;
