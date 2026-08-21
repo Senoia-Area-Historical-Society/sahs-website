@@ -273,21 +273,31 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
         const stripe = getStripe();
         event = stripe.webhooks.constructEvent((req as any).rawBody, sig as string, STRIPE_WEBHOOK_SECRET);
     } catch (err: any) {
+        console.error('Stripe webhook signature verification failed:', err.message);
         res.status(400).send(`Webhook Error: ${err.message}`);
         return;
     }
 
+    console.log(`Stripe webhook received: ${event.type} (${event.id})`);
+
+    try {
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object as Stripe.Checkout.Session;
         const type = session.metadata?.type;
+        // Checkout populates customer_details from what the buyer actually
+        // confirmed; customer_email is only what we prefilled at session
+        // creation. Prefer the former so the record survives the prefill being
+        // dropped (which is the mitigation for the Link OTP trap).
+        const buyerEmail = session.customer_details?.email || session.customer_email || null;
 
         if (type === 'membership') {
             const expirationDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-            // Tri-state, not a boolean: a *duplicate* must suppress the welcome
-            // email, but an *error* must not. The handler always answers 200, so
-            // Stripe never retries a failed write — suppressing the email there
-            // would leave a paying member with nothing at all.
-            let outcome: 'created' | 'duplicate' | 'error' = 'error';
+            // Duplicate must suppress the welcome email; an error must not
+            // reach the email at all. The original tri-state existed because the
+            // handler always answered 200, so a failed write could never be
+            // retried and the email was the only thing left to salvage. The
+            // delivery now fails instead, and a retry re-runs both together.
+            let outcome: 'created' | 'duplicate' = 'duplicate';
             try {
                 // Stripe redelivers events: automatic retries on any non-2xx, and
                 // the Dashboard's manual "Resend". `add()` is not idempotent, so a
@@ -303,7 +313,7 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
                     );
                     if (!existing.empty) return false;
                     tx.set(memberships.doc(), {
-                        email: session.customer_email,
+                        email: buyerEmail,
                         level: session.metadata?.level,
                         quantity: parseInt(session.metadata?.quantity || '1'),
                         status: 'active',
@@ -320,14 +330,15 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
                 }
             } catch (err) {
                 console.error('Error creating membership record:', err);
+                throw err;
             }
 
             // Send welcome email to new member via Resend — skipped only when this
             // is a redelivery of an event we already handled.
-            if (outcome !== 'duplicate' && session.customer_email) {
+            if (outcome !== 'duplicate' && buyerEmail) {
                 const nameParts = (session.customer_details?.name || '').trim().split(/\s+/).filter(Boolean);
                 const firstName = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0] || '';
-                sendWelcomeEmail(session.customer_email, firstName)
+                sendWelcomeEmail(buyerEmail, firstName)
                     .catch(err => console.error('Resend welcome email failed:', err));
             }
 
@@ -368,7 +379,7 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
                         eventId,
                         eventTitle,
                         customerName,
-                        email: session.customer_email,
+                        email: buyerEmail,
                         quantity,
                         totalAmount: session.amount_total || 0,
                         status: 'paid',
@@ -387,6 +398,7 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
                 }
             } catch (err) {
                 console.error('Error creating ticket record:', err);
+                throw err;
             }
 
         } else {
@@ -404,7 +416,14 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
         }
     }
 
-    res.json({ received: true });
+        res.json({ received: true });
+    } catch (err) {
+        // Answering 200 on a failed write is what let this incident stay
+        // invisible: Stripe never retries, so a transient Firestore error loses
+        // a paid ticket permanently and silently. Fail the delivery instead.
+        console.error(`Stripe webhook handler failed for ${event.id} (${event.type}):`, err);
+        res.status(500).send('Webhook handler failed');
+    }
 });
 
 // 7. Verify Ticket (at-the-door scanner)
