@@ -302,6 +302,26 @@ switch compiles cleanly and silently stops fulfilling every room booking.
 matrix; `scripts/replay_stripe_webhook.cjs` proves the idempotency against the emulator
 with genuinely signed events.
 
+**A green `functions` build does not mean CI passes — run the ROOT `npm run build` too**
+— the site's build is `tsc -b && vite build`, and `tsc -b` type-checks `src/`, which means
+it follows the imports in `src/test/*.test.ts` **into whatever `functions/src/` module they
+name**. The site tsconfig has no `node` types and none of the functions dependencies, so a
+test importing a module that touches `process.env` or `resend` fails the root build with
+`TS2591: Cannot find name 'process'` — while `cd functions && npm run build` passes
+happily, because that project does have them. CI's only build step is the root one, so
+this ships as a *failed deploy on main*: nothing is released, and the previous revision
+keeps serving while everyone assumes the merge went out.
+
+Therefore: every `functions/src/` module a site test imports stays free of Node globals and
+external packages — that is why `calendarTime.ts`, `ticketPricing.ts`,
+`checkoutFulfillment.ts` and `ticketEmailContent.ts` have no imports at all, while the
+Resend/`process.env` half lives in `ticketEmail.ts`, which re-exports the pure half so
+callers keep one import site. Before pushing anything under `functions/src/`, run:
+
+```bash
+npm run build && (cd functions && npm run build) && npx vitest run
+```
+
 **Emulator secret overrides in `functions/.secret.local` must be NON-EMPTY** — the file
 is gitignored, so a fresh clone has none and the functions emulator fetches the *real*
 values from Secret Manager. An empty assignment (`RESEND_API_KEY=`) does not override
