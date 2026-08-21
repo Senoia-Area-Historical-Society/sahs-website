@@ -30,6 +30,11 @@
  *
  *   Flags:
  *     --write            create the missing ticket docs (omit for a dry run)
+ *     --send-emails      also email each recovered buyer their confirmation number and
+ *                        QR code (requires --write and RESEND_API_KEY). Deliberately
+ *                        opt-in and separate from --write: creating records is
+ *                        reversible, contacting ~24 customers is not. Requires a built
+ *                        functions/lib — run `cd functions && npm run build` first.
  *     --since YYYY-MM-DD only consider sessions created on/after this date
  *     --csv FILE         write the recovered orders to FILE for notifying buyers
  *     --recount          reset ticketsSold on affected events to the true sum
@@ -73,6 +78,7 @@ const val = (name, fallback) => {
 };
 
 const WRITE = has('write');
+const SEND_EMAILS = has('send-emails');
 const RECOUNT = has('recount');
 const FIXTURE = val('fixture');
 const CSV_PATH = val('csv');
@@ -94,6 +100,29 @@ const db = getFirestore();
 
 /** null in --fixture mode, where there is no Stripe to talk to. */
 const stripe = FIXTURE ? null : new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-04-10' });
+
+/**
+ * The webhook's own email code, loaded from the compiled output so a recovered buyer gets
+ * a byte-identical email to a live purchaser — a second copy of the template here would
+ * drift from the real one the moment either changed.
+ */
+let ticketEmail = null;
+if (SEND_EMAILS) {
+    if (!WRITE) {
+        console.error('--send-emails requires --write: there is nothing to send until the tickets exist.');
+        process.exit(1);
+    }
+    const compiled = path.join(FUNCTIONS_DIR, 'lib', 'ticketEmail.js');
+    if (!fs.existsSync(compiled)) {
+        console.error(`Missing ${compiled}. Run \`cd functions && npm run build\` first.`);
+        process.exit(1);
+    }
+    ticketEmail = req('./lib/ticketEmail.js');
+    if (!process.env.RESEND_API_KEY) {
+        console.error('--send-emails needs RESEND_API_KEY, or every send is silently skipped.');
+        process.exit(1);
+    }
+}
 
 /** Matches `generateConfirmationNumber` in functions/src/index.ts. */
 function generateConfirmationNumber() {
@@ -207,6 +236,19 @@ async function loadRecordedSessionIds() {
     return ids;
 }
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://senoiahistory.com';
+
+/** Post lookups are cached: one event accounts for most of the backlog. */
+const postCache = new Map();
+async function postFor(eventId) {
+    if (!eventId) return undefined;
+    if (!postCache.has(eventId)) {
+        const snap = await db.collection('posts').doc(eventId).get();
+        postCache.set(eventId, snap.exists ? snap.data() : undefined);
+    }
+    return postCache.get(eventId);
+}
+
 const fmtMoney = (cents) => `$${((cents || 0) / 100).toFixed(2)}`;
 const fmtDate = (unix) => (unix ? new Date(unix * 1000).toISOString().slice(0, 10) : '—');
 
@@ -314,11 +356,42 @@ async function main() {
             return 'created';
         });
 
-        if (outcome === 'created') {
-            created.push({ ...order, confirmationNumber });
-            console.log(`  ✔ ${order.sessionId}  ${confirmationNumber}  ${order.email}`);
-        } else {
+        if (outcome !== 'created') {
             console.log(`  – ${order.sessionId}  already present, skipped`);
+            continue;
+        }
+
+        created.push({ ...order, confirmationNumber });
+        console.log(`  ✔ ${order.sessionId}  ${confirmationNumber}  ${order.email}`);
+
+        if (!ticketEmail) continue;
+
+        // Sent per order rather than batched at the end, so an interrupted run leaves
+        // every buyer it reached already emailed and recorded — and a re-run skips them,
+        // because their ticket now exists.
+        try {
+            const post = await postFor(order.eventId);
+            const delivery = await ticketEmail.sendTicketConfirmation({
+                email: order.email,
+                customerName: order.customerName,
+                eventTitle: order.eventTitle,
+                quantity: order.quantity,
+                confirmationNumber,
+                qrCode,
+                sessionId: order.sessionId,
+                eventWhen: ticketEmail.formatEventWhen(post),
+                eventLocation: ticketEmail.resolveEventLocation(post),
+            }, FRONTEND_URL);
+            if (delivery === 'sent') {
+                await ref.update({ confirmationEmailSentAt: new Date().toISOString() });
+            }
+            console.log(`      email ${delivery} → ${order.email}`);
+        } catch (err) {
+            // Non-fatal: the ticket is what the buyer needs, and the CSV still lists them
+            // so a failed address can be handled by hand.
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`      email FAILED → ${order.email}: ${message}`);
+            await ref.update({ confirmationEmailError: message }).catch(() => undefined);
         }
     }
 

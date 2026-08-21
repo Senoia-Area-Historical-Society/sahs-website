@@ -10,8 +10,10 @@ import { Resend } from 'resend';
 import { render } from 'react-email';
 import * as React from 'react';
 import { WelcomeEmail } from './emails/WelcomeEmail';
+import { TicketConfirmationEmail, TicketConfirmationEmailProps } from './emails/TicketConfirmationEmail';
 import { resolveEventWindow, isLongPast } from './calendarTime';
 import { resolveTicketOrder, rejectionStatus } from './ticketPricing';
+import { sendTicketConfirmation, formatEventWhen, resolveEventLocation } from './ticketEmail';
 import {
     classifyCheckoutSession,
     parseTicketOrder,
@@ -346,14 +348,19 @@ async function fulfillTicket(session: Stripe.Checkout.Session): Promise<'created
     const ticketRef = db.collection('tickets').doc(session.id);
     const postRef = db.collection('posts').doc(order.eventId);
 
-    return db.runTransaction(async (tx) => {
+    // Captured out of the transaction so the confirmation email can name the date and
+    // place. Read inside it, assigned here, and used only after it commits.
+    let postData: Record<string, unknown> | undefined;
+
+    const outcome = await db.runTransaction(async (tx) => {
         // Both reads first — Firestore requires every read in a transaction to precede
         // every write. The post is read even on the duplicate path, which costs one
         // wasted lookup and keeps that ordering impossible to get wrong.
         const existing = await tx.get(ticketRef);
         const post = await tx.get(postRef);
+        postData = post.exists ? post.data() : undefined;
 
-        if (existing.exists) return 'duplicate';
+        if (existing.exists) return 'duplicate' as const;
 
         tx.set(ticketRef, {
             eventId: order.eventId,
@@ -382,8 +389,42 @@ async function fulfillTicket(session: Stripe.Checkout.Session): Promise<'created
             console.warn(`stripeWebhook: recorded ticket ${session.id} but event post ${order.eventId} is missing — ticketsSold not incremented`);
         }
 
-        return 'created';
+        return 'created' as const;
     });
+
+    // Outside the transaction, and only for a genuinely new ticket: a transaction
+    // callback re-runs under contention, so an email sent inside one goes out once per
+    // attempt, and a retry that finds the ticket already present must not mail again.
+    //
+    // Non-fatal by design. The record is what cannot be reconstructed; an email can be
+    // resent from the reconciliation script. Failing the webhook here would return 500,
+    // Stripe would retry, the retry would see 'duplicate' — and the buyer would still
+    // have no email, at the cost of an event that looks broken in the dashboard.
+    if (outcome === 'created') {
+        try {
+            const delivery = await sendTicketConfirmation({
+                email: order.email,
+                customerName: order.customerName,
+                eventTitle: order.eventTitle,
+                quantity: order.quantity,
+                confirmationNumber,
+                qrCode,
+                sessionId: session.id,
+                eventWhen: formatEventWhen(postData),
+                eventLocation: resolveEventLocation(postData),
+            }, FRONTEND_URL);
+            if (delivery === 'sent') {
+                await ticketRef.update({ confirmationEmailSentAt: new Date().toISOString() });
+            }
+            console.log(`stripeWebhook: ticket confirmation ${delivery} for ${session.id}`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`stripeWebhook: ticket confirmation email FAILED for ${session.id} — the ticket is saved; resend with scripts/reconcile_ticket_orders.cjs --send-emails`, err);
+            await ticketRef.update({ confirmationEmailError: message }).catch(() => undefined);
+        }
+    }
+
+    return outcome;
 }
 
 /**
@@ -768,6 +809,19 @@ export const renderEmailPreview = onRequest({ cors: true, invoker: 'public' }, a
             html = await render(React.createElement(WelcomeEmail, props as { firstName?: string }));
         } else if (template === 'newsletter') {
             html = await render(React.createElement(NewsletterEmail, props as unknown as NewsletterEmailProps));
+        } else if (template === 'ticket') {
+            // Sample values so the preview is legible with an empty props object — this
+            // template is normally populated from a real purchase, not typed by an admin.
+            html = await render(React.createElement(TicketConfirmationEmail, {
+                customerName: 'Cat Nolan',
+                eventTitle: 'Yacht Rock Party',
+                eventWhen: 'Saturday, August 29, 2026 at 7:00 PM',
+                eventLocation: 'Freeman Sasser Building, Senoia, GA',
+                quantity: 2,
+                confirmationNumber: 'SAMPLE01',
+                ticketUrl: `${FRONTEND_URL}/tickets/success?session_id=cs_example`,
+                ...(props as Partial<TicketConfirmationEmailProps>),
+            }));
         } else {
             res.status(400).json({ error: 'Unknown template' });
             return;
