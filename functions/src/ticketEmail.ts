@@ -89,6 +89,11 @@ export async function sendTicketConfirmation(
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error } = await resend.emails.send({
         from: 'Senoia Area Historical Society <tickets@updates.senoiahistory.com>',
+        // The From address is a sending-only identity on the Resend domain: inbound is
+        // enabled there, so replies land in Resend rather than a person's inbox and
+        // nobody reads them. The email invites a reply, so it has to point somewhere
+        // staffed — otherwise a buyer asking to change an order is answered by silence.
+        replyTo: 'info@senoiahistory.com',
         to: input.email,
         subject: `Your tickets — ${input.eventTitle} (${input.confirmationNumber})`,
         html,
