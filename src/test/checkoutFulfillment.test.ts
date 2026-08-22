@@ -3,7 +3,6 @@ import {
   classifyCheckoutSession,
   parseTicketOrder,
   parseMembershipOrder,
-  parseBookingPayment,
   type CheckoutSessionLike,
 } from '../../functions/src/checkoutFulfillment';
 
@@ -38,17 +37,15 @@ describe('classifyCheckoutSession', () => {
   });
 
   /**
-   * The regression this exists to prevent: `createBookingCheckoutSession` sets
-   * `metadata: { bookingId }` and *no* `type`, which is why the original handler reached
-   * bookings through a bare `else`. Rewriting the dispatch as a `switch` on `type` with a
-   * `case 'booking'` compiles, reads correctly, and silently stops fulfilling every room
-   * booking — the same class of bug this whole change is fixing.
+   * The retired room-booking flow classified sessions by a bare `metadata.bookingId`
+   * with no `type`. Nothing can mint such a session now, and `unrelated` is the right
+   * answer for one: acknowledged with a 200, no record written, nothing 5xx'd.
    */
-  it('routes a booking session that carries only a bookingId, with no type field', () => {
-    expect(classifyCheckoutSession(session({ metadata: { bookingId: 'bk_1' } }))).toBe('booking');
+  it('treats a lone bookingId as unrelated now that room booking is retired', () => {
+    expect(classifyCheckoutSession(session({ metadata: { bookingId: 'bk_1' } }))).toBe('unrelated');
   });
 
-  it('lets an explicit type win over an accompanying bookingId', () => {
+  it('still routes on an explicit type when a bookingId rides along', () => {
     expect(
       classifyCheckoutSession(session({ metadata: { type: 'ticket', bookingId: 'bk_1' } }))
     ).toBe('ticket');
@@ -225,30 +222,5 @@ describe('parseMembershipOrder', () => {
   it('falls back to an empty greeting when Stripe collected no name', () => {
     const result = membership({ level: 'family' }, { customer_details: null });
     expect(result.ok && result.value.firstName).toBe('');
-  });
-});
-
-describe('parseBookingPayment', () => {
-  it('normalizes a bare payment intent id', () => {
-    const result = parseBookingPayment(
-      session({ metadata: { bookingId: 'bk_1' }, payment_intent: 'pi_1' })
-    );
-    expect(result).toEqual({ ok: true, value: { bookingId: 'bk_1', paymentIntentId: 'pi_1' } });
-  });
-
-  it('normalizes an expanded payment intent object', () => {
-    const result = parseBookingPayment(
-      session({ metadata: { bookingId: 'bk_1' }, payment_intent: { id: 'pi_2' } })
-    );
-    expect(result.ok && result.value.paymentIntentId).toBe('pi_2');
-  });
-
-  it('normalizes an absent payment intent to null, not undefined', () => {
-    const result = parseBookingPayment(session({ metadata: { bookingId: 'bk_1' } }));
-    expect(result.ok && result.value.paymentIntentId).toBeNull();
-  });
-
-  it('refuses a session with no bookingId', () => {
-    expect(parseBookingPayment(session())).toEqual({ ok: false, reason: 'missing_booking_id' });
   });
 });

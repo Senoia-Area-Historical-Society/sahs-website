@@ -38,21 +38,22 @@ export interface CheckoutSessionLike {
  * `200` for it — a `500` on traffic we were never meant to fulfill is how an endpoint
  * gets itself disabled, which would break *all* future purchases.
  */
-export type CheckoutKind = 'ticket' | 'membership' | 'booking' | 'unrelated';
+export type CheckoutKind = 'ticket' | 'membership' | 'unrelated';
 
 /**
- * Bookings are identified by the presence of `metadata.bookingId`, **not** by a `type`
- * field: `createBookingCheckoutSession` sets `metadata: { bookingId }` and no `type` at
- * all, which is why the original handler reached bookings through a bare `else`. A
- * `switch (metadata.type)` here would compile, read cleanly, and silently stop
- * fulfilling every room booking. `type` is checked first so an explicitly typed session
- * keeps its own path even if a `bookingId` is ever attached alongside.
+ * Anything without a recognized `type` is `unrelated` — acknowledged with a 200 and no
+ * record written.
+ *
+ * There used to be a third kind here. Room bookings carried `metadata: { bookingId }`
+ * and no `type` at all, so they were classified by that field's presence. That flow was
+ * retired in favour of YouCanBook.me and no code can mint such a session any more, so a
+ * lone `bookingId` now lands in `unrelated` — which is the correct answer for a payment
+ * this system is no longer the record for.
  */
 export function classifyCheckoutSession(session: CheckoutSessionLike): CheckoutKind {
     const metadata = session.metadata ?? {};
     if (metadata.type === 'ticket') return 'ticket';
     if (metadata.type === 'membership') return 'membership';
-    if (nonEmpty(metadata.bookingId)) return 'booking';
     return 'unrelated';
 }
 
@@ -66,8 +67,7 @@ export type FulfillmentRejection =
     | 'missing_event_title'
     | 'invalid_quantity'
     | 'missing_email'
-    | 'missing_level'
-    | 'missing_booking_id';
+    | 'missing_level';
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; reason: FulfillmentRejection };
 
@@ -87,11 +87,6 @@ export interface MembershipRecord {
     userId: string | null;
     /** First-name guess for the welcome email; '' when Stripe collected no name. */
     firstName: string;
-}
-
-export interface BookingRecord {
-    bookingId: string;
-    paymentIntentId: string | null;
 }
 
 /**
@@ -168,25 +163,6 @@ export function parseMembershipOrder(session: CheckoutSessionLike): Parsed<Membe
             quantity,
             userId: nonEmpty(metadata.userId) ? metadata.userId.trim() : null,
             firstName: guessFirstName(session.customer_details?.name),
-        },
-    };
-}
-
-export function parseBookingPayment(session: CheckoutSessionLike): Parsed<BookingRecord> {
-    const bookingId = session.metadata?.bookingId;
-    if (!nonEmpty(bookingId)) return { ok: false, reason: 'missing_booking_id' };
-
-    const paymentIntent = session.payment_intent;
-    return {
-        ok: true,
-        value: {
-            bookingId: bookingId.trim(),
-            // Expanded object, bare id, or absent — normalized so the write never
-            // carries `undefined`. `null` simply means there is nothing to record.
-            paymentIntentId:
-                typeof paymentIntent === 'string'
-                    ? paymentIntent
-                    : paymentIntent?.id ?? null,
         },
     };
 }

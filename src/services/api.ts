@@ -1,13 +1,12 @@
 import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc, serverTimestamp, type FirestoreError } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Booking, Membership, Ticket, VolunteerSheet, VolunteerSlot, VolunteerRegistration } from '../types/index';
+import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Membership, Ticket, VolunteerSheet, VolunteerSlot, VolunteerRegistration } from '../types/index';
 
 // Helpers to transform Firestore docs safely
 const toPost = (doc: any): Post => ({ id: doc.id, ...doc.data() } as Post);
 const toGallery = (doc: any): Gallery => ({ id: doc.id, ...doc.data() } as Gallery);
 const toHistoricalPlace = (doc: any): HistoricalPlace => ({ id: doc.id, ...doc.data() } as HistoricalPlace);
 const toOrganizationEntity = (doc: any): OrganizationEntity => ({ id: doc.id, ...doc.data() } as OrganizationEntity);
-const toBooking = (doc: any): Booking => ({ id: doc.id, ...doc.data() } as Booking);
 
 const getFunctionsBaseUrl = () => {
   const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
@@ -140,66 +139,6 @@ export async function submitApplication(type: 'vendor' | 'sponsor', data: any): 
     });
   } catch (err) {
     console.error(`Error submitting ${type} application:`, err);
-    throw err;
-  }
-}
-
-export async function getBookings(startDate: string, endDate: string): Promise<Booking[]> {
-  try {
-    const q = query(
-      collection(db, 'bookings'),
-      where('date', '>=', startDate),
-      where('date', '<=', endDate),
-      where('status', '==', 'confirmed')
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(toBooking);
-  } catch (err) {
-    console.error('Error fetching bookings:', err);
-    return [];
-  }
-}
-
-/** Fetch all bookings (admin view). Throws on failure so the caller can surface the error. */
-export async function getAllBookings(): Promise<Booking[]> {
-  const q = query(
-    collection(db, 'bookings'),
-    orderBy('submittedAt', 'desc')
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(toBooking);
-}
-
-export async function updateBookingStatus(id: string, status: 'pending' | 'confirmed' | 'cancelled'): Promise<void> {
-  try {
-    const docRef = doc(db, 'bookings', id);
-    await updateDoc(docRef, { status });
-  } catch (err) {
-    console.error('Error updating booking status:', err);
-    throw err;
-  }
-}
-
-export async function submitBookingRequest(data: Omit<Booking, 'id' | 'status' | 'submittedAt'>): Promise<{ url: string }> {
-  try {
-    const baseUrl = getFunctionsBaseUrl();
-    const functionUrl = `${baseUrl}/createBookingCheckoutSession`;
-    
-    const response = await fetch(functionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-         throw new Error(`Cloud function returned ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (err) {
-    console.error('Error creating checkout session:', err);
     throw err;
   }
 }

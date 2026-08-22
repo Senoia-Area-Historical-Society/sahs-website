@@ -19,7 +19,7 @@ Public website (`senoiahistory.com`) and admin portal (`admin.senoiahistory.com`
 | Functions | Cloud Functions v2, TypeScript, Node 24, codebase `website` |
 | Payments | Stripe Checkout |
 | Email | Resend + React Email v6 |
-| Calendar | Google Calendar API (event/booking sync via service account) |
+| Calendar | Google Calendar API (public event sync via service account) |
 | Gallery lightbox | yet-another-react-lightbox |
 | Testing | Vitest (unit) + Playwright (E2E) |
 
@@ -67,7 +67,6 @@ Flow: Stripe Checkout → `stripeWebhook` function → Resend welcome email → 
 | `galleries` | Photo galleries with cover image, ordered by `sortOrder` | Public read; editors+ write |
 | `historical_places` | Museum exhibit database with coordinates | Public read; editors+ write |
 | `organization_entities` | Board members (`board_member`), corporate sponsors (`corporate_sponsor`), event sponsors (`event_sponsor`) | Public read; editors+ write |
-| `bookings` | Meeting room rental requests — pending/confirmed/cancelled | Public read confirmed; curators manage |
 | `memberships` | Member records created by Stripe webhook | Curators only |
 | `tickets` | Event ticket purchases with QR codes | Public lookup by stripeSessionId (limit 1); curators manage |
 | `submissions` | Vendor and sponsor application forms | Public create-only; curators read |
@@ -112,7 +111,6 @@ Flow: Stripe Checkout → `stripeWebhook` function → Resend welcome email → 
 | `/admin/login` | `Login.tsx` | Unprotected — Google OAuth |
 | `/admin` | `AdminDashboard.tsx` | Stats and quick links |
 | `/admin/content` | `ContentAdmin.tsx` | Primary content editor |
-| `/admin/bookings` | `BookingsAdmin.tsx` | Room booking management |
 | `/admin/memberships` | `MembershipsAdmin.tsx` | Member database (Stripe) |
 | `/admin/tickets` | `TicketsAdmin.tsx` | Ticket sales history |
 | `/admin/tickets/scan` | `TicketScanner.tsx` | QR code verification |
@@ -131,15 +129,12 @@ All HTTP functions use `onRequest({ cors: true, secrets: [...] })`.
 
 | Function | Trigger | Purpose |
 |---|---|---|
-| `checkCalendarAvailability` | HTTP POST | Google Calendar free/busy query for meeting room |
-| `createBookingCheckoutSession` | HTTP POST | Creates pending booking doc + Stripe checkout ($50) |
 | `createMembershipCheckoutSession` | HTTP POST | Stripe checkout for membership tiers |
 | `createTicketCheckoutSession` | HTTP POST | Stripe checkout for event tickets |
 | `listStripeSubscriptions` | HTTP GET/POST | Lists all Stripe subscriptions for admin view |
-| `stripeWebhook` | HTTP POST | Handles `checkout.session.completed` — creates membership/ticket/booking records, sends welcome email, adds Resend contact |
+| `stripeWebhook` | HTTP POST | Handles `checkout.session.completed` — creates membership/ticket records, sends welcome email, adds Resend contact |
 | `verifyTicket` | HTTP GET/POST | QR scanner endpoint — validates ticket by `confirmationNumber` |
-| `onBookingConfirmed` | Firestore trigger | Watches `bookings/{id}` status → `confirmed`; inserts Google Calendar event |
-| `onPostWritten` | Firestore trigger | Watches `posts/{id}` type=`event`; syncs create/update/delete to Google Calendar |
+| `onPostWritten` | Firestore trigger | Watches `posts/{id}`; syncs create/update/delete to the **Membership Calendar** (see Gotchas) |
 | `getMembershipByEmail` | HTTP GET/POST | Self-service Stripe lookup by email |
 | `renderEmailPreview` | HTTP POST | Returns rendered HTML for admin email preview iframe |
 | `sendNewsletter` | HTTP POST | Test send or Resend broadcast to audience |
@@ -271,8 +266,8 @@ penny. `functions/src/ticketPricing.ts` owns the whole decision — price, produ
 not `status: 'published'`, or has no positive integer `ticketPrice`. Do **not** re-add
 `price` or `title` to `submitTicketRequest`'s payload; the server ignores them by
 design, and a stale cached bundle that still sends them keeps working. The sibling
-functions are already safe the same way: `createMembershipCheckoutSession` uses a
-server-side `priceMap` keyed by tier, `createBookingCheckoutSession` hardcodes 5000.
+sibling function is already safe the same way: `createMembershipCheckoutSession` uses
+a server-side `priceMap` keyed by tier.
 Capacity is deliberately *not* enforced here — overselling needs transaction
 semantics around `ticketsSold` and is a separate problem.
 
@@ -291,13 +286,11 @@ several months. Three rules now hold, and all three are load-bearing:
 2. A failed fulfillment returns 500 so Stripe retries on its own backoff and the event
    shows as failing in the dashboard — that dashboard *is* the dead-letter queue, which
    is why there is no `webhook_failures` collection.
-3. Traffic that is not ours — an `event.type` we don't handle, or a session with neither
-   a `metadata.type` nor a `bookingId` — returns **200**. An endpoint that 5xxs on
-   unrelated events invites Stripe to disable it, breaking every future purchase.
+3. Traffic that is not ours — an `event.type` we don't handle, or a session with no
+   recognized `metadata.type` — returns **200**. An endpoint that 5xxs on unrelated
+   events invites Stripe to disable it, breaking every future purchase. A session
+   carrying only a `metadata.bookingId` lands here now that room booking is retired.
 
-Booking sessions are identified by `metadata.bookingId` with **no** `type` field, which
-is why dispatch keys on that presence and not on a `switch (type)`. Rewriting it as a
-switch compiles cleanly and silently stops fulfilling every room booking.
 `src/test/checkoutFulfillment.test.ts` pins the dispatch rule and the required-field
 matrix; `scripts/replay_stripe_webhook.cjs` proves the idempotency against the emulator
 with genuinely signed events.
@@ -331,6 +324,27 @@ production Resend account — the only thing that stopped one here was Resend re
 `example.com` recipients. Use a non-empty dummy (`re_emulator_disabled_not_a_real_key`)
 and confirm with `grep "Trying to access secret" ` on the emulator log: zero hits means
 the overrides took.
+
+**There are three SAHS calendars, and only one is a publication calendar** — the sync
+writes to `PUBLIC_EVENTS_CALENDAR_ID` (SAHS Membership Calendar), which is the id
+`src/components/public/CalendarSubscribe.tsx` offers visitors on Home and News.
+`ROOM_RESOURCE_CALENDAR_ID` is a Workspace **room resource** ("Carmichael House-1-Meeting
+Room (50)"); booking it means the physical conference room is unavailable to everyone
+else. Both live in `functions/src/calendarIds.ts`, named, because they used to be one
+constant called `CALENDAR_ID`: the sync was bolted onto the room-booking system's id and
+every published website event silently booked the meeting room, including events held
+miles away. There is also a "SAHS Board Calendar" that no code touches. Note that
+`googleCalendarEventId` on a post is scoped to the calendar the entry was minted on —
+repointing the constant without clearing that field strands the post silently, because
+patch/delete then 404 into a catch that only logs. `scripts/migrate_calendar_to_
+membership.cjs` is the pattern for moving entries between calendars.
+
+**Writes to the Membership Calendar need an explicit ACL grant** — the sync service
+account `sahs-calendar-sync@sahs-archives.iam.gserviceaccount.com` must hold "Make
+changes to events" (role `writer`) on it. Without the grant every insert 403s into a
+catch that only logs, so the sync fails completely silently. A read succeeding does not
+prove the grant: reader access is enough for that, and the failure mode is precisely a
+grant that reads but cannot write.
 
 **`onPostWritten` will happily put a years-old event on the public calendar** — the
 Google Calendar insert path is gated only on the post lacking a `googleCalendarEventId`,

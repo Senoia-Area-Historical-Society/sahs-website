@@ -145,21 +145,6 @@ export interface OrganizationEntity {
   updatedAt: Timestamp | null;
 }
 
-export interface Booking {
-  id: string;
-  date: string; // ISO Date YYYY-MM-DD
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
-  organization: string;
-  contactName: string;
-  email: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
-  purpose: string;
-  paymentIntentId?: string;
-  
-  submittedAt: any;
-}
-
 // ── Volunteer Management ──────────────────────────────────────────────────────
 
 export interface VolunteerSheet {

@@ -8,7 +8,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || '/admin/bookings';
+  const from = location.state?.from?.pathname || '/admin/content';
 
   useEffect(() => {
     if (user && isSAHSUser) {
@@ -31,7 +31,7 @@ export default function Login() {
           Curator Portal
         </h2>
         <p className="mt-2 text-center text-sm font-sans text-charcoal/60">
-          Sign in to manage SAHS bookings and configurations.
+          Sign in to manage SAHS content and configurations.
         </p>
       </div>
 
