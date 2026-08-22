@@ -43,13 +43,6 @@ service cloud.firestore {
       allow read, update, delete: if isCurator();
     }
 
-    // Bookings: Public can read CONFIRMED ones to see the calendar.
-    // Creation is handled by Cloud Functions.
-    match /bookings/{doc} {
-      allow read: if resource.data.status == 'confirmed' || isCurator();
-      allow write: if isCurator();
-    }
-
     // Sensitive Data: Strictly Curators/Admins only
     match /memberships/{doc} { allow read, write: if isCurator(); }
     match /tickets/{doc} { 

@@ -125,7 +125,7 @@ export default function UsersAdmin() {
                   className="w-full px-4 py-2 border border-tan-light rounded-md focus:outline-none focus:ring-2 focus:ring-tan/50"
                 >
                   <option value="editor">Editor (Can edit posts/events)</option>
-                  <option value="curator">Curator (Can edit posts, forms, bookings)</option>
+                  <option value="curator">Curator (Can edit posts, forms, memberships)</option>
                   <option value="admin">Admin (Full Access)</option>
                   <option value="read_only">Read-Only</option>
                 </select>

@@ -21,8 +21,6 @@ import Supporters from './pages/Supporters';
 import MeetingRoom from './pages/MeetingRoom';
 import StripeSuccess from './pages/StripeSuccess';
 import StripeCancel from './pages/StripeCancel';
-import BookingSuccess from './pages/BookingSuccess';
-import BookingCancel from './pages/BookingCancel';
 import VendorApplication from './pages/VendorApplication';
 import HistoricalPlaces from './pages/HistoricalPlaces';
 import HistoricalPlaceDetail from './pages/HistoricalPlaceDetail';
@@ -38,7 +36,6 @@ import EmbedTickets from './pages/EmbedTickets';
 
 // Admin Pages
 import Login from './pages/admin/Login';
-import BookingsAdmin from './pages/admin/BookingsAdmin';
 import MembershipsAdmin from './pages/admin/MembershipsAdmin';
 import TicketsAdmin from './pages/admin/TicketsAdmin';
 import ContentAdmin from './pages/admin/ContentAdmin';
@@ -117,11 +114,6 @@ function App() {
               <UsersAdmin />
             </ProtectedRoute>
           } />
-          <Route path="/admin/bookings" element={
-            <ProtectedRoute>
-              <BookingsAdmin />
-            </ProtectedRoute>
-          } />
           <Route path="/admin/memberships" element={
             <ProtectedRoute>
               <MembershipsAdmin />
@@ -187,8 +179,6 @@ function App() {
           <Route path="/support-sahs/success" element={<PublicLayout><StripeSuccess /></PublicLayout>} />
           <Route path="/support-sahs/cancel" element={<PublicLayout><StripeCancel /></PublicLayout>} />
           <Route path="/meeting-room" element={<PublicLayout><MeetingRoom /></PublicLayout>} />
-          <Route path="/meeting-room/success" element={<PublicLayout><BookingSuccess /></PublicLayout>} />
-          <Route path="/meeting-room/cancel" element={<PublicLayout><BookingCancel /></PublicLayout>} />
           <Route path="/vendor-application-form" element={<PublicLayout><VendorApplication /></PublicLayout>} />
           <Route path="/sponsor-application-form" element={<Navigate to="/support-sahs#memberships" replace />} />
           <Route path="/historic-structures-and-places" element={<PublicLayout><HistoricalPlaces /></PublicLayout>} />

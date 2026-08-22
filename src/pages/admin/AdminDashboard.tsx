@@ -4,18 +4,16 @@ import { db } from '../../lib/firebase';
 import { Link } from 'react-router-dom';
 import AdminHeader from './AdminHeader';
 import ErrorBanner from '../../components/admin/ErrorBanner';
-import { FileText, Calendar, Ticket, CalendarDays, Users, Plus, TrendingUp, BookOpen, Clock, Loader2 } from 'lucide-react';
+import { FileText, Calendar, Ticket, CalendarDays, Users, Plus, TrendingUp, Clock, Loader2 } from 'lucide-react';
 
 interface PostCounts { published: number; draft: number; archived: number; }
 interface UpcomingEvent { id: string; title: string; slug: string; eventDate: Timestamp | null; location?: string; }
 interface RecentTicket { id: string; eventTitle: string; email: string; quantity: number; totalAmount: number; purchasedAt: string; }
-interface RecentBooking { id: string; organizationName?: string; contactName?: string; date: string; status: string; submittedAt?: any; }
 
 export default function AdminDashboard() {
   const [postCounts, setPostCounts] = useState<PostCounts | null>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [recentTickets, setRecentTickets] = useState<RecentTicket[]>([]);
-  const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
 
@@ -35,13 +33,12 @@ export default function AdminDashboard() {
         // A generous limit still bounds the worst-case read as the event archive grows.
         { label: 'upcoming events', promise: getDocs(query(collection(db, 'posts'), where('type', '==', 'event'), where('status', '==', 'published'), limit(50))) },
         { label: 'recent tickets', promise: getDocs(query(collection(db, 'tickets'), orderBy('purchasedAt', 'desc'), limit(5))) },
-        { label: 'recent bookings', promise: getDocs(query(collection(db, 'bookings'), orderBy('submittedAt', 'desc'), limit(5))) },
       ];
       // `settled` is derived from `specs` by a single map(), so it's always the same
       // length and order as `specs` — positionally destructuring it here is safe
       // because label and query live together in one array, not two synced-by-hand ones.
       const settled = await Promise.allSettled(specs.map(s => s.promise));
-      const [publishedRes, draftRes, archivedRes, eventsRes, ticketsRes, bookingsRes] = settled;
+      const [publishedRes, draftRes, archivedRes, eventsRes, ticketsRes] = settled;
 
       const errors: string[] = [];
       specs.forEach((s, i) => {
@@ -70,7 +67,6 @@ export default function AdminDashboard() {
       setUpcomingEvents(events);
 
       setRecentTickets(ticketsRes.status === 'fulfilled' ? ticketsRes.value.docs.map(d => ({ id: d.id, ...d.data() } as RecentTicket)) : []);
-      setRecentBookings(bookingsRes.status === 'fulfilled' ? bookingsRes.value.docs.map(d => ({ id: d.id, ...d.data() } as RecentBooking)) : []);
       setLoading(false);
     }
 
@@ -150,7 +146,7 @@ export default function AdminDashboard() {
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Upcoming Events */}
               <div className="lg:col-span-1 bg-white rounded-xl border border-tan-light shadow-sm overflow-hidden">
                 <SectionHeader icon={<CalendarDays size={15} className="text-tan" />} title="Upcoming Events" link="/admin/content" />
@@ -194,31 +190,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Recent Bookings */}
-              <div className="lg:col-span-1 bg-white rounded-xl border border-tan-light shadow-sm overflow-hidden">
-                <SectionHeader icon={<BookOpen size={15} className="text-tan" />} title="Recent Bookings" link="/admin/bookings" />
-                <div className="divide-y divide-tan-light/50">
-                  {recentBookings.length === 0 ? (
-                    <EmptyState message="No bookings yet" />
-                  ) : (
-                    recentBookings.map(b => (
-                      <div key={b.id} className="px-5 py-4">
-                        <p className="text-xs font-bold font-sans text-charcoal leading-tight truncate">
-                          {b.organizationName || b.contactName || 'Unknown'}
-                        </p>
-                        <div className="flex items-center justify-between mt-1">
-                          <p className="text-xs text-charcoal/50 font-sans">{b.date}</p>
-                          <span className={`text-[10px] font-bold uppercase tracking-wider font-sans px-2 py-0.5 rounded-full ${
-                            b.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                            b.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>{b.status}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* Quick Links */}
@@ -226,7 +197,7 @@ export default function AdminDashboard() {
               {[
                 { label: 'Manage Content', to: '/admin/content', icon: <FileText size={16} /> },
                 { label: 'Memberships', to: '/admin/memberships', icon: <Users size={16} /> },
-                { label: 'Bookings', to: '/admin/bookings', icon: <CalendarDays size={16} /> },
+                { label: 'Volunteers', to: '/admin/volunteers', icon: <CalendarDays size={16} /> },
                 { label: 'Ticket Sales', to: '/admin/tickets', icon: <TrendingUp size={16} /> },
               ].map(({ label, to, icon }) => (
                 <Link
