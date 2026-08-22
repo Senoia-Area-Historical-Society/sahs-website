@@ -24,6 +24,12 @@ import { qrPngBase64, ticketPageUrl } from './ticketEmailContent';
 
 export { qrPngBase64, ticketPageUrl, formatEventWhen, resolveEventLocation } from './ticketEmailContent';
 
+/**
+ * Content-ID linking the QR attachment to the `cid:` reference in the template. Any
+ * stable token under 128 characters works; it never reaches the reader.
+ */
+const QR_CONTENT_ID = 'sahs-ticket-qr';
+
 export interface TicketEmailInput {
     email: string;
     customerName: string;
@@ -63,6 +69,12 @@ export async function sendTicketConfirmation(
     }
 
     const ticketUrl = ticketPageUrl(input.sessionId, frontendUrl);
+    const png = qrPngBase64(input.qrCode);
+
+    // Rendered and attached as one unit: the template references `cid:QR_CONTENT_ID` and
+    // the attachment below carries that id, so the QR displays in the body. Both are
+    // driven off `png` being non-null — if the stored QR is unusable, the template omits
+    // the image and no attachment is sent, rather than shipping a broken <img>.
     const html = await render(React.createElement(TicketConfirmationEmail, {
         customerName: input.customerName,
         eventTitle: input.eventTitle,
@@ -71,19 +83,25 @@ export async function sendTicketConfirmation(
         quantity: input.quantity,
         confirmationNumber: input.confirmationNumber,
         ticketUrl,
+        qrCid: png ? QR_CONTENT_ID : null,
     }));
 
-    const png = qrPngBase64(input.qrCode);
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error } = await resend.emails.send({
         from: 'Senoia Area Historical Society <tickets@updates.senoiahistory.com>',
         to: input.email,
         subject: `Your tickets — ${input.eventTitle} (${input.confirmationNumber})`,
         html,
-        // Attached rather than inlined, per qrPngBase64's note. Omitted entirely if the
-        // stored value isn't a PNG data URI: the confirmation number in the body is what
-        // actually admits the buyer, so a missing QR must not block the email.
-        ...(png ? { attachments: [{ filename: `sahs-ticket-${input.confirmationNumber}.png`, content: png }] } : {}),
+        // `contentId` makes Resend send this as an *inline* attachment, so this single
+        // part both renders in the body and remains saveable — there is no second copy.
+        // A `data:` URI in the HTML would not work: Gmail and Outlook strip them.
+        ...(png ? {
+            attachments: [{
+                filename: `sahs-ticket-${input.confirmationNumber}.png`,
+                content: png,
+                contentId: QR_CONTENT_ID,
+            }],
+        } : {}),
     });
     if (error) {
         throw new Error(`Resend rejected the ticket confirmation: ${error.message}`);

@@ -1,5 +1,5 @@
 import {
-  Html, Head, Body, Container, Section, Text, Button, Hr, Preview,
+  Html, Head, Body, Container, Section, Text, Button, Hr, Preview, Img,
 } from 'react-email';
 
 export interface TicketConfirmationEmailProps {
@@ -11,6 +11,18 @@ export interface TicketConfirmationEmailProps {
   quantity: number;
   confirmationNumber: string;
   ticketUrl: string;
+  /**
+   * Content-ID of the QR attachment, rendered inline as `cid:<qrCid>`.
+   *
+   * A `data:` URI cannot be used here — Gmail and Outlook strip them, which is why the
+   * QR travels as an attachment carrying this id instead. Resend marks any attachment
+   * with a `contentId` as inline, so the same single part both displays in the body and
+   * stays saveable; there is no second copy.
+   *
+   * Null when the stored QR was not a usable PNG. The image is then omitted rather than
+   * rendered broken — the confirmation number below admits the buyer either way.
+   */
+  qrCid?: string | null;
 }
 
 const brown = '#6b5c3e';
@@ -21,7 +33,7 @@ const bodyFont = 'Georgia, serif';
 const uiFont = 'Arial, sans-serif';
 
 export function TicketConfirmationEmail({
-  customerName, eventTitle, eventWhen, eventLocation, quantity, confirmationNumber, ticketUrl,
+  customerName, eventTitle, eventWhen, eventLocation, quantity, confirmationNumber, ticketUrl, qrCid,
 }: TicketConfirmationEmailProps) {
   const name = (customerName || '').trim() || 'Friend';
   const ticketWord = quantity === 1 ? 'ticket' : 'tickets';
@@ -63,8 +75,24 @@ export function TicketConfirmationEmail({
               <Text style={{ margin: 0, fontFamily: uiFont, fontSize: 32, fontWeight: 'bold', letterSpacing: 4, color: darkBrown }}>
                 {confirmationNumber}
               </Text>
+
+              {/* Inline via cid: so the buyer sees their code without opening an
+                  attachment, tapping a link, or having a signal at the door. Sits inside
+                  the same box as the number so one glance covers both. */}
+              {qrCid ? (
+                <Img
+                  src={`cid:${qrCid}`}
+                  alt={`QR code for confirmation ${confirmationNumber}`}
+                  width="180"
+                  height="180"
+                  style={{ display: 'block', margin: '20px auto 4px', border: '1px solid #e8dfd0', borderRadius: 4 }}
+                />
+              ) : null}
+
               <Text style={{ margin: '12px 0 0', fontFamily: uiFont, fontSize: 13, color: '#7a6a5a', lineHeight: '1.5' }}>
-                Show this at the door — we can check you in with this number alone.
+                {qrCid
+                  ? 'Show this at the door — scan the code, or just read us the number above.'
+                  : 'Show this at the door — we can check you in with this number alone.'}
               </Text>
             </Section>
 
@@ -75,12 +103,13 @@ export function TicketConfirmationEmail({
 
             <Section style={{ textAlign: 'center', padding: '32px 0 8px' }}>
               <Button href={ticketUrl} style={{ display: 'inline-block', backgroundColor: brown, color: '#ffffff', fontFamily: uiFont, fontSize: 13, fontWeight: 'bold', letterSpacing: 1, textTransform: 'uppercase', textDecoration: 'none', padding: '14px 32px', borderRadius: 4 }}>
-                View Your Ticket &amp; QR Code
+                View Your Ticket Online
               </Button>
             </Section>
             <Text style={{ margin: '8px 0 0', fontFamily: uiFont, fontSize: 13, color: '#7a6a5a', textAlign: 'center', lineHeight: '1.6' }}>
-              Your QR code is also attached to this email, so you can save it now and scan
-              it at the door without a signal.
+              {qrCid
+                ? 'Everything you need is already in this email — the link is just a backup if images are blocked.'
+                : 'Open this to see your QR code.'}
             </Text>
 
             <Hr style={{ borderColor: '#e8dfd0', margin: '32px 0 20px' }} />

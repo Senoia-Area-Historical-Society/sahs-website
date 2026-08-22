@@ -202,7 +202,11 @@ async function loadPaidTicketSessions() {
         source = 'Stripe';
     }
 
-    const sessions = all.filter(isPaidTicketSession);
+    // --only lets a run be narrowed to one session, so the first --write of a changed
+    // email template goes to a single chosen recipient before 27 real customers.
+    const only = val('only');
+    const sessions = all.filter(isPaidTicketSession).filter((s) => !only || s.id === only);
+    if (only) console.log(`--only ${only}: narrowed to ${sessions.length} session(s)`);
     console.log(`Scanned ${all.length} Checkout Session(s) from ${source}; ` +
         `${sessions.length} are paid ticket orders ` +
         `(${all.length - sessions.length} skipped: not tickets, unpaid, or abandoned).`);
