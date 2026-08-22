@@ -45,7 +45,8 @@ type PostData = Record<string, unknown>;
  */
 function normalize(value: unknown): unknown {
   if (value === undefined || value === null) return null;
-  if (typeof value === 'object' && value !== null && 'toMillis' in value) {
+  // `value` cannot be null here — the guard above returned for both nullish cases.
+  if (typeof value === 'object' && 'toMillis' in value) {
     const toMillis = (value as { toMillis: unknown }).toMillis;
     if (typeof toMillis === 'function') {
       return (value as { toMillis: () => number }).toMillis();
