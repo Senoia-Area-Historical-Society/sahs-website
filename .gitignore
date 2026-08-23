@@ -68,3 +68,6 @@ start-emulators.sh
 
 # Poker Run artwork staged for local emulator runs (source lives in .artwork/)
 public/poker-run-art/
+
+# Recovery output — contains buyer emails and confirmation numbers. Never commit.
+recovered.csv
