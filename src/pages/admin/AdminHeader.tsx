@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  Calendar,
   Users,
   Ticket,
   LogOut,
@@ -56,7 +55,6 @@ export default function AdminHeader() {
       icon: HandHeart,
       items: [
         { label: 'Volunteers', path: '/admin/volunteers', icon: HandHeart, description: 'Signups and volunteer tracking' },
-        { label: 'Bookings', path: '/admin/bookings', icon: Calendar, description: 'Facility rental management' },
         { label: 'Memberships', path: '/admin/memberships', icon: Users, description: 'Member database and status' },
       ]
     },

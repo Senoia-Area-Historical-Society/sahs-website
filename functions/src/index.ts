@@ -1,5 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https';
-import { onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
@@ -12,13 +12,14 @@ import * as React from 'react';
 import { WelcomeEmail } from './emails/WelcomeEmail';
 import { TicketConfirmationEmail, TicketConfirmationEmailProps } from './emails/TicketConfirmationEmail';
 import { resolveEventWindow, isLongPast } from './calendarTime';
+import { PUBLIC_EVENTS_CALENDAR_ID } from './calendarIds';
+import { calendarFieldsChanged } from './calendarSync';
 import { resolveTicketOrder, rejectionStatus } from './ticketPricing';
 import { sendTicketConfirmation, formatEventWhen, resolveEventLocation } from './ticketEmail';
 import {
     classifyCheckoutSession,
     parseTicketOrder,
     parseMembershipOrder,
-    parseBookingPayment,
     CheckoutKind,
     FulfillmentRejection,
 } from './checkoutFulfillment';
@@ -27,7 +28,6 @@ import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail'
 admin.initializeApp();
 const db = getFirestore();
 
-const CALENDAR_ID = 'c_188962a8uva3ijbpl6cdtc9621g6m@resource.calendar.google.com';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://senoiahistory.com';
 
 const getStripe = () => {
@@ -99,65 +99,6 @@ async function generateQRCode(text: string): Promise<string> {
 function generateConfirmationNumber(): string {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
-
-// 1. Check Calendar Availability
-export const checkCalendarAvailability = onRequest({ cors: true }, async (req, res) => {
-    try {
-        const { timeMin, timeMax } = req.body;
-        if (!timeMin || !timeMax) {
-            res.status(400).send({ error: "Missing timeMin or timeMax" });
-            return;
-        }
-        const auth = getCalendarAuth();
-        const calendar = google.calendar({ version: 'v3', auth });
-        const response = await calendar.freebusy.query({
-            requestBody: { timeMin, timeMax, items: [{ id: CALENDAR_ID }] }
-        });
-        const busy = response.data.calendars?.[CALENDAR_ID]?.busy || [];
-        res.json({ busy });
-    } catch (error) {
-        console.error('Error checking availability:', error);
-        res.status(500).send({ error: "Failed to check availability" });
-    }
-});
-
-// 2. Create Stripe Checkout Session for Room Booking
-export const createBookingCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
-    try {
-        if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
-        const { organization, contactName, email, date, startTime, endTime, purpose } = req.body;
-        const bookingRef = await db.collection('bookings').add({
-            organization, contactName, email, date, startTime, endTime, purpose,
-            status: 'pending',
-            submittedAt: FieldValue.serverTimestamp()
-        });
-        const stripe = getStripe();
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            line_items: [{
-                price_data: {
-                    currency: 'usd',
-                    product_data: {
-                        name: 'Meeting Room Booking',
-                        description: `Booking for ${organization} on ${date} from ${startTime} to ${endTime}`,
-                    },
-                    unit_amount: 5000,
-                },
-                quantity: 1,
-            }],
-            mode: 'payment',
-            success_url: `${FRONTEND_URL}/meeting-room/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${FRONTEND_URL}/meeting-room/cancel`,
-            client_reference_id: bookingRef.id,
-            customer_email: email,
-            metadata: { bookingId: bookingRef.id }
-        });
-        res.json({ url: session.url });
-    } catch (error) {
-        console.error('Error creating booking checkout session:', error);
-        res.status(500).send({ error: "Failed to create checkout session" });
-    }
-});
 
 // 3. Create Membership Checkout Session
 export const createMembershipCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
@@ -488,35 +429,6 @@ async function fulfillMembership(session: Stripe.Checkout.Session): Promise<'cre
     return outcome;
 }
 
-/**
- * Attaches the payment intent to the booking a customer just paid for.
- *
- * Deliberately does not advance `status` past `pending`: confirmation stays a human
- * decision in BookingsAdmin, because `onBookingConfirmed` inserts a public Google
- * Calendar entry on that transition.
- */
-async function fulfillBooking(session: Stripe.Checkout.Session): Promise<'recorded' | 'duplicate'> {
-    const parsed = parseBookingPayment(session);
-    if (!parsed.ok) throw new UnfulfillableSessionError('booking', parsed.reason);
-    const { bookingId, paymentIntentId } = parsed.value;
-
-    const ref = db.collection('bookings').doc(bookingId);
-    return db.runTransaction(async (tx) => {
-        const existing = await tx.get(ref);
-        if (!existing.exists) {
-            // `createBookingCheckoutSession` writes this document before redirecting to
-            // Stripe, so a missing one means it was deleted mid-checkout. Surfaced as a
-            // failure rather than resurrected: a `set` with merge would leave a stub
-            // booking holding nothing but a payment intent.
-            throw new Error(`booking ${bookingId} no longer exists`);
-        }
-        if (existing.get('paymentIntentId')) return 'duplicate';
-
-        tx.update(ref, { paymentIntentId });
-        return 'recorded';
-    });
-}
-
 export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'RESEND_API_KEY'] }, async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
@@ -540,16 +452,14 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
     const session = event.data.object as Stripe.Checkout.Session;
     const kind = classifyCheckoutSession(session);
     if (kind === 'unrelated') {
-        console.warn(`stripeWebhook: session ${session.id} has no recognizable type or bookingId — ignoring`);
+        console.warn(`stripeWebhook: session ${session.id} has no recognizable type — ignoring`);
         res.json({ received: true, ignored: 'unrecognized_session' });
         return;
     }
 
     try {
         const outcome =
-            kind === 'ticket' ? await fulfillTicket(session)
-            : kind === 'membership' ? await fulfillMembership(session)
-            : await fulfillBooking(session);
+            kind === 'ticket' ? await fulfillTicket(session) : await fulfillMembership(session);
 
         // Logged on success as well as failure, so a purchase that went missing can be
         // traced in Cloud Functions logs by session id instead of inferred from silence.
@@ -610,31 +520,6 @@ export const verifyTicket = onRequest({ cors: true }, async (req, res) => {
     }
 });
 
-// 8. Sync Confirmed Bookings to Google Calendar
-export const onBookingConfirmed = onDocumentUpdated('bookings/{bookingId}', async (event) => {
-    const newValue = event.data?.after.data();
-    const previousValue = event.data?.before.data();
-    if (!newValue || !previousValue) return;
-    if (newValue.status === 'confirmed' && previousValue.status !== 'confirmed') {
-        const auth = getCalendarAuth();
-        try {
-            const calendar = google.calendar({ version: 'v3', auth });
-            const startDateTime = new Date(`${newValue.date}T${newValue.startTime}:00`).toISOString();
-            const endDateTime = new Date(`${newValue.date}T${newValue.endTime}:00`).toISOString();
-            const calendarEvent = {
-                summary: `Meeting Room Booking: ${newValue.organization}`,
-                description: `Contact: ${newValue.contactName} (${newValue.email})\nPurpose: ${newValue.purpose}`,
-                start: { dateTime: startDateTime, timeZone: 'America/New_York' },
-                end: { dateTime: endDateTime, timeZone: 'America/New_York' },
-            };
-            const response = await calendar.events.insert({ calendarId: CALENDAR_ID, requestBody: calendarEvent });
-            await event.data?.after.ref.update({ googleCalendarEventId: response.data.id });
-        } catch (error) {
-            console.error('Error syncing to Calendar:', error);
-        }
-    }
-});
-
 // 8b. Sync Published Event Posts to Google Calendar
 export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) => {
     const beforeData = event.data?.before.data();
@@ -647,7 +532,7 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
             try {
                 const calendar = google.calendar({ version: 'v3', auth });
                 await calendar.events.delete({
-                    calendarId: CALENDAR_ID,
+                    calendarId: PUBLIC_EVENTS_CALENDAR_ID,
                     eventId: beforeData.googleCalendarEventId
                 });
             } catch (err) {
@@ -703,7 +588,7 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
                 };
                 
                 const response = await calendar.events.insert({
-                    calendarId: CALENDAR_ID,
+                    calendarId: PUBLIC_EVENTS_CALENDAR_ID,
                     requestBody: calendarEvent
                 });
                 
@@ -716,6 +601,11 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
         }
         // Case B: Edited details of a published event that already has a calendar entry
         else if (isPublished && afterData.googleCalendarEventId) {
+            // Only patch when something the entry is actually built from moved. This
+            // trigger fires on every write, and every ticket sale increments
+            // `ticketsSold` on the post — without this, each sale spent a Calendar
+            // write re-sending identical data.
+            if (!calendarFieldsChanged(beforeData, afterData)) return;
             try {
                 const window = resolveEventWindow(afterData);
                 if (!window) {
@@ -725,7 +615,7 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
                 const { startDateTime, endDateTime } = window;
 
                 await calendar.events.patch({
-                    calendarId: CALENDAR_ID,
+                    calendarId: PUBLIC_EVENTS_CALENDAR_ID,
                     eventId: afterData.googleCalendarEventId,
                     requestBody: {
                         summary: `SAHS Event: ${afterData.title}`,
@@ -743,7 +633,7 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
         else if (!isPublished && wasPublished && afterData.googleCalendarEventId) {
             try {
                 await calendar.events.delete({
-                    calendarId: CALENDAR_ID,
+                    calendarId: PUBLIC_EVENTS_CALENDAR_ID,
                     eventId: afterData.googleCalendarEventId
                 });
                 await event.data?.after.ref.update({
