@@ -1,19 +1,30 @@
 User-agent: *
 Allow: /
 
-# Admin portal and post-checkout landing pages carry no public content.
+# Admin portal carries no public content and is login-gated, so there's nothing
+# for a crawler to render either way.
 Disallow: /admin/
-Disallow: /membership-status
-Disallow: /support-sahs/success
-Disallow: /support-sahs/cancel
+
+# Dead routes from the retired room-booking flow. Nothing serves these paths
+# (404), so they can't be indexed; kept only so a stray old backlink 404s
+# instead of getting crawled.
 Disallow: /meeting-room/success
 Disallow: /meeting-room/cancel
-Disallow: /tickets/success
-Disallow: /volunteer/
-Disallow: /401
+
+# Do NOT add Disallow entries here for /membership-status, /support-sahs/success,
+# /support-sahs/cancel, /tickets/success, or /volunteer/ — each already renders
+# <Seo noindex> (src/components/Seo.tsx). A robots.txt block prevents Googlebot
+# from ever fetching the page, which means it never sees that noindex tag.
+# Blocking one of these is what caused the "Indexed, though blocked by
+# robots.txt" report: /membership-status is linked from the header nav on every
+# page, and /volunteer/:token is linked from NewsDetail, so Google indexed them
+# before this robots.txt existed and then got locked out of ever deindexing
+# them. Crawlable-but-noindex is the correct state for all of them.
 
 # Ticket widgets are meant to be framed on partner sites; indexing them would
-# duplicate the event page they point at.
+# duplicate the event page they point at. (No noindex tag exists here, so
+# unlike the paths above, blocking crawl is the actual mechanism keeping this
+# out of the index — don't add Seo noindex and then also keep this Disallow.)
 Disallow: /embed/
 
 Sitemap: https://senoiahistory.com/sitemap.xml
