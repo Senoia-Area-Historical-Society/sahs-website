@@ -78,5 +78,13 @@ start-emulators.sh
 # a literal line silently left the next event's copies committable.
 public/*-art/
 
+# Fall/Winter 2026 artwork staged for local emulator runs (source lives in .artwork/)
+public/fw2026-art/
+
+# Nano Banana masters: 60MB of 4K PNGs, regenerable with
+# .artwork/generate-fall-winter-2026.sh. The derived JPEGs the site actually
+# serves are committed alongside them.
+.artwork/*/masters/
+
 # Recovery output — contains buyer emails and confirmation numbers. Never commit.
 recovered.csv
