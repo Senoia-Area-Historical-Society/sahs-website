@@ -13,7 +13,7 @@ Public website (`senoiahistory.com`) and admin portal (`admin.senoiahistory.com`
 | Icons | Lucide React |
 | Forms | react-hook-form v7 |
 | Dates | date-fns v4 |
-| Auth | Firebase Auth — Google OAuth, `@senoiahistory.com` accounts only |
+| Auth | Firebase Auth — Google OAuth; access granted by a `user_roles` doc (see Gotchas) |
 | Database | Cloud Firestore — **default database** |
 | Storage | Firebase Storage (bucket shared with archive-app) |
 | Functions | Cloud Functions v2, TypeScript, Node 24, codebase `website` |
@@ -29,7 +29,7 @@ Public website (`senoiahistory.com`) and admin portal (`admin.senoiahistory.com`
 - **Firestore:** default database (website data only). Archive-app uses the `sahs-archives` named DB.
 - **Hosting targets:** `sahs-website-public` (main site), `sahs-shortlinks` (shortlink redirect function)
 - **Functions codebase:** `website` — distinct from archive-app's `archives` codebase
-- **Auth:** Shared Firebase Auth instance across both apps — same `@senoiahistory.com` gate
+- **Auth:** Shared Firebase Auth instance across both apps — same `user_roles` gate
 - **Storage:** Shared bucket — website images and archive media coexist
 - **Emulator ports:** Auth 9099 · Functions 5001 · Firestore 8080 · Storage 9199
 - **Secrets (GCP Secret Manager — never in .env):** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_AUDIENCE_ID`
@@ -213,6 +213,33 @@ firebase deploy --only firestore:indexes   # manual and deliberate only — see 
 ```
 
 ## Gotchas
+
+**Portal access is granted by a `user_roles` document, not by the email domain** —
+the docs used to say "`@senoiahistory.com` accounts only", and that is not what
+either layer enforces. `AuthContext` looks up `user_roles/{email}` and grants
+nothing when the document is absent; `firestore.rules` does the same via
+`isAdmin()`/`isCurator()`/`isEditor()`/`isSAHSStaff()`. **Neither checks the
+domain.** Two consequences, in opposite directions:
+
+1. A brand-new `@senoiahistory.com` Google account has **no** access until
+   someone adds `user_roles/{email}`. Signing in is not enough — `isSAHSUser` is
+   false, so `ProtectedRoute` bounces straight back to `/admin/login`. Only
+   `catnolan@` and `jeremywarren@` are hardcoded (`PERMANENT_ADMINS`).
+2. A `user_roles` document for *any* address — a personal Gmail, an outside
+   contractor — grants that address real access. Nothing rejects it. Treat
+   creating one as the security decision it is, and prefer granting the
+   `@senoiahistory.com` identity so access follows Workspace offboarding.
+
+In practice the common support report is neither: people sign in with their
+personal Google account out of habit, land on a denial, and assume they were
+never granted access. Several board members hold a role on an
+`@senoiahistory.com` address they have never once signed in with. `Login.tsx`
+therefore leads its denial message with "switch accounts" and only offers
+"contact an administrator" as the fallback — keep that ordering.
+
+Adding a domain check to the rules would close (2), but it would also lock out
+any personal address already relied on, so it is a deliberate change and not a
+tidy-up. Roles are managed at `/admin/users`, admin-only.
 
 **macOS / Linux filesystem casing** — macOS is case-insensitive; Linux Cloud Run is not. If a compiled output file gets wrong casing (e.g. `welcomeEmail.js` instead of `WelcomeEmail.js`), the container fails at startup. Fix: `rm -rf functions/lib && cd functions && npm run build`.
 
