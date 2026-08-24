@@ -1,4 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// `api.ts` imports `../lib/firebase`, which calls `getAuth(app)` at module scope.
+// That throws `auth/invalid-api-key` wherever VITE_FIREBASE_API_KEY is unset —
+// which is every CI runner, since `.env` is gitignored. Without these mocks the
+// suite fails to load at import time and takes all of its tests with it, while
+// passing locally for anyone who happens to have a `.env`.
+//
+// `getTicketBySessionId` is a plain fetch against the `getTicketBySession` Cloud
+// Function and touches no Firestore, so stubbing both is free. Same approach as
+// membershipsApi.test.ts.
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn(), getDocs: vi.fn(), query: vi.fn(), orderBy: vi.fn(), limit: vi.fn(),
+  where: vi.fn(), addDoc: vi.fn(), doc: vi.fn(), updateDoc: vi.fn(), getDoc: vi.fn(),
+  runTransaction: vi.fn(), Timestamp: { now: vi.fn(), fromDate: vi.fn() }, deleteDoc: vi.fn(),
+  serverTimestamp: vi.fn(),
+}));
+vi.mock('../lib/firebase', () => ({ db: {} }));
+
 import { getTicketBySessionId } from '../services/api';
 
 /**
