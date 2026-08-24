@@ -88,3 +88,8 @@ public/fw2026-art/
 
 # Recovery output — contains buyer emails and confirmation numbers. Never commit.
 recovered.csv
+
+# Claude Code MCP auth cache — records which MCP servers still need authorizing,
+# with per-server ids scoped to one developer's machine. Regenerated on demand
+# and meaningless in anyone else's checkout, so it is local-only.
+mcp-needs-auth-cache.json
