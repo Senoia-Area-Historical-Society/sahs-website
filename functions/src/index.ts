@@ -54,11 +54,6 @@ const getResend = () => new Resend(process.env.RESEND_API_KEY);
  */
 const MAX_STRIPE_PAGE_ITEMS = 5000;
 
-/** Escapes a value for interpolation into a Stripe search query string. */
-function escapeSearchValue(value: string): string {
-    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
 /**
  * Throws on a send failure rather than logging it, so `fulfillMembership` can record the
  * outcome on the membership document. Resend reports failures in the response body
@@ -916,56 +911,21 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
     }
 });
 
-// 9. Member self-service lookup (public, returns only the queried email's data)
-export const getMembershipByEmail = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
-    try {
-        const email = ((req.query.email as string) || (req.body?.email as string) || '').toLowerCase().trim();
-        if (!email || !email.includes('@')) {
-            res.status(400).json({ error: 'Valid email required' });
-            return;
-        }
-
-        const stripe = getStripe();
-
-        // Find all Stripe customers with this email. The address is escaped rather than
-        // interpolated raw: this endpoint is public, `email` is only checked for an '@',
-        // and an unescaped quote produces a malformed search query — a 500 that the
-        // member portal renders as "Could not reach the membership server".
-        const customers = await stripe.customers
-            .search({ query: `email:"${escapeSearchValue(email)}"` })
-            .autoPagingToArray({ limit: MAX_STRIPE_PAGE_ITEMS });
-        if (customers.length === 0) {
-            res.json({ found: false, memberships: [] });
-            return;
-        }
-
-        // Fetch product names once. See listStripeSubscriptions for why archived
-        // products are included.
-        const products = await stripe.products.list({ limit: 100 }).autoPagingToArray({ limit: MAX_STRIPE_PAGE_ITEMS });
-        const productMap = new Map(products.map(p => [p.id, p.name]));
-
-        const memberships: object[] = [];
-        for (const customer of customers) {
-            const subs = await stripe.subscriptions
-                .list({ customer: customer.id, status: 'all', limit: 100 })
-                .autoPagingToArray({ limit: MAX_STRIPE_PAGE_ITEMS });
-            for (const sub of subs) {
-                const productId = sub.items.data[0]?.price?.product as string;
-                memberships.push({
-                    level: productMap.get(productId) || 'Membership',
-                    status: sub.status,
-                    expirationDate: new Date(sub.current_period_end * 1000).toISOString(),
-                    cancelAtPeriodEnd: sub.cancel_at_period_end,
-                });
-            }
-        }
-
-        res.json({ found: memberships.length > 0, memberships });
-    } catch (err: any) {
-        console.error('getMembershipByEmail error:', err);
-        res.status(500).json({ error: 'Failed to look up membership' });
-    }
-});
+// Member self-service lookup lived here and has been deleted.
+//
+// `getMembershipByEmail` took an email address and returned whether that person was a
+// member, their tier, and their renewal date — unauthenticated, uncapped, and with
+// `cors: true`, which reflects the caller's Origin, so any third-party page could query
+// it from a visitor's browser. Measured before removal: eight concurrent probes all
+// answered 200, and a non-member (`{"found":false}`) was trivially distinguishable from a
+// member. That is an enumeration oracle over the membership list, and `level` is
+// effectively the donation amount.
+//
+// Deleting the function is the fix, not deleting the page: the endpoint stayed callable
+// at its URL regardless of what linked to it. Stripe's billing portal replaces it and is
+// verifiably non-enumerable — it answers "if that address is active with us, you'll
+// receive a link" whether or not the address exists — and additionally lets a member
+// update a card or cancel. See the retired route in `src/App.tsx`.
 
 // 10. Render email preview (admin use — returns HTML for iframe display)
 export const renderEmailPreview = onRequest({ cors: true, invoker: 'public' }, async (req, res) => {
