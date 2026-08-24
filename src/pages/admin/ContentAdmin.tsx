@@ -473,7 +473,8 @@ export default function ContentAdmin() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Main Cover Image */}
                   <div className="flex flex-col items-center p-4 border border-tan-light/30 rounded-lg bg-white shadow-xs">
-                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Cover Image (Standard)</label>
+                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Cover Image (1200×675)</label>
+                    <p className="text-[10px] text-charcoal/40 text-center -mt-1 mb-2 font-sans leading-tight">Used on cards, and as the social preview. Also crops to a square thumbnail — keep the subject centered.</p>
                     <input
                       type="file"
                       accept="image/*"
@@ -506,7 +507,7 @@ export default function ContentAdmin() {
 
                   {/* Wide Banner Image */}
                   <div className="flex flex-col items-center p-4 border border-tan-light/30 rounded-lg bg-white shadow-xs">
-                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Top Banner (1280x720)</label>
+                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Top Banner (1920×1080)</label>
                     <input
                       type="file"
                       accept="image/*"
@@ -539,7 +540,7 @@ export default function ContentAdmin() {
 
                   {/* Square Image */}
                   <div className="flex flex-col items-center p-4 border border-tan-light/30 rounded-lg bg-white shadow-xs">
-                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Square Alt (1080x1080)</label>
+                    <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-2 text-center font-sans">Square Alt (1200×1200)</label>
                     <input
                       type="file"
                       accept="image/*"

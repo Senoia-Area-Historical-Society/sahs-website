@@ -354,3 +354,58 @@ for anything that started more than 48 hours ago. The window is generous on purp
 Eastern strings are parsed as UTC there, a five-hour error at worst, and an event from
 earlier today must still sync. Patching an entry that already exists is deliberately not
 guarded — keeping a real calendar entry accurate is right whatever its date.
+
+**Events are seeded by script, and `--prod` is a publish, not a dry run** — an event is
+a Firestore `posts` document created by `node scripts/seed_<event>.cjs`, not a committed
+content file. Writing a `status: 'published'` post to production fires `onPostWritten`,
+which inserts a *real* entry on the SAHS Membership Calendar that members see (subject
+to `isLongPast` — see above), and uploads artwork to production Storage. Every seed therefore defaults to the emulator and
+requires an explicit `--prod` flag to do anything real. Treat running it as a release.
+`scripts/seed_poker_run.cjs` is the reference implementation; `/author-sahs-event` has
+the full authoring workflow.
+
+**Never write `ticketsSold` from a script** — `stripeWebhook` owns that counter and
+increments it inside a transaction alongside the ticket document. A seed that sets
+`ticketsSold: 0` on re-run erases real sales, and the number is not recoverable from the
+post. Use `FieldValue.increment(0)` on any update path so the field is left exactly as
+found; only the create path may write `ticketsSold: 0`. The same applies to ad-hoc
+repair scripts in `scripts/` — read the counter, never assign it. `seed_july4_event.cjs`
+violated both halves of this (unconditional `.add()`, `ticketsSold: 0` every run) until
+it was brought in line; it is still emulator-only throwaway test data, so copy
+`seed_poker_run.cjs` when authoring a real event.
+
+**Event artwork: the aspect ratio is the contract, the pixel size is only a floor** — a
+post carries up to three images, and because every consumer uses `object-cover`, only
+the ratio is load-bearing:
+
+| Field | Ratio | Seed convention | Where it renders |
+|---|---|---|---|
+| `bannerImage` (optional) | **16:9** | 1920×1080 | `NewsDetail` hero, `aspect-[16/9]` |
+| `mainImage` (required) | none enforced | 1200×675 | every card + `og:image` + JSON-LD |
+| `squareImage` (optional) | **1:1** | 1200×1200 | mid-article block, `aspect-square` |
+
+`mainImage` has no ratio contract at all — every consumer is a fixed-height
+`object-cover` box, including a 64×64 **square** thumbnail in the Home sidebar. Compose
+it so the subject survives a square crop, and remember it is also the social-preview
+image (`Seo.tsx`) and the structured-data image (`EventCard.tsx`), so it is the one that
+cannot be quietly wrong. Note that `ContentAdmin`'s upload hints advertise 1280×720 and
+`ContentAdmin`'s upload hints carry these same numbers — keep the two in sync. Source files
+are committed to `.artwork/<event-name>/` with dimensions in the filename so a fresh
+clone can re-run a seed reproducibly. The directory is a short nickname, not the slug —
+the only instance is `.artwork/poker-run/` for slug
+`cruisin-for-history-poker-run-2026` — and the script hardcodes the path rather than
+deriving it, so pick it explicitly.
+
+**A script's emulator mode must never touch Firebase Storage** — `firebase.json`
+configures a Storage emulator on 9199, but nothing in the codebase sets
+`STORAGE_EMULATOR_HOST`, so the Admin SDK ignores it entirely. An `upload()` call in
+emulator mode authenticates with the real service-account key and writes to
+**production** Storage. That is why `seed_poker_run.cjs` copies artwork into
+`public/poker-run-art/` and references it by site-relative path for local runs, instead
+of uploading for parity. Do not "fix" that asymmetry without wiring
+`STORAGE_EMULATOR_HOST` first — the obvious cleanup is the bug.
+
+Staging directories are ignored by the glob `public/*-art/`, so **name yours
+`<event>-art`** and it is covered automatically. It was a literal `public/poker-run-art/`
+line until a second event would have silently left its artwork copies committable;
+a name that misses the glob reintroduces exactly that.
