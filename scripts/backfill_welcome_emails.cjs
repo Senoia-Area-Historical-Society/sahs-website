@@ -13,14 +13,11 @@
  * The Resend client is not even constructed without it, so there is no one-line edit
  * that turns a rehearsal into 75 emails.
  *
- * Two cohorts, deliberately worded differently:
- *
- *   • Joined ON OR AFTER --cutoff (default 2026-06-04, when the welcome email shipped in
- *     commit 5bd6dc6) — these members should have received one at the time and did not.
- *     They get the apology note explaining the delay.
- *   • Joined BEFORE --cutoff — the system did not exist yet, so nothing failed them.
- *     Telling them "a technical error delayed this" would simply be untrue. They get the
- *     same letter with no apology attached.
+ * Every active member gets the same letter, carrying a short note introducing the welcome
+ * email as part of the 2026 digital transformation. It is deliberately not an apology: an
+ * apology would have to claim the recipient was owed this letter when they joined, and the
+ * welcome email did not exist before mid-2026 while most of the membership joined in 2024
+ * and 2025.
  *
  * Only `active` subscriptions are mailed. Canceled and `unpaid` members are skipped: the
  * letter opens with "your ongoing support and active membership", and sending that to
@@ -35,7 +32,7 @@
  * Usage:
  *   GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/sahs-firebase-deploy.json \
  *   STRIPE_SECRET_KEY=sk_live_... RESEND_API_KEY=re_... \
- *     node scripts/backfill_welcome_emails.cjs [--send] [--cutoff YYYY-MM-DD] [--limit N] [--only a@b.com]
+ *     node scripts/backfill_welcome_emails.cjs [--send] [--limit N] [--only a@b.com]
  *
  * Rehearse first, then send to yourself, then send for real:
  *   node scripts/backfill_welcome_emails.cjs
@@ -70,7 +67,6 @@ function arg(name, fallback) {
 }
 
 const SEND    = process.argv.includes('--send');
-const CUTOFF  = arg('cutoff', '2026-06-04');
 const ONLY    = (arg('only', '') || '').toLowerCase().trim();
 const LIMIT   = parseInt(arg('limit', '0'), 10) || 0;
 
@@ -79,9 +75,6 @@ const RESEND_KEY = process.env.RESEND_API_KEY;
 
 if (!STRIPE_KEY) { console.error('STRIPE_SECRET_KEY not set'); process.exit(1); }
 if (SEND && !RESEND_KEY) { console.error('RESEND_API_KEY not set — required with --send'); process.exit(1); }
-if (Number.isNaN(Date.parse(CUTOFF))) { console.error(`--cutoff is not a parseable date: ${CUTOFF}`); process.exit(1); }
-
-const CUTOFF_MS = Date.parse(CUTOFF);
 
 // Matches the version `functions/src/index.ts` pins, so this script sees the same shape
 // the deployed code does — notably `current_period_end` on the subscription itself.
@@ -90,11 +83,10 @@ const stripe = new Stripe(STRIPE_KEY, { apiVersion: '2024-04-10' });
 initializeApp({ credential: applicationDefault() });
 const db = getFirestore();
 
-/** Mirrors `guessFirstName` in functions/src/checkoutFulfillment.ts. */
+/** Mirrors `guessFirstName` in functions/src/checkoutFulfillment.ts: first token only. */
 function guessFirstName(fullName) {
   const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '';
-  return parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
+  return parts[0] || '';
 }
 
 /** Sleep between sends — 75 emails fired at once is a spike Resend will rate-limit. */
@@ -113,7 +105,7 @@ async function alreadyGreeted(subscriptionId) {
 
 async function main() {
   console.log(`Mode:   ${SEND ? '*** LIVE SEND ***' : 'dry run (no email will be sent)'}`);
-  console.log(`Cutoff: ${CUTOFF} — members who joined on/after this date get the delay apology`);
+  console.log('Letter: welcome email introduced as part of the 2026 digital transformation');
   if (ONLY) console.log(`Filter: only ${ONLY}`);
   console.log('');
 
@@ -136,7 +128,7 @@ async function main() {
     renderWelcome = props => render(React.createElement(WelcomeEmail, props));
   }
 
-  const stats = { sent: 0, skippedAlreadySent: 0, skippedFilter: 0, failed: 0, apology: 0, plain: 0 };
+  const stats = { sent: 0, skippedAlreadySent: 0, skippedFilter: 0, failed: 0 };
   let processed = 0;
 
   for (const sub of subs) {
@@ -157,20 +149,17 @@ async function main() {
     }
 
     const joinedMs = sub.created * 1000;
-    const delayedDelivery = joinedMs >= CUTOFF_MS;
     const firstName = guessFirstName(customer && customer.name);
     const level = sub.items.data[0] && sub.items.data[0].plan ? sub.items.data[0].plan.nickname : null;
     processed++;
-    delayedDelivery ? stats.apology++ : stats.plain++;
 
-    const tag = delayedDelivery ? 'apology' : 'plain  ';
     if (!SEND) {
-      console.log(`  [dry-run] ${tag} → ${email}  (joined ${new Date(joinedMs).toISOString().slice(0, 10)}, ${firstName || 'Friend'})`);
+      console.log(`  [dry-run] → ${email}  (joined ${new Date(joinedMs).toISOString().slice(0, 10)}, "Dear ${firstName || 'Friend'},")`);
       continue;
     }
 
     try {
-      const html = await renderWelcome({ firstName, delayedDelivery });
+      const html = await renderWelcome({ firstName, sentToExistingMember: true });
       const { error } = await resend.emails.send({
         from: 'Senoia Area Historical Society <membership@updates.senoiahistory.com>',
         to: email,
@@ -203,7 +192,7 @@ async function main() {
         updatedAt: now,
       }, { merge: true });
 
-      console.log(`  SENT ${tag} → ${email}`);
+      console.log(`  SENT → ${email}`);
       stats.sent++;
       await pause(600);
     } catch (err) {
@@ -214,8 +203,6 @@ async function main() {
 
   console.log('\n─── Summary ───');
   console.log(`  would-send / sent   : ${SEND ? stats.sent : processed}`);
-  console.log(`    with delay note   : ${stats.apology}`);
-  console.log(`    plain letter      : ${stats.plain}`);
   console.log(`  skipped (greeted)   : ${stats.skippedAlreadySent}`);
   if (ONLY) console.log(`  skipped (--only)    : ${stats.skippedFilter}`);
   if (SEND) console.log(`  failed              : ${stats.failed}`);
