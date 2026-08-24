@@ -6,7 +6,10 @@ try {
     projectId: 'sahs-archives'
   });
 } catch (e) {
-  console.error("Firebase Admin initialization failed.");
+  // Log the underlying cause: this exits the process, so swallowing it leaves
+  // whoever ran the script with no idea whether it was a missing credential,
+  // a bad project id, or something else.
+  console.error("Firebase Admin initialization failed.", e);
   process.exit(1);
 }
 

@@ -24,6 +24,10 @@ export default function VendorApplication() {
       setIsSuccess(true);
       reset();
     } catch (err) {
+      // The alert tells the applicant to retry but carries no detail; without
+      // this the actual failure is invisible to anyone debugging a report that
+      // "the vendor form doesn't work".
+      console.error('Vendor application submission failed:', err);
       alert("There was an error submitting your application. Please try again.");
     } finally {
       setIsSubmitting(false);

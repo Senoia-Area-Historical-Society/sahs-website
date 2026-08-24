@@ -18,9 +18,11 @@ test.describe('Member Portal (/membership-status)', () => {
 
   test('renew link points to /support-sahs', async ({ page }) => {
     await page.goto('/membership-status');
-    const renewLink = page.locator('a[href="/support-sahs"]').first();
-    // Page renders the link statically without needing a lookup
-    // Just confirm the page loaded correctly
+    // The page renders this link statically, without needing a membership lookup.
     await expect(page.locator('input[type="email"]')).toBeVisible();
+    // Assert the renew link itself — the point of the test. It was previously
+    // located and then never asserted on, so the test passed without ever
+    // checking the behaviour its name describes.
+    await expect(page.locator('a[href="/support-sahs"]').first()).toBeVisible();
   });
 });
