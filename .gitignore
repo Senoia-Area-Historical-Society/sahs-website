@@ -39,7 +39,14 @@ functions/lib/
 
 # Claude Code system files
 skills-lock.json
-.claude/
+# Ignore .claude/ contents by default, but share the skills and the dev-server launch
+# config — CLAUDE.md references /author-sahs-event, which is a dangling pointer for
+# anyone who doesn't have it. Must be `.claude/*`, not `.claude/`: git does not descend
+# into an excluded *directory*, so a `!` negation beneath `.claude/` would never be
+# reached. `.claude/worktrees/` stays ignored — it holds nested working checkouts.
+.claude/*
+!.claude/skills/
+!.claude/launch.json
 
 # Ad-hoc scripts and temp files (one-off scripts go in scripts/, not repo root)
 temp_files.txt
@@ -66,8 +73,10 @@ conductor/
 # Local emulator scripts
 start-emulators.sh
 
-# Poker Run artwork staged for local emulator runs (source lives in .artwork/)
-public/poker-run-art/
+# Event artwork staged into public/ for local emulator runs (sources live in .artwork/).
+# A glob, not a literal path: each seeded event stages into its own <name>-art/ dir, and
+# a literal line silently left the next event's copies committable.
+public/*-art/
 
 # Recovery output — contains buyer emails and confirmation numbers. Never commit.
 recovered.csv
