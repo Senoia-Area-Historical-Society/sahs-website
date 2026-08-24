@@ -67,11 +67,17 @@ async function sendWelcomeEmail(email: string, firstName: string): Promise<'sent
     return 'sent';
 }
 
-// Configure Google Auth for Calendar API
+// Configure Google Auth for Calendar API.
+//
+// Deliberately `require()` and not `import`: the key file is optional and is
+// absent on Cloud Run, where the runtime service account supplies credentials
+// instead. A static import would be hoisted and would fail the whole module at
+// load time; only a runtime require can be caught like this.
 let credentials: any = null;
 try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     credentials = require(path.resolve(__dirname, '../src/service-account.json'));
-} catch (error) {
+} catch {
     console.warn('Google Service Account key file not found. Calendar integration will rely on environment credentials.');
 }
 

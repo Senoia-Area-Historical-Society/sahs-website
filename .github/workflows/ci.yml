@@ -1,0 +1,54 @@
+name: CI
+
+# Runs on pull requests, deliberately NOT on push to main.
+#
+# Merging to main *is* the production release (see deploy.yml), so a check
+# wired into that path fails after the merge — too late to act on — and would
+# let a lint nit block an urgent content fix from shipping. Catching problems
+# on the PR is the point where they are still cheap to fix.
+on:
+  pull_request:
+
+# A new push to the same PR makes the in-flight run obsolete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install site dependencies
+        run: npm ci
+
+      - name: Install functions dependencies
+        run: npm ci --prefix functions
+
+      # `--max-warnings` is deliberately not set: ~60 pre-existing
+      # `no-explicit-any` warnings are tracked as debt, not defects, and are
+      # downgraded to warnings in eslint.config.js. This step fails only on
+      # genuine errors — unused variables, bad imports, hook rule violations.
+      - name: Lint
+        run: npm run lint
+
+      # The site build is `tsc -b && vite build`, and `tsc -b` type-checks
+      # src/ — which means it follows imports in src/test/*.test.ts into any
+      # functions/src/ module they name. This is the same build deploy.yml
+      # runs, so a failure here is a failure that would otherwise have shipped
+      # as a failed deploy on main with nothing released. See CLAUDE.md.
+      - name: Build site
+        run: npm run build
+
+      - name: Build functions
+        run: npm run build --prefix functions
+
+      - name: Unit tests
+        run: npx vitest run

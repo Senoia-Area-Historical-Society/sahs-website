@@ -5,8 +5,8 @@ try {
   initializeApp({
     projectId: 'sahs-archives'
   });
-} catch (e) {
-  // Already initialized
+} catch {
+  // Already initialized — the only way this throws in practice, and harmless.
 }
 
 const db = getFirestore();
