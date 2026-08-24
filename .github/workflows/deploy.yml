@@ -5,6 +5,29 @@ on:
     branches:
       - main
 
+# Serialize deploys: only one may touch the Firebase project at a time.
+#
+# Without this, two merges close together each start their own run and deploy
+# hosting, functions and rules concurrently to the same project. That happened
+# on 2026-08-24 — two merges 50 seconds apart produced two simultaneous
+# deploys. Both succeeded, but the ordering is not guaranteed: the two runs
+# deploy in whatever order they reach each step, so the older run can finish
+# after the newer one and leave production serving an *earlier* build, or leave
+# functions and Firestore rules from different commits live together.
+#
+# `cancel-in-progress: false` is the load-bearing half. Cancelling a running
+# deploy is worse than queueing behind it — `firebase deploy` partway through
+# hosting/functions/rules would leave production in a half-applied state with
+# no automatic rollback. Queue instead; a deploy takes a couple of minutes.
+#
+# Note GitHub keeps only one run pending per group: if a third merge lands
+# while one run is executing and another is queued, the queued one is dropped
+# in favour of the newest. That is correct here — every run deploys from main,
+# so the newest commit is a superset of the one it replaces.
+concurrency:
+  group: deploy-firebase-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
