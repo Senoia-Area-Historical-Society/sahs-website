@@ -137,7 +137,7 @@ export function WelcomeEmail({ firstName, sentToExistingMember }: WelcomeEmailPr
             </Text>
 
             <CtaRow label="Upcoming Events & News" description="Browse programs and community events on our website." buttonLabel="View Events" buttonUrl="https://senoiahistory.com/news" />
-            <CtaRow label="Check Your Membership Status" description="View your membership level and renewal date anytime." buttonLabel="My Membership" buttonUrl="https://senoiahistory.com/membership-status" />
+            <CtaRow label="Manage Your Membership" description="View your renewal date, update your card, or change your membership." buttonLabel="My Membership" buttonUrl="https://billing.stripe.com/p/login/3cscOSe99bt8bvi000" />
 
             <Hr style={{ borderColor: '#e8dfd0', margin: '0 0 28px' }} />
 

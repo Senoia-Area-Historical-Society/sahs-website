@@ -11,15 +11,19 @@ Disallow: /admin/
 Disallow: /meeting-room/success
 Disallow: /meeting-room/cancel
 
-# Do NOT add Disallow entries here for /membership-status, /support-sahs/success,
-# /support-sahs/cancel, /tickets/success, or /volunteer/ — each already renders
-# <Seo noindex> (src/components/Seo.tsx). A robots.txt block prevents Googlebot
-# from ever fetching the page, which means it never sees that noindex tag.
-# Blocking one of these is what caused the "Indexed, though blocked by
-# robots.txt" report: /membership-status is linked from the header nav on every
-# page, and /volunteer/:token is linked from NewsDetail, so Google indexed them
-# before this robots.txt existed and then got locked out of ever deindexing
-# them. Crawlable-but-noindex is the correct state for all of them.
+# Do NOT add Disallow entries here for /support-sahs/success, /support-sahs/cancel,
+# /tickets/success, or /volunteer/ — each already renders <Seo noindex>
+# (src/components/Seo.tsx). A robots.txt block prevents Googlebot from ever
+# fetching the page, which means it never sees that noindex tag. Blocking one of
+# these is what caused the "Indexed, though blocked by robots.txt" report:
+# /volunteer/:token is linked from NewsDetail, so Google indexed it before this
+# robots.txt existed and then got locked out of ever deindexing it.
+# Crawlable-but-noindex is the correct state for all of them.
+#
+# /membership-status was on that list until the route was retired. It now 301s to
+# Stripe's billing portal (see firebase.json), which is the state that lets Google
+# drop it: a redirect is followable, whereas a Disallow would strand the indexed
+# URL exactly as described above.
 
 # Ticket widgets are meant to be framed on partner sites; indexing them would
 # duplicate the event page they point at. (No noindex tag exists here, so

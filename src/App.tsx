@@ -31,7 +31,6 @@ import Unauthorized from './pages/Unauthorized';
 import VolunteerSignup from './pages/VolunteerSignup';
 import TicketSuccess from './pages/TicketSuccess';
 import BoxOffice from './pages/BoxOffice';
-import MemberPortal from './pages/MemberPortal';
 import EmbedTickets from './pages/EmbedTickets';
 
 // Admin Pages
@@ -190,7 +189,17 @@ function App() {
 
           {/* Embeddable widgets for partner sites — intentionally no PublicLayout */}
           <Route path="/embed/tickets/:slug" element={<EmbedTickets />} />
-          <Route path="/membership-status" element={<PublicLayout><MemberPortal /></PublicLayout>} />
+          {/* /membership-status is retired. It was an unauthenticated membership oracle:
+              anyone could POST an email address and learn whether that person was a member,
+              at what tier, and when they renewed — with no throttle, and CORS reflecting any
+              origin, so it could be driven from third-party pages via visitors' browsers.
+              Tier is effectively donation amount, which is the sensitive part.
+
+              Stripe's billing portal does the same job and verifiably does not enumerate:
+              it answers "if that address is active with us, you'll receive a link" whether
+              or not the address exists. `firebase.json` 301s this path there, so the link in
+              already-delivered welcome emails still works. Do not reintroduce this route
+              without an email-verification step. */}
           
           {/* Status Pages */}
           <Route path="/401" element={<PublicLayout><Unauthorized /></PublicLayout>} />

@@ -40,6 +40,11 @@
           "source": "/events",
           "destination": "/news",
           "type": 301
+        },
+        {
+          "source": "/membership-status",
+          "destination": "https://billing.stripe.com/p/login/3cscOSe99bt8bvi000",
+          "type": 301
         }
       ],
       "rewrites": [
