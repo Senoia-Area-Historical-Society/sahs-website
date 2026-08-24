@@ -25,9 +25,23 @@ service cloud.firestore {
 
     function isEditor() {
       return request.auth != null && (
-        isCurator() || 
+        isCurator() ||
         (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
          get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'editor')
+      );
+    }
+
+    // Any SAHS staff account with *any* assigned role, including the view-only
+    // ones. This is the server-side mirror of `isSAHSUser` in AuthContext, which
+    // is what `ProtectedRoute` gates /admin/* on — so it must include
+    // 'board_member' as well as 'read_only', exactly as AuthContext does.
+    // A signed-in @senoiahistory.com account with NO user_roles document is
+    // deliberately not staff: the role doc is the grant, not the email domain.
+    function isSAHSStaff() {
+      return request.auth != null && (
+        isEditor() ||
+        (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
+         get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role in ['read_only', 'board_member'])
       );
     }
 
@@ -45,10 +59,17 @@ service cloud.firestore {
 
     // Sensitive Data: Strictly Curators/Admins only
     match /memberships/{doc} { allow read, write: if isCurator(); }
-    match /tickets/{doc} { 
+    match /tickets/{doc} {
+      // Read is open to all SAHS staff, not just curators: volunteers and event
+      // organizers are routinely asked "how many have we sold?", and /admin/tickets
+      // is gated on isSAHSUser by ProtectedRoute. Gating the read at isCurator()
+      // meant every read_only account reached the page and got a bare permission
+      // error (and a silent "No ticket sales yet" on the dashboard, whose query is
+      // wrapped in Promise.allSettled). Writing — cancelling a ticket — stays at
+      // isCurator(), mirrored client-side by the isCurator gate on the Cancel button.
       // Public confirm page needs to query by sessionId; limited to 1 doc for safety
-      allow read: if isCurator() || (request.query.limit == 1);
-      allow write: if isCurator(); 
+      allow read: if isSAHSStaff() || (request.query.limit == 1);
+      allow write: if isCurator();
     }
     
     // Internal Knowledge Base
