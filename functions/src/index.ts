@@ -68,7 +68,7 @@ function escapeSearchValue(value: string): string {
 async function sendWelcomeEmail(
     email: string,
     firstName: string,
-    options: { delayedDelivery?: boolean } = {}
+    options: { sentToExistingMember?: boolean } = {}
 ): Promise<'sent' | 'skipped'> {
     if (!process.env.RESEND_API_KEY) {
         // Not an error: the emulator and any local run have no Resend key, and a
@@ -79,7 +79,7 @@ async function sendWelcomeEmail(
     }
     const resend = getResend();
     const html = await render(
-        React.createElement(WelcomeEmail, { firstName, delayedDelivery: options.delayedDelivery })
+        React.createElement(WelcomeEmail, { firstName, sentToExistingMember: options.sentToExistingMember })
     );
     const { error } = await resend.emails.send({
         from: 'Senoia Area Historical Society <membership@updates.senoiahistory.com>',
@@ -975,7 +975,7 @@ export const renderEmailPreview = onRequest({ cors: true, invoker: 'public' }, a
         let html = '';
         if (template === 'welcome') {
             html = await render(
-                React.createElement(WelcomeEmail, props as { firstName?: string; delayedDelivery?: boolean })
+                React.createElement(WelcomeEmail, props as { firstName?: string; sentToExistingMember?: boolean })
             );
         } else if (template === 'newsletter') {
             html = await render(React.createElement(NewsletterEmail, props as unknown as NewsletterEmailProps));

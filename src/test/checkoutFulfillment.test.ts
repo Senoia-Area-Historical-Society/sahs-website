@@ -286,8 +286,19 @@ describe('parseMembershipOrder', () => {
     expect(result.ok && result.value.quantity).toBe(1);
   });
 
+  /**
+   * First token only. This used to take everything *before* the last token, so
+   * "Mary Anne Nolan" greeted "Mary Anne" — correct for a two-part given name and wrong
+   * for everything else. A dry run over the real member list produced "Dear Hilary De,",
+   * "Dear Robert W," and "Dear Cheryl Crook,": six awkward greetings in seventy-five
+   * letters. The trade is that "Mary Anne" is now greeted "Mary", which still reads as a
+   * name, whereas a surname fragment glued on does not.
+   */
   it.each([
-    ['Mary Anne Nolan', 'Mary Anne'],
+    ['Hilary De Puy', 'Hilary'],
+    ['Robert W Trammell', 'Robert'],
+    ['Cheryl Crook Thompson', 'Cheryl'],
+    ['Mary Anne Nolan', 'Mary'],
     ['Nolan', 'Nolan'],
     ['  Cat  Nolan  ', 'Cat'],
   ])('greets %j as %j', (name, expected) => {

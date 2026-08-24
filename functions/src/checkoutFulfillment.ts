@@ -215,13 +215,22 @@ function resolveId(ref: string | { id: string } | null | undefined): string | nu
 }
 
 /**
- * Everything before the last whitespace-separated token, matching what the original
- * welcome-email call did: "Mary Anne Nolan" greets "Mary Anne", "Nolan" greets "Nolan".
+ * The first whitespace-separated token. "Hilary De Puy" greets "Hilary".
+ *
+ * This used to take everything *before* the last token, on the theory that "Mary Anne
+ * Nolan" should greet "Mary Anne". That reasoning holds for a two-part given name and
+ * fails for everything else, which is more common than it sounds: a dry run over the
+ * real member list produced "Dear Hilary De," (Hilary De Puy), "Dear Robert W,"
+ * (Robert W Trammell), "Dear Margaret T," and "Dear Cheryl Crook," (Cheryl Crook
+ * Thompson) — six awkward greetings in seventy-five letters.
+ *
+ * First-token-only gets those right and costs only that "Mary Anne" is greeted as
+ * "Mary", which still reads as a name. The failure modes are not symmetric: a shortened
+ * given name is unremarkable, a surname fragment glued on is visibly wrong.
  */
 function guessFirstName(fullName: string | null | undefined): string {
     const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '';
-    return parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
+    return parts[0] ?? '';
 }
 
 /**

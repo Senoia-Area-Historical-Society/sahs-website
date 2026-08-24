@@ -6,15 +6,15 @@ import {
 interface WelcomeEmailProps {
   firstName?: string;
   /**
-   * Adds a short note explaining why this arrived late. Set only by
-   * `scripts/backfill_welcome_emails.cjs`, for members who joined *after* the welcome
-   * email existed and should have received one at the time — a fault on our side.
+   * Adds a short note explaining why someone who joined a while ago is receiving a
+   * *welcome* letter. Set only by `scripts/backfill_welcome_emails.cjs`.
    *
-   * Deliberately not set for the members who joined before this system was built. Telling
-   * someone who signed up in 2024 that "a technical error delayed this" would be untrue;
-   * they get the same letter with no apology attached.
+   * Framed as introducing a new member communication rather than apologising for a late
+   * one. An apology would have to claim the recipient was owed this letter when they
+   * joined, which is untrue for most of the membership — the welcome email did not exist
+   * before mid-2026, and the majority of members joined in 2024 and 2025.
    */
-  delayedDelivery?: boolean;
+  sentToExistingMember?: boolean;
 }
 
 const brown = '#6b5c3e';
@@ -25,7 +25,7 @@ const mutedBrown = '#a09080';
 const bodyFont = 'Georgia, serif';
 const uiFont = 'Arial, sans-serif';
 
-export function WelcomeEmail({ firstName, delayedDelivery }: WelcomeEmailProps) {
+export function WelcomeEmail({ firstName, sentToExistingMember }: WelcomeEmailProps) {
   const name = firstName || 'Friend';
 
   return (
@@ -58,14 +58,14 @@ export function WelcomeEmail({ firstName, delayedDelivery }: WelcomeEmailProps) 
               region — and that work simply wouldn't be possible without members like you.
             </Text>
 
-            {delayedDelivery && (
+            {sentToExistingMember && (
               <Section style={{ padding: '14px 16px', borderLeft: `3px solid ${mutedBrown}`, backgroundColor: lightCream, marginBottom: 20 }}>
                 <Text style={{ margin: 0, fontFamily: uiFont, fontSize: 14, color: '#5a4a3a', lineHeight: '1.6' }}>
-                  <strong>A note on the timing.</strong> You should have received this letter when
-                  you joined. A technical fault on our website meant our welcome emails were never
-                  sent, and we only discovered it recently. We're sorry for the silence — your
-                  membership has been active and in good standing the whole time, and nothing about
-                  it was affected.
+                  <strong>Something new for 2026.</strong> As part of the digital transformation
+                  we've been undertaking this year, we're introducing a proper welcome letter for
+                  SAHS members — and we're sending this first one to every current member, not
+                  only to new ones. Your membership is active and in good standing; there's
+                  nothing you need to do.
                 </Text>
               </Section>
             )}
