@@ -143,29 +143,10 @@ export async function submitApplication(type: 'vendor' | 'sponsor', data: any): 
   }
 }
 
-export async function submitMembershipRequest(data: { email: string; level: string; quantity: number; userId?: string }): Promise<{ url: string }> {
-  try {
-    const baseUrl = getFunctionsBaseUrl();
-    const functionUrl = `${baseUrl}/createMembershipCheckoutSession`;
-    
-    const response = await fetch(functionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-         throw new Error(`Cloud function returned ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (err) {
-    console.error('Error creating membership checkout session:', err);
-    throw err;
-  }
-}
+// `submitMembershipRequest` was removed along with the `createMembershipCheckoutSession`
+// function it POSTed to. Nothing called it: memberships are bought through the Stripe
+// Pricing Table in `src/pages/Support.tsx`, which goes straight to Stripe Checkout with no
+// endpoint of ours in between. See the note at the top of `functions/src/index.ts`.
 
 /**
  * The server derives price, title and the cancel-URL slug from `posts/{eventId}`;

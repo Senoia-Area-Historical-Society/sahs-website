@@ -165,8 +165,9 @@ export function parseTicketOrder(session: CheckoutSessionLike): Parsed<TicketRec
  * address, so a record without one is not a membership.
  *
  * `level` used to be a second hard requirement, rejecting with `'missing_level'`. That
- * was correct while our own `createMembershipCheckoutSession` was assumed to be the only
- * source — it always wrote the field, so an absent one meant forged metadata. It is
+ * was correct while our own (since-deleted) `createMembershipCheckoutSession` was assumed
+ * to be the only source — it always wrote the field, so an absent one meant forged
+ * metadata. It is
  * wrong now that pricing-table sessions are recognised: those carry no metadata at all,
  * so the rejection would turn *every real membership* into an `UnfulfillableSessionError`,
  * a 500, and an endless Stripe retry of an order that can never succeed. The tier is

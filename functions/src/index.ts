@@ -23,6 +23,12 @@ import {
     CheckoutKind,
     FulfillmentRejection,
 } from './checkoutFulfillment';
+import {
+    isLifecycleEvent,
+    statusForLifecycleEvent,
+    buildPaymentFailureAlert,
+    LifecycleEventType,
+} from './subscriptionLifecycle';
 import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
 
 admin.initializeApp();
@@ -126,40 +132,21 @@ function generateConfirmationNumber(): string {
     return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
-// 3. Create Membership Checkout Session
-export const createMembershipCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
-    try {
-        if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
-        const { email, level, quantity = 1, userId } = req.body;
-        const stripe = getStripe();
-        const priceMap = { senior: 2500, individual: 3500, family: 5000, patron: 10000, corporate: 25000 };
-        const unitAmount = priceMap[level as keyof typeof priceMap];
-        if (!unitAmount) { res.status(400).send({ error: "Invalid membership level" }); return; }
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            line_items: [{
-                price_data: {
-                    currency: 'usd',
-                    product_data: {
-                        name: `SAHS Membership - ${level.charAt(0).toUpperCase() + level.slice(1)}`,
-                        description: `Membership dues for Senoia Area Historical Society`
-                    },
-                    unit_amount: unitAmount,
-                },
-                quantity,
-            }],
-            mode: 'payment',
-            success_url: `${FRONTEND_URL}/support-sahs/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${FRONTEND_URL}/support-sahs/cancel`,
-            customer_email: email,
-            metadata: { type: 'membership', level, quantity: quantity.toString(), userId: userId || '' }
-        });
-        res.json({ url: session.url });
-    } catch (error) {
-        console.error('Error creating membership checkout session:', error);
-        res.status(500).send({ error: "Failed to create membership checkout session" });
-    }
-});
+// Membership checkout is not ours to create.
+//
+// `createMembershipCheckoutSession` lived here and was dead code — nothing in the app
+// called it. Every real membership is bought through the Stripe Pricing Table embedded in
+// `src/pages/Support.tsx`, which mints its own Checkout Session in `mode: 'subscription'`.
+// The removed function used `mode: 'payment'`, so anything bought through it would have
+// been a one-time charge: no subscription, no auto-renewal, and invisible to
+// `getMembershipByEmail` — which reads subscriptions — so the member portal would have
+// told that member they were not a member. Its `priceMap` also matched none of the five
+// live prices. Reviving it would duplicate what the pricing table already does better:
+// Stripe-hosted, editable in the Dashboard without a deploy, and already proven.
+//
+// `/support-sahs/success` and `/support-sahs/cancel` intentionally remain: the pricing
+// table's own confirmation page points there (and `StripeSuccess` fires the GTM
+// `purchase` event), which is the only membership conversion signal there is.
 
 // 4. Create Ticket Checkout Session
 export const createTicketCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
@@ -518,6 +505,112 @@ async function fulfillMembership(session: Stripe.Checkout.Session): Promise<'cre
     return outcome;
 }
 
+/**
+ * Records what a subscription-lifecycle event says, and shouts about a failed renewal.
+ *
+ * Two rules, and they differ from fulfillment's on purpose:
+ *
+ *   1. **A missing membership document is not an error.** These events fire for all ~85
+ *      existing subscriptions, almost none of which has a record — the collection was
+ *      never populated, because pricing-table sessions used to be classified
+ *      `unrelated`. Treating "no record" as a failure would 500 on nearly every renewal
+ *      and get the endpoint disabled.
+ *   2. **A failed staff alert *does* 500.** An alert that silently fails is the exact bug
+ *      being fixed here, so Stripe retries it on its own backoff and the dashboard shows
+ *      the event as failing. The Firestore update is best-effort by comparison: Stripe
+ *      remains the system of record for membership status, so a stale mirror row is
+ *      cosmetic, whereas an unsent alert means a member lapses unnoticed.
+ */
+async function handleSubscriptionLifecycle(
+    eventType: LifecycleEventType,
+    event: Stripe.Event
+): Promise<string> {
+    const status = statusForLifecycleEvent(eventType);
+    const object = event.data.object as Stripe.Invoice | Stripe.Subscription;
+
+    const subscriptionId =
+        object.object === 'invoice'
+            ? typeof object.subscription === 'string'
+                ? object.subscription
+                : object.subscription?.id ?? null
+            : object.id;
+
+    // Best-effort mirror update — see rule 1. Never throws.
+    if (subscriptionId) {
+        try {
+            const snap = await db
+                .collection('memberships')
+                .where('stripeSubscriptionId', '==', subscriptionId)
+                .limit(1)
+                .get();
+            if (!snap.empty) {
+                await snap.docs[0].ref.update({ status, updatedAt: new Date().toISOString() });
+                console.log(`stripeWebhook: ${eventType} → memberships/${snap.docs[0].id} status=${status}`);
+            } else {
+                // Logged rather than ignored: this is how the mirror's coverage becomes
+                // visible without querying Firestore by hand.
+                console.log(`stripeWebhook: ${eventType} for ${subscriptionId} — no membership record to update`);
+            }
+        } catch (err) {
+            console.error(`stripeWebhook: could not update membership status for ${subscriptionId}`, err);
+        }
+    }
+
+    if (eventType !== 'invoice.payment_failed') return status;
+
+    const invoice = object as Stripe.Invoice;
+    const alert = buildPaymentFailureAlert({
+        email: invoice.customer_email ?? null,
+        customerName: invoice.customer_name ?? null,
+        amountDue: invoice.amount_due ?? null,
+        attemptCount: invoice.attempt_count ?? null,
+        nextAttemptAt: invoice.next_payment_attempt
+            ? new Date(invoice.next_payment_attempt * 1000).toISOString()
+            : null,
+        hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+        subscriptionId,
+    });
+
+    // Throws on failure, so the caller answers 500 and Stripe retries. See rule 2.
+    await sendStaffAlert(alert.subject, alert.text);
+    console.warn(`stripeWebhook: renewal failure alert sent — ${alert.subject}`);
+    return status;
+}
+
+/**
+ * Emails the staff alert list.
+ *
+ * Recipients default to the two permanent admins the codebase already hardcodes (see the
+ * role table in CLAUDE.md) and can be overridden with `MEMBERSHIP_ALERT_TO`, a
+ * comma-separated list, without a code change.
+ *
+ * Throws rather than logging, for the same reason `sendWelcomeEmail` does: Resend reports
+ * failures in the response body instead of rejecting, so a version that only logged would
+ * look identical to a successful send.
+ */
+async function sendStaffAlert(subject: string, text: string): Promise<void> {
+    const recipients = (process.env.MEMBERSHIP_ALERT_TO ||
+        'catnolan@senoiahistory.com,jeremywarren@senoiahistory.com')
+        .split(',')
+        .map(a => a.trim())
+        .filter(Boolean);
+
+    if (!process.env.RESEND_API_KEY) {
+        // The emulator has no key. Loud, because in production this would mean a renewal
+        // failure went unannounced — the very thing this alert exists to prevent.
+        console.warn(`RESEND_API_KEY not configured — staff alert NOT sent: ${subject}`);
+        return;
+    }
+
+    const { error } = await getResend().emails.send({
+        from: 'SAHS Website <membership@updates.senoiahistory.com>',
+        to: recipients,
+        subject,
+        text,
+    });
+    if (error) throw new Error(`Resend rejected the staff alert: ${error.message}`);
+}
+
 export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'RESEND_API_KEY'] }, async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
@@ -529,6 +622,24 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
         // 400 and no retry: an unverifiable payload will never verify on a second try.
         console.error('stripeWebhook: signature verification failed', err);
         res.status(400).send(`Webhook Error: ${err.message}`);
+        return;
+    }
+
+    // Subscription lifecycle: renewals succeeding, renewals failing, memberships ending.
+    // Registered on the endpoint alongside `checkout.session.completed`; without these,
+    // nothing in the system ever learns that a member's card stopped working.
+    if (isLifecycleEvent(event.type)) {
+        try {
+            const status = await handleSubscriptionLifecycle(event.type, event);
+            res.json({ received: true, lifecycle: event.type, status });
+        } catch (err) {
+            console.error(
+                `stripeWebhook: FAILED to handle ${event.type} — answering 500 so Stripe retries. ` +
+                'A renewal failure that is never announced is the defect this path exists to fix.',
+                err
+            );
+            res.status(500).json({ error: 'lifecycle_failed', event: event.type });
+        }
         return;
     }
 

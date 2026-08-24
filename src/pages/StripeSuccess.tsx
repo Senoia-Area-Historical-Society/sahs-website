@@ -8,9 +8,14 @@ export default function StripeSuccess() {
   const sessionId = searchParams.get('session_id');
   const reportedRef = useRef(false);
 
-  // Donation and membership amounts vary (Individual $35 up to Sustaining $25,000), and this
-  // page never fetches the checkout session, so no `value` is reported here — just the
-  // conversion itself. See createMembershipCheckoutSession / the donation checkout flow.
+  // Membership and donation amounts vary ($25 Senior/Student up to $500 Corporate), and
+  // this page never fetches the checkout session, so no `value` is reported here — just
+  // the conversion itself.
+  //
+  // Reached from the Stripe Pricing Table's confirmation page, configured in the Dashboard
+  // rather than in this repo. If that setting is ever cleared, members land on stripe.com
+  // after paying and this event stops firing — leaving no membership conversion signal at
+  // all — with nothing in the codebase to indicate why.
   useEffect(() => {
     if (!sessionId || reportedRef.current) return;
     reportedRef.current = true;

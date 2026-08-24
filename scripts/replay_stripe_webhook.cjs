@@ -36,6 +36,12 @@
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/replay_stripe_webhook.cjs send ticket
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/replay_stripe_webhook.cjs show
  *
+ *   lifecycle <invoice.payment_failed|invoice.paid|customer.subscription.deleted>
+ *             [--subscription ID] [--exhausted] [--amount CENTS] [--attempts N]
+ *   --exhausted sets next_payment_attempt to null: Stripe has given up retrying and the
+ *   member lapses unless a person acts. That is the case that went unnoticed in
+ *   production, and the staff alert must read differently for it.
+ *
  *   send <ticket|membership|pricing-table|booking|unrelated>
  *        [--session ID] [--quantity N] [--drop FIELD] [--event-id ID] [--subscription ID]
  *   --drop omits one metadata field, to exercise a rejection path.
@@ -227,11 +233,65 @@ async function show() {
         : `bookings/${BOOKING_ID}: (missing)`);
 }
 
+// ── lifecycle ──────────────────────────────────────────────────────────────────────
+/**
+ * Sends a subscription-lifecycle event: a renewal succeeding, a renewal failing, or a
+ * membership ending. These were not delivered at all until the endpoint was subscribed to
+ * them, which is why a member's card could stop working with nobody finding out.
+ *
+ * `--exhausted` is the case that actually went wrong in production: `next_payment_attempt`
+ * is null, meaning Stripe has given up and the member lapses unless a person acts. The
+ * alert must read differently from a routine first failure.
+ */
+async function lifecycle(type) {
+    const known = ['invoice.payment_failed', 'invoice.paid', 'customer.subscription.deleted'];
+    if (!known.includes(type)) {
+        console.error(`Unknown lifecycle type '${type}'. Use one of:\n  ${known.join('\n  ')}`);
+        process.exit(1);
+    }
+    const subscriptionId = flag('subscription', 'sub_test_pricing_table');
+    const exhausted = argv.includes('--exhausted');
+
+    const object = type === 'customer.subscription.deleted'
+        ? { id: subscriptionId, object: 'subscription', status: 'canceled' }
+        : {
+            id: flag('invoice', 'in_test_lifecycle'),
+            object: 'invoice',
+            subscription: subscriptionId,
+            customer_email: flag('email', 'member@example.com'),
+            customer_name: flag('name', 'Sandra Adams'),
+            amount_due: parseInt(flag('amount', '5000'), 10),
+            attempt_count: parseInt(flag('attempts', '1'), 10),
+            // null = Stripe has stopped retrying, the urgent case.
+            next_payment_attempt: exhausted ? null : Math.floor(Date.now() / 1000) + 86400 * 3,
+            hosted_invoice_url: 'https://invoice.stripe.com/i/live_replay_test',
+        };
+
+    const payload = JSON.stringify({
+        id: `evt_test_${Date.now()}`,
+        object: 'event',
+        type,
+        data: { object },
+    });
+    const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: WEBHOOK_SECRET });
+    const res = await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Stripe-Signature': signature },
+        body: payload,
+    });
+    const body = await res.text();
+    console.log(`POST ${type}${exhausted ? ' (retries exhausted)' : ''} subscription=${subscriptionId}`);
+    console.log(`  → HTTP ${res.status} ${body}`);
+    console.log(res.status >= 500
+        ? '  → 5xx: Stripe WILL retry this event.'
+        : '  → 2xx: Stripe considers this delivered and will NOT retry.');
+}
+
 // ── dispatch ───────────────────────────────────────────────────────────────────────
 const [command, kind] = argv;
-const run = { seed, show, send: () => send(kind) }[command];
+const run = { seed, show, send: () => send(kind), lifecycle: () => lifecycle(kind) }[command];
 if (!run) {
-    console.error('Usage: replay_stripe_webhook.cjs <seed|send|show> [kind] [flags]');
+    console.error('Usage: replay_stripe_webhook.cjs <seed|send|lifecycle|show> [kind] [flags]');
     process.exit(1);
 }
 run().then(() => process.exit(0)).catch((err) => {
