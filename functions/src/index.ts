@@ -40,12 +40,30 @@ const getStripe = () => {
 const getResend = () => new Resend(process.env.RESEND_API_KEY);
 
 /**
+ * Ceiling on how many records an auto-paged Stripe list will pull. Every membership
+ * read path is bounded by this rather than by a single 100-item page, because the
+ * failure mode of a bare `limit: 100` is silent: the list simply stops and the caller
+ * cannot tell a complete roster from a truncated one. Set far above the ~85 live
+ * subscriptions so it is a runaway backstop, not an operating limit.
+ */
+const MAX_STRIPE_PAGE_ITEMS = 5000;
+
+/** Escapes a value for interpolation into a Stripe search query string. */
+function escapeSearchValue(value: string): string {
+    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+/**
  * Throws on a send failure rather than logging it, so `fulfillMembership` can record the
  * outcome on the membership document. Resend reports failures in the response body
  * instead of rejecting, which is how the previous version could log an error and still
  * look, to its caller, exactly like a successful send.
  */
-async function sendWelcomeEmail(email: string, firstName: string): Promise<'sent' | 'skipped'> {
+async function sendWelcomeEmail(
+    email: string,
+    firstName: string,
+    options: { delayedDelivery?: boolean } = {}
+): Promise<'sent' | 'skipped'> {
     if (!process.env.RESEND_API_KEY) {
         // Not an error: the emulator and any local run have no Resend key, and a
         // membership must still be recorded there. Reported back as 'skipped' rather
@@ -54,7 +72,9 @@ async function sendWelcomeEmail(email: string, firstName: string): Promise<'sent
         return 'skipped';
     }
     const resend = getResend();
-    const html = await render(React.createElement(WelcomeEmail, { firstName }));
+    const html = await render(
+        React.createElement(WelcomeEmail, { firstName, delayedDelivery: options.delayedDelivery })
+    );
     const { error } = await resend.emails.send({
         from: 'Senoia Area Historical Society <membership@updates.senoiahistory.com>',
         to: email,
@@ -196,11 +216,20 @@ export const listStripeSubscriptions = onRequest({ secrets: ['STRIPE_SECRET_KEY'
     try {
         if (req.method !== 'GET' && req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
         const stripe = getStripe();
-        const productsList = await stripe.products.list({ limit: 100, active: true });
+        // `active: true` is deliberately absent: 40% of the member base is still on the
+        // retired Webflow products, and archiving one of those would silently rename
+        // every subscription on it to 'Unknown Level' in the admin table.
+        const products = await stripe.products.list({ limit: 100 }).autoPagingToArray({ limit: MAX_STRIPE_PAGE_ITEMS });
         const productNameMap: Record<string, string> = {};
-        productsList.data.forEach(p => { productNameMap[p.id] = p.name; });
-        const subscriptions = await stripe.subscriptions.list({ status: 'all', expand: ['data.customer'], limit: 100 });
-        const formattedMemberships = subscriptions.data.map(sub => {
+        products.forEach(p => { productNameMap[p.id] = p.name; });
+        // Auto-paged rather than a bare `limit: 100`. `status: 'all'` includes every
+        // subscription ever created — canceled ones accumulate forever and never age
+        // out — so a single page silently truncates the board's view of who is a
+        // member, presenting a partial roster as if it were the whole thing.
+        const subscriptions = await stripe.subscriptions
+            .list({ status: 'all', expand: ['data.customer'], limit: 100 })
+            .autoPagingToArray({ limit: MAX_STRIPE_PAGE_ITEMS });
+        const formattedMemberships = subscriptions.map(sub => {
             const customer = sub.customer as Stripe.Customer;
             const item = sub.items.data[0];
             const plan = item.plan;
@@ -369,6 +398,46 @@ async function fulfillTicket(session: Stripe.Checkout.Session): Promise<'created
 }
 
 /**
+ * The tier name and renewal date for a subscription, or nulls if either cannot be read.
+ *
+ * Every failure here is swallowed on purpose. A pricing-table membership carries no
+ * `metadata.level`, so this lookup is the only way to name the tier — but the name is a
+ * *label*, and the money is already taken. Letting a transient Stripe error propagate
+ * would throw out of `fulfillMembership`, answer Stripe 500, and have it retry a paid
+ * membership forever over a display string. That is the inverse of the rule the rest of
+ * this file follows: never lose a paid order to a field that is only cosmetic.
+ */
+async function describeSubscription(
+    subscriptionId: string | null
+): Promise<{ level: string | null; expirationDate: string | null }> {
+    if (!subscriptionId) return { level: null, expirationDate: null };
+    try {
+        const stripe = getStripe();
+        const sub = await stripe.subscriptions.retrieve(subscriptionId, {
+            expand: ['items.data.price.product'],
+        });
+        const product = sub.items.data[0]?.price?.product;
+        const level =
+            product && typeof product !== 'string' && !('deleted' in product && product.deleted)
+                ? product.name
+                : null;
+        return {
+            level,
+            expirationDate: sub.current_period_end
+                ? new Date(sub.current_period_end * 1000).toISOString()
+                : null,
+        };
+    } catch (err) {
+        console.warn(
+            `stripeWebhook: could not read subscription ${subscriptionId} for its tier name — ` +
+            'recording the membership with a generic label rather than failing the order',
+            err
+        );
+        return { level: null, expirationDate: null };
+    }
+}
+
+/**
  * Records a membership, then sends the welcome email outside the transaction.
  *
  * The email is intentionally not part of the atomic unit: a transaction callback can
@@ -390,6 +459,14 @@ async function fulfillMembership(session: Stripe.Checkout.Session): Promise<'cre
     if (!parsed.ok) throw new UnfulfillableSessionError('membership', parsed.reason);
     const membership = parsed.value;
 
+    const details = await describeSubscription(membership.subscriptionId);
+
+    // Still keyed by Checkout Session id, deliberately. `stripeSubscriptionId` is written
+    // as a *field* rather than promoted to the document id: two key schemes in one
+    // collection is precisely the split that loses records, and the session id remains
+    // stable across every Stripe redelivery. The field is what
+    // `scripts/backfill_welcome_emails.cjs` queries to avoid re-mailing a member the
+    // webhook already greeted.
     const ref = db.collection('memberships').doc(session.id);
     const outcome = await db.runTransaction(async (tx) => {
         const existing = await tx.get(ref);
@@ -397,11 +474,17 @@ async function fulfillMembership(session: Stripe.Checkout.Session): Promise<'cre
 
         tx.set(ref, {
             email: membership.email,
-            level: membership.level,
+            // Falls back to a generic label rather than failing: see `describeSubscription`.
+            level: membership.level ?? details.level ?? 'Membership',
             quantity: membership.quantity,
             status: 'active',
-            expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            // A real subscription knows when it renews. The year-from-now guess is only
+            // for a one-time join, which has no renewal date to read.
+            expirationDate:
+                details.expirationDate ??
+                new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
             paymentId: session.id,
+            stripeSubscriptionId: membership.subscriptionId,
             userId: membership.userId,
             welcomeEmailSentAt: null,
             welcomeEmailError: null,
@@ -727,21 +810,29 @@ export const getMembershipByEmail = onRequest({ secrets: ['STRIPE_SECRET_KEY'], 
 
         const stripe = getStripe();
 
-        // Find all Stripe customers with this email
-        const customers = await stripe.customers.search({ query: `email:"${email}"` });
-        if (customers.data.length === 0) {
+        // Find all Stripe customers with this email. The address is escaped rather than
+        // interpolated raw: this endpoint is public, `email` is only checked for an '@',
+        // and an unescaped quote produces a malformed search query — a 500 that the
+        // member portal renders as "Could not reach the membership server".
+        const customers = await stripe.customers
+            .search({ query: `email:"${escapeSearchValue(email)}"` })
+            .autoPagingToArray({ limit: MAX_STRIPE_PAGE_ITEMS });
+        if (customers.length === 0) {
             res.json({ found: false, memberships: [] });
             return;
         }
 
-        // Fetch product names once
-        const productsList = await stripe.products.list({ limit: 100, active: true });
-        const productMap = new Map(productsList.data.map(p => [p.id, p.name]));
+        // Fetch product names once. See listStripeSubscriptions for why archived
+        // products are included.
+        const products = await stripe.products.list({ limit: 100 }).autoPagingToArray({ limit: MAX_STRIPE_PAGE_ITEMS });
+        const productMap = new Map(products.map(p => [p.id, p.name]));
 
         const memberships: object[] = [];
-        for (const customer of customers.data) {
-            const subs = await stripe.subscriptions.list({ customer: customer.id, status: 'all' });
-            for (const sub of subs.data) {
+        for (const customer of customers) {
+            const subs = await stripe.subscriptions
+                .list({ customer: customer.id, status: 'all', limit: 100 })
+                .autoPagingToArray({ limit: MAX_STRIPE_PAGE_ITEMS });
+            for (const sub of subs) {
                 const productId = sub.items.data[0]?.price?.product as string;
                 memberships.push({
                     level: productMap.get(productId) || 'Membership',
@@ -766,7 +857,9 @@ export const renderEmailPreview = onRequest({ cors: true, invoker: 'public' }, a
         const { template, props } = req.body as { template: string; props: Record<string, unknown> };
         let html = '';
         if (template === 'welcome') {
-            html = await render(React.createElement(WelcomeEmail, props as { firstName?: string }));
+            html = await render(
+                React.createElement(WelcomeEmail, props as { firstName?: string; delayedDelivery?: boolean })
+            );
         } else if (template === 'newsletter') {
             html = await render(React.createElement(NewsletterEmail, props as unknown as NewsletterEmailProps));
         } else if (template === 'ticket') {

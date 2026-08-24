@@ -12,6 +12,9 @@
  *   • a paid ticket lands in Firestore and bumps `ticketsSold`
  *   • replaying the same session neither duplicates the ticket nor bumps again
  *   • a write that cannot succeed answers 5xx, so Stripe retries instead of dropping it
+ *   • a metadata-less pricing-table subscription is recognised as a membership at all
+ *     — the `pricing-table` kind below; classifying it `unrelated` is the bug that left
+ *     every real member with no record and no welcome email
  *
  * ── Before running: create functions/.secret.local ────────────────────────────────
  * It is gitignored, so it does not exist in a fresh clone, and without it the functions
@@ -33,9 +36,13 @@
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/replay_stripe_webhook.cjs send ticket
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/replay_stripe_webhook.cjs show
  *
- *   send <ticket|membership|booking|unrelated> [--session ID] [--quantity N]
- *                                             [--drop FIELD] [--event-id ID]
+ *   send <ticket|membership|pricing-table|booking|unrelated>
+ *        [--session ID] [--quantity N] [--drop FIELD] [--event-id ID] [--subscription ID]
  *   --drop omits one metadata field, to exercise a rejection path.
+ *
+ *   `pricing-table` is the one that matters for memberships: it reproduces a real
+ *   Stripe-minted subscription session, which carries NO metadata at all. Replay it
+ *   twice with the same --session to prove the write is idempotent.
  */
 const Stripe = require('../functions/node_modules/stripe');
 const { initializeApp } = require('firebase-admin/app');
@@ -132,10 +139,18 @@ function buildSession(kind, sessionId) {
         },
         booking: { bookingId: flag('booking-id', BOOKING_ID) },
         unrelated: { type: 'donation' },
+        // A real pricing-table membership. Copied from live session
+        // cs_live_a1PKCWk…: Stripe minted it, so `metadata` is genuinely empty and
+        // `mode` is the only thing identifying it. This is the shape that used to be
+        // classified `unrelated` and dropped, and it is why no member ever got a
+        // welcome email. `--drop` cannot apply — there is nothing to drop.
+        'pricing-table': {},
     }[kind];
 
     if (!metadata) {
-        console.error(`Unknown kind '${kind}'. Use ticket, membership, booking or unrelated.`);
+        console.error(
+            `Unknown kind '${kind}'. Use ticket, membership, pricing-table, booking or unrelated.`
+        );
         process.exit(1);
     }
 
@@ -145,7 +160,16 @@ function buildSession(kind, sessionId) {
         console.log(`(dropped metadata.${drop} to exercise a rejection path)`);
     }
 
-    return { ...base, metadata };
+    if (kind === 'pricing-table') {
+        return {
+            ...base,
+            mode: 'subscription',
+            subscription: flag('subscription', 'sub_test_pricing_table'),
+            metadata: {},
+        };
+    }
+
+    return { ...base, mode: 'payment', metadata };
 }
 
 async function send(kind) {
