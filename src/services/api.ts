@@ -196,14 +196,27 @@ export async function submitTicketRequest(data: { eventId: string; quantity: num
   }
 }
 
+/**
+ * Look up the buyer's ticket for a Stripe Checkout Session.
+ *
+ * Goes through the `getTicketBySession` Cloud Function rather than reading
+ * Firestore directly: the `tickets` collection is no longer publicly readable,
+ * because the rule that allowed it (`request.query.limit == 1`) let anyone page
+ * through every ticket in the collection. The session id is the buyer's own
+ * secret, so the function can serve them without a login.
+ *
+ * Returns null for a genuine miss *and* for any transport error — the caller
+ * (`TicketSuccess`) polls, and deliberately treats an unresolved lookup as
+ * 'pending' rather than claiming the purchase was confirmed.
+ */
 export async function getTicketBySessionId(sessionId: string): Promise<import('../types').Ticket | null> {
   try {
-    const { collection: col, query: q, where: w, getDocs: gd, limit: lim } = await import('firebase/firestore');
-    const { db: firestoreDb } = await import('../lib/firebase');
-    const snap = await gd(q(col(firestoreDb, 'tickets'), w('stripeSessionId', '==', sessionId), lim(1)));
-    if (snap.empty) return null;
-    const d = snap.docs[0];
-    return { id: d.id, ...d.data() } as import('../types').Ticket;
+    const baseUrl = getFunctionsBaseUrl();
+    const res = await fetch(`${baseUrl}/getTicketBySession?session_id=${encodeURIComponent(sessionId)}`);
+    if (!res.ok) throw new Error(`Cloud function returned ${res.status}`);
+    const data = await res.json();
+    if (!data?.found || !data.ticket) return null;
+    return data.ticket as import('../types').Ticket;
   } catch (err) {
     console.error('Error fetching ticket by session:', err);
     return null;

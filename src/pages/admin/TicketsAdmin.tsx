@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { getTickets } from '../../services/api';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { useAuth } from '../../contexts/AuthContext';
+import { summarizeTickets, rollupByEvent } from '../../lib/ticketSummary';
 import type { Ticket } from '../../types';
 import { Ticket as TicketIcon, Loader2, Search, X, QrCode, ScanLine } from 'lucide-react';
 import AdminHeader from './AdminHeader';
@@ -12,6 +14,12 @@ import { format } from 'date-fns';
 type FilterTab = 'all' | 'paid' | 'cancelled';
 
 export default function TicketsAdmin() {
+  // Cancelling a ticket is a curator-only write in firestore.rules. Read access
+  // extends to every SAHS staff role, so view-only volunteers reach this page —
+  // gate the destructive control on isCurator to match the server exactly.
+  // Note: NOT `!isReadOnly` — AuthContext sets isReadOnly true for the permanent
+  // admins as well, so that test would hide Cancel from them.
+  const { isCurator } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -39,22 +47,26 @@ export default function TicketsAdmin() {
     const q = search.toLowerCase();
     return tickets.filter(t => {
       const matchesTab = filterTab === 'all' || t.status === filterTab;
+      // Every field here is guarded: a ticket written by a backfill or an older
+      // code path may be missing one, and an unguarded .toLowerCase() would throw
+      // on the first keystroke rather than at load, taking the page down.
       const matchesSearch = !q ||
-        t.confirmationNumber.toLowerCase().includes(q) ||
-        t.email.toLowerCase().includes(q) ||
+        (t.confirmationNumber || '').toLowerCase().includes(q) ||
+        (t.email || '').toLowerCase().includes(q) ||
         (t.eventTitle || '').toLowerCase().includes(q) ||
         (t.customerName || '').toLowerCase().includes(q);
       return matchesTab && matchesSearch;
     });
   }, [tickets, search, filterTab]);
 
-  const totals = useMemo(() => {
-    const paid = tickets.filter(t => t.status === 'paid');
-    return {
-      count: paid.length,
-      revenue: paid.reduce((sum, t) => sum + (t.totalAmount || 0), 0),
-    };
-  }, [tickets]);
+  // Derived from `filtered` so the headline answers whatever the search/tab is
+  // narrowed to. See src/lib/ticketSummary.ts for why this counts quantity
+  // rather than rows.
+  const totals = useMemo(() => summarizeTickets(filtered), [filtered]);
+
+  // Rolled up over *all* tickets, so the most common question — "how many have
+  // we sold for <event>?" — is answered at a glance without typing anything.
+  const byEvent = useMemo(() => rollupByEvent(tickets), [tickets]);
 
   const handleCancel = async (ticket: Ticket) => {
     if (!confirm(`Cancel ticket ${ticket.confirmationNumber} for ${ticket.customerName || ticket.email}? This does not issue a refund in Stripe.`)) return;
@@ -101,11 +113,15 @@ export default function TicketsAdmin() {
             <p className="text-charcoal/60 font-sans text-sm">Manage ticket sales and verify confirmations.</p>
           </div>
           <div className="flex items-center gap-4">
-            {/* Revenue summary */}
+            {/* Tickets sold + revenue for whatever is currently filtered */}
             <div className="bg-white px-5 py-3 rounded-lg border border-tan/20 shadow-sm text-right">
-              <span className="block text-xs font-sans text-charcoal/50 uppercase tracking-widest font-bold mb-0.5">Revenue</span>
-              <span className="text-xl font-bold">${(totals.revenue / 100).toFixed(2)}</span>
-              <span className="text-xs text-charcoal/50 font-sans ml-2">({totals.count} sold)</span>
+              <span className="block text-xs font-sans text-charcoal/50 uppercase tracking-widest font-bold mb-0.5">
+                Tickets Sold{search || filterTab !== 'all' ? ' (filtered)' : ''}
+              </span>
+              <span className="text-xl font-bold">{totals.tickets}</span>
+              <span className="text-xs text-charcoal/50 font-sans ml-2">
+                across {totals.orders} order{totals.orders !== 1 ? 's' : ''} · ${(totals.revenue / 100).toFixed(2)}
+              </span>
             </div>
             {/* Scanner link */}
             <Link
@@ -118,6 +134,31 @@ export default function TicketsAdmin() {
         </header>
 
         {loadError && <ErrorBanner message={`Failed to load tickets: ${loadError}.`} />}
+
+        {/* Per-event rollup — the at-a-glance answer to "how many for <event>?" */}
+        {!loading && byEvent.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-xs font-sans font-bold uppercase tracking-widest text-charcoal/50 mb-2">Sold by Event</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {byEvent.map(row => (
+                <button
+                  key={row.event}
+                  onClick={() => { setSearch(row.event); setFilterTab('paid'); }}
+                  title={`Filter to ${row.event}`}
+                  className="bg-white px-4 py-3 rounded-lg border border-tan/20 shadow-sm text-left hover:border-tan transition-colors"
+                >
+                  <p className="font-medium text-charcoal truncate mb-1">{row.event}</p>
+                  <p className="font-sans text-sm">
+                    <span className="text-2xl font-bold text-tan align-middle">{row.tickets}</span>
+                    <span className="text-charcoal/50 text-xs ml-2">
+                      ticket{row.tickets !== 1 ? 's' : ''} · {row.orders} order{row.orders !== 1 ? 's' : ''} · ${(row.revenue / 100).toFixed(2)}
+                    </span>
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Search + Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -186,7 +227,7 @@ export default function TicketsAdmin() {
                             <QrCode size={17} />
                           </button>
                         )}
-                        {ticket.status === 'paid' && (
+                        {isCurator && ticket.status === 'paid' && (
                           <button
                             onClick={() => handleCancel(ticket)}
                             disabled={cancelling === ticket.id}
@@ -223,7 +264,7 @@ export default function TicketsAdmin() {
             )}
             <p className="font-mono text-2xl font-bold text-tan mb-1">{selectedTicket.confirmationNumber}</p>
             <p className="text-sm text-charcoal/60 font-sans">{selectedTicket.quantity} ticket{selectedTicket.quantity !== 1 ? 's' : ''} · {selectedTicket.totalAmount ? `$${(selectedTicket.totalAmount / 100).toFixed(2)}` : ''}</p>
-            {selectedTicket.status === 'paid' && (
+            {isCurator && selectedTicket.status === 'paid' && (
               <button
                 onClick={() => handleCancel(selectedTicket)}
                 disabled={cancelling === selectedTicket.id}
