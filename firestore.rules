@@ -67,8 +67,16 @@ service cloud.firestore {
       // error (and a silent "No ticket sales yet" on the dashboard, whose query is
       // wrapped in Promise.allSettled). Writing — cancelling a ticket — stays at
       // isCurator(), mirrored client-side by the isCurator gate on the Cancel button.
-      // Public confirm page needs to query by sessionId; limited to 1 doc for safety
-      allow read: if isSAHSStaff() || (request.query.limit == 1);
+      //
+      // There is deliberately NO public read clause. This used to carry
+      // `|| request.query.limit == 1` so the post-checkout confirmation page could
+      // look a ticket up by session id — but rules cannot inspect a query's `where`
+      // clause, so that permitted *any* unauthenticated limit-1 query and let the
+      // whole collection be paged through, exposing buyer names, emails and
+      // confirmation numbers (which are what `verifyTicket` admits people on).
+      // The confirmation page now goes through the `getTicketBySession` Cloud
+      // Function, which requires the buyer's own high-entropy Checkout Session id.
+      allow read: if isSAHSStaff();
       allow write: if isCurator();
     }
     

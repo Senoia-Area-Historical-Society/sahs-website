@@ -520,6 +520,76 @@ export const verifyTicket = onRequest({ cors: true }, async (req, res) => {
     }
 });
 
+// 7b. Public ticket lookup for the post-checkout confirmation page.
+//
+// This exists so `firestore.rules` does not have to expose `tickets` publicly.
+// The rule it replaces was `allow read: if isCurator() || request.query.limit == 1`,
+// which let *any* unauthenticated caller page through the entire collection with
+// limit-1 cursors, reading names, emails and confirmation numbers — and
+// `verifyTicket` validates at the door on confirmation number alone.
+//
+// What makes this endpoint safe without auth is the Checkout Session id: it is
+// high-entropy and Stripe only ever hands it to the buyer, in the redirect URL.
+// You cannot enumerate tickets with it, which is exactly the property the old
+// rule lacked. Do not add a lookup by email, name or confirmation number here —
+// those are all guessable and would reintroduce the hole this closes.
+//
+// The response is an explicit field whitelist rather than the raw document, so a
+// field added to a ticket later (Stripe metadata, internal notes) is not exposed
+// by default. It carries only what /tickets/success renders.
+export const getTicketBySession = onRequest({ cors: true }, async (req, res) => {
+    try {
+        const sessionId = ((req.query.session_id || req.query.sessionId ||
+            req.body?.session_id || req.body?.sessionId || '') as string).trim();
+
+        if (!sessionId) {
+            res.status(400).json({ found: false, reason: 'missing_session_id' });
+            return;
+        }
+
+        // Tickets are keyed by Checkout Session id (`tickets/{session.id}`), so the
+        // direct get is the normal path. The query is a fallback for any document
+        // written before that convention, which carries the id only as a field.
+        let snap = await db.collection('tickets').doc(sessionId).get();
+
+        if (!snap.exists) {
+            const legacy = await db.collection('tickets')
+                .where('stripeSessionId', '==', sessionId)
+                .limit(1)
+                .get();
+            if (legacy.empty) {
+                // Not an error: the confirmation page polls this while the webhook
+                // is still in flight, and treats a miss as 'pending'.
+                res.json({ found: false, reason: 'not_found' });
+                return;
+            }
+            snap = legacy.docs[0];
+        }
+
+        const t = snap.data() as Record<string, unknown>;
+
+        res.json({
+            found: true,
+            ticket: {
+                id: snap.id,
+                eventId: t.eventId ?? null,
+                eventTitle: t.eventTitle ?? null,
+                customerName: t.customerName ?? null,
+                email: t.email ?? null,
+                quantity: t.quantity ?? 0,
+                totalAmount: t.totalAmount ?? 0,
+                status: t.status ?? null,
+                confirmationNumber: t.confirmationNumber ?? null,
+                purchasedAt: t.purchasedAt ?? null,
+                qrCode: t.qrCode ?? null,
+            },
+        });
+    } catch (error) {
+        console.error('Error looking up ticket by session:', error);
+        res.status(500).json({ found: false, reason: 'server_error' });
+    }
+});
+
 // 8b. Sync Published Event Posts to Google Calendar
 export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) => {
     const beforeData = event.data?.before.data();
