@@ -66,6 +66,43 @@ describe('classifyCheckoutSession', () => {
       'unrelated'
     );
   });
+
+  /**
+   * The production case, and the one that was broken. A real pricing-table membership
+   * looks exactly like this: Stripe minted the session, so there is no metadata at all,
+   * and only `mode` identifies it. Classifying it `unrelated` is what silently dropped
+   * every member — no record, no welcome email — for the life of the endpoint.
+   */
+  it('routes a pricing-table membership, which carries no metadata whatsoever', () => {
+    expect(
+      classifyCheckoutSession(session({ metadata: {}, mode: 'subscription' }))
+    ).toBe('membership');
+  });
+
+  it('routes a subscription session even when metadata is entirely absent', () => {
+    expect(
+      classifyCheckoutSession(session({ metadata: undefined, mode: 'subscription' }))
+    ).toBe('membership');
+  });
+
+  /**
+   * The guard on the rule above. Memberships are the only recurring products on the
+   * account, so `mode` is a safe discriminator — but one-time payments must keep landing
+   * in `unrelated`, or the donation Payment Link would start mailing donors member
+   * benefits and writing them membership records.
+   */
+  it.each([
+    ['a one-time donation', 'payment'],
+    ['a setup-mode session', 'setup'],
+  ])('leaves %s unrelated', (_label, mode) => {
+    expect(classifyCheckoutSession(session({ metadata: {}, mode }))).toBe('unrelated');
+  });
+
+  it('lets an explicit ticket type win over subscription mode', () => {
+    expect(
+      classifyCheckoutSession(session({ metadata: { type: 'ticket' }, mode: 'subscription' }))
+    ).toBe('ticket');
+  });
 });
 
 describe('parseTicketOrder', () => {
@@ -166,6 +203,7 @@ describe('parseMembershipOrder', () => {
         level: 'family',
         quantity: 1,
         userId: 'u_1',
+        subscriptionId: null,
         firstName: '',
       },
     });
@@ -177,8 +215,46 @@ describe('parseMembershipOrder', () => {
    * `undefined`, that throw landed in the swallowing catch, and the member disappeared.
    * Every field returned here is a string, a number, or an explicit null.
    */
-  it('refuses a session with no level instead of writing undefined', () => {
-    expect(membership({})).toEqual({ ok: false, reason: 'missing_level' });
+  /**
+   * This used to reject with `'missing_level'`. It must not: a pricing-table session
+   * carries no metadata, so rejecting would make every real membership an
+   * `UnfulfillableSessionError` — a 500, and Stripe retrying a paid order forever over a
+   * label. `null` is the contract; `fulfillMembership` resolves the real tier from the
+   * subscription and falls back to a generic name. What still matters is that it is
+   * `null` and never `undefined`, which the Admin SDK refuses outright.
+   */
+  it('returns a null level — never undefined — when the session carries no metadata', () => {
+    const result = membership({});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.level).toBeNull();
+    expect(Object.hasOwn(result.value, 'level')).toBe(true);
+  });
+
+  it('reads the subscription id off a pricing-table session', () => {
+    const result = parseMembershipOrder(
+      session({ metadata: {}, mode: 'subscription', subscription: 'sub_live_123' })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.subscriptionId).toBe('sub_live_123');
+    expect(result.value.level).toBeNull();
+  });
+
+  it('unwraps an expanded subscription object as readily as a bare id', () => {
+    const result = parseMembershipOrder(
+      session({ metadata: {}, mode: 'subscription', subscription: { id: 'sub_live_456' } })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.subscriptionId).toBe('sub_live_456');
+  });
+
+  it('returns null — never undefined — for an absent subscription', () => {
+    const result = membership({ level: 'Individual' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.subscriptionId).toBeNull();
   });
 
   it('returns null — never undefined — for an absent userId', () => {

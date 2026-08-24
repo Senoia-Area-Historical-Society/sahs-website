@@ -26,6 +26,10 @@ export interface CheckoutSessionLike {
     customer_details?: { name?: string | null; email?: string | null } | null;
     amount_total?: number | null;
     payment_intent?: string | { id: string } | null;
+    /** `'subscription'` is how a pricing-table membership identifies itself — see `classifyCheckoutSession`. */
+    mode?: string | null;
+    /** Set on a subscription-mode session once Stripe has created the subscription. */
+    subscription?: string | { id: string } | null;
     metadata?: Record<string, string> | null;
 }
 
@@ -41,8 +45,26 @@ export interface CheckoutSessionLike {
 export type CheckoutKind = 'ticket' | 'membership' | 'unrelated';
 
 /**
- * Anything without a recognized `type` is `unrelated` — acknowledged with a 200 and no
- * record written.
+ * Anything without a recognized `type` — and not a subscription — is `unrelated`:
+ * acknowledged with a 200 and no record written.
+ *
+ * **`mode === 'subscription'` is the rule that matters in production.** Every real
+ * membership is bought through the Stripe Pricing Table embedded in `Support.tsx`, and
+ * Stripe — not our code — creates that Checkout Session, so it carries **no metadata at
+ * all**. Keying only on `metadata.type` therefore classified every genuine member as
+ * `unrelated` and dropped them: no record, and no welcome email. Confirmed against live
+ * data — a real pricing-table session has `metadata: {}` and `mode: 'subscription'` —
+ * and against Resend, where every message ever sent from this account was a ticket
+ * confirmation and not one was a membership welcome.
+ *
+ * This is safe *because memberships are the only recurring products on the account*. The
+ * donation Payment Link and every ticket are one-time (`mode: 'payment'`), so they still
+ * land in `unrelated`. **Adding a recurring donation price would silently classify
+ * donors as members** and mail them member benefits; give any such price a
+ * `metadata.type` and branch on it here before shipping it.
+ *
+ * `metadata.type` is still honoured first, so a session minted by our own code keeps
+ * routing on its explicit label regardless of mode.
  *
  * There used to be a third kind here. Room bookings carried `metadata: { bookingId }`
  * and no `type` at all, so they were classified by that field's presence. That flow was
@@ -54,6 +76,7 @@ export function classifyCheckoutSession(session: CheckoutSessionLike): CheckoutK
     const metadata = session.metadata ?? {};
     if (metadata.type === 'ticket') return 'ticket';
     if (metadata.type === 'membership') return 'membership';
+    if (session.mode === 'subscription') return 'membership';
     return 'unrelated';
 }
 
@@ -66,8 +89,7 @@ export type FulfillmentRejection =
     | 'missing_event_id'
     | 'missing_event_title'
     | 'invalid_quantity'
-    | 'missing_email'
-    | 'missing_level';
+    | 'missing_email';
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; reason: FulfillmentRejection };
 
@@ -82,9 +104,17 @@ export interface TicketRecord {
 
 export interface MembershipRecord {
     email: string;
-    level: string;
+    /**
+     * `null` when the session carries no `metadata.level` — the normal case for a
+     * pricing-table membership, where the tier is a property of the Stripe subscription
+     * rather than of anything we wrote. `fulfillMembership` resolves it from the
+     * subscription; this module stays free of imports and so cannot look it up itself.
+     */
+    level: string | null;
     quantity: number;
     userId: string | null;
+    /** The Stripe subscription this membership belongs to, or `null` for a one-time join. */
+    subscriptionId: string | null;
     /** First-name guess for the welcome email; '' when Stripe collected no name. */
     firstName: string;
 }
@@ -131,8 +161,18 @@ export function parseTicketOrder(session: CheckoutSessionLike): Parsed<TicketRec
 }
 
 /**
- * `email` and `level` are hard requirements because a membership record without them
- * cannot be renewed, matched to a Stripe customer, or turned into a welcome email.
+ * `email` is the only hard requirement: a membership is renewed, looked up and mailed by
+ * address, so a record without one is not a membership.
+ *
+ * `level` used to be a second hard requirement, rejecting with `'missing_level'`. That
+ * was correct while our own `createMembershipCheckoutSession` was assumed to be the only
+ * source — it always wrote the field, so an absent one meant forged metadata. It is
+ * wrong now that pricing-table sessions are recognised: those carry no metadata at all,
+ * so the rejection would turn *every real membership* into an `UnfulfillableSessionError`,
+ * a 500, and an endless Stripe retry of an order that can never succeed. The tier is
+ * instead resolved from the subscription by `fulfillMembership`, which falls back to a
+ * generic label rather than failing — the same reasoning `parseTicketOrder` applies to a
+ * missing name: never lose a paid order over a field that is only a label.
  *
  * Note what the old inline version did with a thin metadata object: it wrote
  * `level: session.metadata?.level`, i.e. `undefined`, which the Admin SDK rejects
@@ -143,13 +183,11 @@ export function parseTicketOrder(session: CheckoutSessionLike): Parsed<TicketRec
 export function parseMembershipOrder(session: CheckoutSessionLike): Parsed<MembershipRecord> {
     const metadata = session.metadata ?? {};
 
-    // Unlike a ticket, a membership has no other identifier: it is renewed, looked up
-    // and mailed by email address, so a record without one is not a membership. Kept as
-    // a rejection for that reason, with the `customer_details` fallback below making it
-    // effectively unreachable — Stripe echoes the address checkout was created with.
+    // The `customer_details` fallback inside `resolveEmail` makes this effectively
+    // unreachable — Stripe echoes the address checkout collected — but a membership
+    // record with no address is not one we could ever act on.
     const email = resolveEmail(session);
     if (email === null) return { ok: false, reason: 'missing_email' };
-    if (!nonEmpty(metadata.level)) return { ok: false, reason: 'missing_level' };
 
     // A missing quantity means one membership — unlike a ticket, where an unparseable
     // quantity implies forged metadata, `quantity` here has always been optional.
@@ -159,12 +197,20 @@ export function parseMembershipOrder(session: CheckoutSessionLike): Parsed<Membe
         ok: true,
         value: {
             email,
-            level: metadata.level.trim(),
+            level: nonEmpty(metadata.level) ? metadata.level.trim() : null,
             quantity,
             userId: nonEmpty(metadata.userId) ? metadata.userId.trim() : null,
+            subscriptionId: resolveId(session.subscription),
             firstName: guessFirstName(session.customer_details?.name),
         },
     };
+}
+
+/** Unwraps a Stripe reference that may arrive as a bare id or as an expanded object. */
+function resolveId(ref: string | { id: string } | null | undefined): string | null {
+    if (typeof ref === 'string') return nonEmpty(ref) ? ref.trim() : null;
+    if (ref && nonEmpty(ref.id)) return ref.id.trim();
+    return null;
 }
 
 /**

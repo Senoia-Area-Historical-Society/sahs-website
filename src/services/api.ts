@@ -216,28 +216,33 @@ export async function verifyTicketConfirmation(confirmationNumber: string): Prom
   return res.json();
 }
 
+/**
+ * Throws on failure rather than returning `[]`.
+ *
+ * The previous version caught everything and returned an empty array, which made
+ * `MembershipsAdmin`'s error banner unreachable: a 500 from `listStripeSubscriptions`,
+ * an expired Stripe key, or a network failure all rendered as the empty-state copy
+ * "No membership records found matching your filters." Someone checking the roster
+ * during an outage would conclude the society has no members, which is the one wrong
+ * answer this page must never give. The caller already has a `catch` that surfaces the
+ * message.
+ */
 export async function getMemberships(): Promise<Membership[]> {
-  try {
-    const functionsBaseUrl = getFunctionsBaseUrl();
-    
-    const functionUrl = `${functionsBaseUrl}/listStripeSubscriptions`;
-    
-    const response = await fetch(functionUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+  const functionsBaseUrl = getFunctionsBaseUrl();
+  const functionUrl = `${functionsBaseUrl}/listStripeSubscriptions`;
 
-    if (!response.ok) {
-      throw new Error(`Cloud function returned ${response.status}`);
-    }
+  const response = await fetch(functionUrl, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
 
-    return await response.json();
-  } catch (err) {
-    console.error('Error fetching memberships from Stripe:', err);
-    return [];
+  if (!response.ok) {
+    throw new Error(`Cloud function returned ${response.status}`);
   }
+
+  return await response.json();
 }
 
 /** Fetch all tickets (admin view). Throws on failure so the caller can surface the error. */

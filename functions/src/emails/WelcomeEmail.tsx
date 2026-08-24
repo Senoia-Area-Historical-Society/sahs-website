@@ -5,6 +5,16 @@ import {
 
 interface WelcomeEmailProps {
   firstName?: string;
+  /**
+   * Adds a short note explaining why this arrived late. Set only by
+   * `scripts/backfill_welcome_emails.cjs`, for members who joined *after* the welcome
+   * email existed and should have received one at the time — a fault on our side.
+   *
+   * Deliberately not set for the members who joined before this system was built. Telling
+   * someone who signed up in 2024 that "a technical error delayed this" would be untrue;
+   * they get the same letter with no apology attached.
+   */
+  delayedDelivery?: boolean;
 }
 
 const brown = '#6b5c3e';
@@ -15,7 +25,7 @@ const mutedBrown = '#a09080';
 const bodyFont = 'Georgia, serif';
 const uiFont = 'Arial, sans-serif';
 
-export function WelcomeEmail({ firstName }: WelcomeEmailProps) {
+export function WelcomeEmail({ firstName, delayedDelivery }: WelcomeEmailProps) {
   const name = firstName || 'Friend';
 
   return (
@@ -47,6 +57,18 @@ export function WelcomeEmail({ firstName }: WelcomeEmailProps) {
               and share the stories, structures, and heritage of Senoia and the surrounding
               region — and that work simply wouldn't be possible without members like you.
             </Text>
+
+            {delayedDelivery && (
+              <Section style={{ padding: '14px 16px', borderLeft: `3px solid ${mutedBrown}`, backgroundColor: lightCream, marginBottom: 20 }}>
+                <Text style={{ margin: 0, fontFamily: uiFont, fontSize: 14, color: '#5a4a3a', lineHeight: '1.6' }}>
+                  <strong>A note on the timing.</strong> You should have received this letter when
+                  you joined. A technical fault on our website meant our welcome emails were never
+                  sent, and we only discovered it recently. We're sorry for the silence — your
+                  membership has been active and in good standing the whole time, and nothing about
+                  it was affected.
+                </Text>
+              </Section>
+            )}
 
             <Text style={{ margin: '0 0 28px', fontFamily: bodyFont, fontSize: 17, lineHeight: '1.7', color: darkBrown }}>
               Here's a reminder of everything your membership includes.
