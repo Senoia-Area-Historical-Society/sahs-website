@@ -77,12 +77,22 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
 function HostnameRedirect() {
   const { pathname } = useLocation();
   const hostname = window.location.hostname;
-  
+
+  // Stray traffic (old bookmarks, indexed links) sometimes lands on the raw
+  // Firebase-assigned domain instead of the real site — that domain serves a
+  // stale pre-hosting-target deploy, so bounce it to the real domain instead
+  // of letting staff hit broken/blank pages there (e.g. via the footer's
+  // relative "Staff Login" link, which stays on whatever origin it's clicked from).
+  if (hostname.endsWith('.firebaseapp.com') || hostname.endsWith('.web.app')) {
+    window.location.replace(`https://senoiahistory.com${pathname}${window.location.search}`);
+    return null;
+  }
+
   // If we're on the admin subdomain and at the root path, redirect to admin content
   if (hostname.startsWith('admin.') && pathname === '/') {
     return <Navigate to="/admin/content" replace />;
   }
-  
+
   return null;
 }
 
