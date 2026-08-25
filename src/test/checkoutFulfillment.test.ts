@@ -205,6 +205,7 @@ describe('parseMembershipOrder', () => {
         userId: 'u_1',
         subscriptionId: null,
         firstName: '',
+        lastName: '',
       },
     });
   });
@@ -309,5 +310,26 @@ describe('parseMembershipOrder', () => {
   it('falls back to an empty greeting when Stripe collected no name', () => {
     const result = membership({ level: 'family' }, { customer_details: null });
     expect(result.ok && result.value.firstName).toBe('');
+  });
+
+  /**
+   * The complement of the firstName cases above: lastName is not a greeting, so it
+   * keeps everything the first token doesn't — firstName + lastName reconstructs the
+   * original name rather than dropping the middle of it.
+   */
+  it.each([
+    ['Hilary De Puy', 'De Puy'],
+    ['Robert W Trammell', 'W Trammell'],
+    ['Mary Anne Nolan', 'Anne Nolan'],
+    ['Nolan', ''],
+    ['  Cat  Nolan  ', 'Nolan'],
+  ])('records %j as lastName %j', (name, expected) => {
+    const result = membership({ level: 'family' }, { customer_details: { name } });
+    expect(result.ok && result.value.lastName).toBe(expected);
+  });
+
+  it('falls back to an empty lastName when Stripe collected no name', () => {
+    const result = membership({ level: 'family' }, { customer_details: null });
+    expect(result.ok && result.value.lastName).toBe('');
   });
 });

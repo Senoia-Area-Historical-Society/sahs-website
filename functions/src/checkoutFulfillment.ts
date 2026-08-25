@@ -117,6 +117,12 @@ export interface MembershipRecord {
     subscriptionId: string | null;
     /** First-name guess for the welcome email; '' when Stripe collected no name. */
     firstName: string;
+    /**
+     * Everything after the first name, for the Resend Audience contact record — not a
+     * greeting, so the "surname fragment glued on" problem `guessFirstName` exists to
+     * avoid does not apply here. '' when Stripe collected no name, or only one word.
+     */
+    lastName: string;
 }
 
 /**
@@ -203,6 +209,7 @@ export function parseMembershipOrder(session: CheckoutSessionLike): Parsed<Membe
             userId: nonEmpty(metadata.userId) ? metadata.userId.trim() : null,
             subscriptionId: resolveId(session.subscription),
             firstName: guessFirstName(session.customer_details?.name),
+            lastName: guessLastName(session.customer_details?.name),
         },
     };
 }
@@ -231,6 +238,24 @@ function resolveId(ref: string | { id: string } | null | undefined): string | nu
 function guessFirstName(fullName: string | null | undefined): string {
     const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
     return parts[0] ?? '';
+}
+
+/**
+ * Everything after the first token. The complement of `guessFirstName`, kept as a
+ * separate function rather than derived at the call site so both stay next to the
+ * same doc comment explaining why they split there.
+ *
+ * This is the reverse of the "first token only" reasoning above, and deliberately so:
+ * that reasoning is about what reads well in a *greeting* ("Dear Hilary De," is worse
+ * than "Dear Hilary,"), not about what belongs in a directory field. A Resend contact's
+ * `last_name` has no such readability constraint, and firstName + lastName should
+ * reconstruct the original name, so "Hilary De Puy" is firstName "Hilary" / lastName
+ * "De Puy" — nothing is silently dropped the way it would be if lastName only ever took
+ * the final token.
+ */
+function guessLastName(fullName: string | null | undefined): string {
+    const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
+    return parts.slice(1).join(' ');
 }
 
 /**
