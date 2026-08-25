@@ -68,7 +68,18 @@ function arg(name, fallback) {
 
 const SEND    = process.argv.includes('--send');
 const ONLY    = (arg('only', '') || '').toLowerCase().trim();
+// Comma-separated addresses to skip. Exists because a member's name can be wrong in
+// Stripe in a way we cannot correct -- see issue #61, where a legacy Webflow integration
+// reverts `customer.name` edits within seconds. Excluding them here keeps the bulk send
+// clean while their letter is sent separately with the right name.
+const EXCLUDE = (arg('exclude', '') || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
 const LIMIT   = parseInt(arg('limit', '0'), 10) || 0;
+// ISO-8601 instant to hand Resend as `scheduledAt`. Scheduling happens on Resend's side,
+// not here, so the send survives this machine sleeping, the terminal closing, or the
+// laptop being closed entirely -- which a local cron or a background process would not.
+// Each scheduled message returns an id, recorded on the membership document, so an
+// individual letter can still be cancelled before it goes out.
+const SCHEDULE_AT = (arg('schedule-at', '') || '').trim();
 
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
 const RESEND_KEY = process.env.RESEND_API_KEY;
@@ -107,6 +118,8 @@ async function main() {
   console.log(`Mode:   ${SEND ? '*** LIVE SEND ***' : 'dry run (no email will be sent)'}`);
   console.log('Letter: welcome email introduced as part of the 2026 digital transformation');
   if (ONLY) console.log(`Filter: only ${ONLY}`);
+  if (EXCLUDE.length) console.log(`Filter: excluding ${EXCLUDE.join(', ')}`);
+  if (SCHEDULE_AT) console.log(`Schedule: queued at Resend for ${SCHEDULE_AT}`);
   console.log('');
 
   const subs = await stripe.subscriptions
@@ -139,6 +152,11 @@ async function main() {
       continue;
     }
     if (ONLY && email !== ONLY) { stats.skippedFilter++; continue; }
+    if (EXCLUDE.includes(email)) {
+      console.log(`  SKIP ${email}: excluded via --exclude`);
+      stats.skippedFilter++;
+      continue;
+    }
     if (LIMIT && processed >= LIMIT) break;
 
     const greetedDocId = await alreadyGreeted(sub.id);
@@ -160,11 +178,12 @@ async function main() {
 
     try {
       const html = await renderWelcome({ firstName, sentToExistingMember: true });
-      const { error } = await resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: 'Senoia Area Historical Society <membership@updates.senoiahistory.com>',
         to: email,
         subject: 'Thank You for Your SAHS Membership',
         html,
+        ...(SCHEDULE_AT ? { scheduledAt: SCHEDULE_AT } : {}),
       });
       // Resend reports failures in the response body rather than by rejecting — the same
       // trap `sendWelcomeEmail` documents. Not checking `error` would log a success for
@@ -172,6 +191,10 @@ async function main() {
       if (error) throw new Error(error.message);
 
       const now = new Date().toISOString();
+      // When scheduled, this is the moment the letter actually reaches the member, and it
+      // is what `alreadyGreeted` keys on -- so a re-run between now and then correctly
+      // treats these members as done and cannot queue a second copy.
+      const deliveryAt = SCHEDULE_AT ? new Date(SCHEDULE_AT).toISOString() : now;
       // Written in the shape `fulfillMembership` writes, keyed by a synthetic id so a
       // later real webhook delivery (keyed by session id) cannot collide with it, while
       // `stripeSubscriptionId` still makes both discoverable as the same member.
@@ -186,7 +209,9 @@ async function main() {
         paymentId: null,
         stripeSubscriptionId: sub.id,
         userId: null,
-        welcomeEmailSentAt: now,
+        welcomeEmailSentAt: deliveryAt,
+        welcomeEmailScheduledAt: SCHEDULE_AT ? deliveryAt : null,
+        welcomeEmailResendId: (data && data.id) || null,
         welcomeEmailError: null,
         backfilledAt: now,
         updatedAt: now,
@@ -204,7 +229,7 @@ async function main() {
   console.log('\n─── Summary ───');
   console.log(`  would-send / sent   : ${SEND ? stats.sent : processed}`);
   console.log(`  skipped (greeted)   : ${stats.skippedAlreadySent}`);
-  if (ONLY) console.log(`  skipped (--only)    : ${stats.skippedFilter}`);
+  if (ONLY || EXCLUDE.length) console.log(`  skipped (filters)   : ${stats.skippedFilter}`);
   if (SEND) console.log(`  failed              : ${stats.failed}`);
   if (!SEND) console.log('\nNothing was sent. Re-run with --send to deliver.');
 }
