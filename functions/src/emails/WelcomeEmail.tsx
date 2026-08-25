@@ -101,16 +101,24 @@ export function WelcomeEmail({ firstName, sentToExistingMember }: WelcomeEmailPr
               body="Special events, historic tours, and commemorations throughout the year — including our summer events and signature fundraisers."
             />
 
+            {/* Digital Archives. A live benefit, so BenefitRow rather than
+                ComingSoonRow — the latter stamps a "Coming Soon" badge, which would
+                contradict a paragraph telling the reader the archives are online now.
+                Deliberately promises no member-exclusive features: the tiers that were
+                once listed here (research notes, Favorites, high-resolution downloads)
+                do not exist yet, and this letter goes to members who joined as far back
+                as 2024 — announcing benefits they still cannot use reads as an
+                unfulfilled promise rather than a welcome. */}
+            <BenefitRow
+              title="Digital Archives"
+              accent={brown}
+              body="A growing portion of our collection is now online at archives.senoiahistory.com, and more is being digitized all the time — work made possible by the support of members like you."
+            />
+
             {/* Newsletter - Coming Soon */}
             <ComingSoonRow
               title="Member Newsletter"
               body="Updates on SAHS news, upcoming programs, and preservation projects delivered directly to your inbox."
-            />
-
-            {/* Digital Archives - Coming Soon */}
-            <ComingSoonRow
-              title="Digital Archives — Member Features"
-              body="Our digital archives at archives.senoiahistory.com are available to all. Exciting member-exclusive features are on their way, including research notes and comments, a personal Favorites collection, and full high-resolution image downloads."
             />
 
             {/* Meeting Room */}
