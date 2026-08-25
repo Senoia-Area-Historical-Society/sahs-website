@@ -70,6 +70,34 @@ export function WelcomeEmail({ firstName, sentToExistingMember }: WelcomeEmailPr
               </Section>
             )}
 
+            {/* Time-sensitive event promotion, placed above the benefits so it is seen
+                rather than buried under a list the reader may already know.
+                NOTE: this names a specific date and will read as stale once the event has
+                passed — it is here for the 2026 backfill send and should be updated or
+                removed before the letter is used for routine new-member welcomes.
+                The day of week is taken from the post's `eventDate` (Saturday), not from
+                the post's body copy, which says "Friday" and is wrong. */}
+            <Section style={{ padding: '16px', border: `2px solid ${brown}`, backgroundColor: lightCream, marginBottom: 24 }}>
+              <Text style={{ margin: '0 0 4px', fontFamily: uiFont, fontSize: 11, fontWeight: 'bold', letterSpacing: 1.5, textTransform: 'uppercase', color: brown }}>
+                This Weekend
+              </Text>
+              <Text style={{ margin: '0 0 6px', fontFamily: bodyFont, fontSize: 17, fontWeight: 'bold', color: darkBrown }}>
+                Yacht Rock Party — Saturday, August 29
+              </Text>
+              <Text style={{ margin: '0 0 12px', fontFamily: uiFont, fontSize: 14, color: '#5a4a3a', lineHeight: '1.6' }}>
+                Our signature summer fundraiser returns to the Freeman-Sasser Building at 7:00 PM
+                for an evening of smooth sailing hits with DJ Evan. Nautical attire encouraged,
+                captain's hats optional. Tickets are $50 and every one supports the preservation
+                work your membership makes possible — we'd love to see you there.
+              </Text>
+              <Button
+                href="https://senoiahistory.com/news/yacht-rock-party-2026"
+                style={{ backgroundColor: brown, color: '#ffffff', fontFamily: uiFont, fontSize: 12, fontWeight: 'bold', letterSpacing: 1, textTransform: 'uppercase', textDecoration: 'none', padding: '10px 20px', borderRadius: 4 }}
+              >
+                Get Tickets
+              </Button>
+            </Section>
+
             <Text style={{ margin: '0 0 28px', fontFamily: bodyFont, fontSize: 17, lineHeight: '1.7', color: darkBrown }}>
               Here's a reminder of everything your membership includes.
             </Text>
@@ -112,7 +140,16 @@ export function WelcomeEmail({ firstName, sentToExistingMember }: WelcomeEmailPr
             <BenefitRow
               title="Digital Archives"
               accent={brown}
-              body="A growing portion of our collection is now online at archives.senoiahistory.com, and more is being digitized all the time — work made possible by the support of members like you."
+              body={
+                <>
+                  A growing portion of our collection is now online at{' '}
+                  <Link href="https://archives.senoiahistory.com" style={{ color: brown, fontWeight: 'bold', textDecoration: 'underline' }}>
+                    archives.senoiahistory.com
+                  </Link>
+                  , and more is being digitized all the time — work made possible by the support of
+                  members like you.
+                </>
+              }
             />
 
             {/* Newsletter - Coming Soon */}
@@ -192,7 +229,10 @@ export function WelcomeEmail({ firstName, sentToExistingMember }: WelcomeEmailPr
   );
 }
 
-function BenefitRow({ title, body, accent }: { title: string; body: string; accent: string }) {
+// `body` is ReactNode rather than string so a row can contain a link — the Digital
+// Archives row needs archives.senoiahistory.com to be clickable. Plain strings still
+// work unchanged, so every other caller is unaffected.
+function BenefitRow({ title, body, accent }: { title: string; body: React.ReactNode; accent: string }) {
   return (
     <Section style={{ padding: '14px 16px', borderLeft: `3px solid ${accent}`, backgroundColor: lightCream, marginBottom: 12 }}>
       <Text style={{ margin: '0 0 4px', fontFamily: bodyFont, fontSize: 15, fontWeight: 'bold', color: darkBrown }}>{title}</Text>
