@@ -15,11 +15,9 @@ export default function Header() {
 
   // Close mobile menu when route changes
   useEffect(() => {
-    if (isMobileMenuOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsMobileMenuOpen(false);
-    }
-  }, [location, isMobileMenuOpen]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMobileMenuOpen(false);
+  }, [location]);
 
   // Lock body scroll when mobile menu is open
   useEffect(() => {
