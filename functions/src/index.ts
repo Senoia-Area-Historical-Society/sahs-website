@@ -88,6 +88,50 @@ async function sendWelcomeEmail(
     return 'sent';
 }
 
+/**
+ * Adds a new member to the Resend Audience so they receive the newsletter without
+ * anyone having to run `scripts/backfill_resend_members.cjs` by hand.
+ *
+ * CLAUDE.md has described this as part of the live flow for a while — "Stripe Checkout
+ * → stripeWebhook function → Resend welcome email → contact added to Resend Audience" —
+ * but nothing here ever did the third step; only the one-time backfill script did, and
+ * only when someone remembered to run it. New members were mailed a welcome letter and
+ * then silently excluded from every newsletter afterward, discoverable only by noticing
+ * their absence from a send.
+ *
+ * `resend.contacts.create` upserts by email within an audience — confirmed by the
+ * backfill script's own doc comment ("safe to run multiple times") — so a member
+ * rejoining under an email already in the audience is not an error.
+ *
+ * Throws on failure, matching `sendWelcomeEmail`, so `fulfillMembership`'s existing
+ * try/catch records the outcome on the membership document the same way.
+ */
+async function addMemberToResendAudience(
+    email: string,
+    firstName: string,
+    lastName: string
+): Promise<'added' | 'skipped'> {
+    const audienceId = process.env.RESEND_AUDIENCE_ID;
+    if (!process.env.RESEND_API_KEY || !audienceId) {
+        // Same reasoning as sendWelcomeEmail's 'skipped': the emulator and any local
+        // run have neither secret, and the membership record must still be written.
+        console.warn('RESEND_API_KEY or RESEND_AUDIENCE_ID not configured — skipping audience sync');
+        return 'skipped';
+    }
+    const resend = getResend();
+    const { error } = await resend.contacts.create({
+        audienceId,
+        email,
+        firstName,
+        lastName,
+        unsubscribed: false,
+    });
+    if (error) {
+        throw new Error(`Resend rejected the audience contact: ${error.message}`);
+    }
+    return 'added';
+}
+
 // Configure Google Auth for Calendar API.
 //
 // Deliberately `require()` and not `import`: the key file is optional and is
@@ -476,6 +520,8 @@ async function fulfillMembership(session: Stripe.Checkout.Session): Promise<'cre
             userId: membership.userId,
             welcomeEmailSentAt: null,
             welcomeEmailError: null,
+            resendAudienceSyncedAt: null,
+            resendAudienceError: null,
             updatedAt: new Date().toISOString(),
         });
         return 'created' as const;
@@ -494,6 +540,21 @@ async function fulfillMembership(session: Stripe.Checkout.Session): Promise<'cre
             // Best-effort: if even this update fails the log above still stands, and
             // throwing here would fail an event whose money-critical write succeeded.
             await ref.update({ welcomeEmailError: message }).catch(() => undefined);
+        }
+
+        // Independent of the welcome email: a Resend outage should not cost a member
+        // their newsletter subscription, and a failed audience sync should not stop the
+        // welcome email above from having already gone out.
+        try {
+            const sync = await addMemberToResendAudience(membership.email, membership.firstName, membership.lastName);
+            if (sync === 'added') {
+                await ref.update({ resendAudienceSyncedAt: new Date().toISOString() });
+            }
+            console.log(`stripeWebhook: resend audience sync ${sync} for membership ${session.id}`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`stripeWebhook: resend audience sync FAILED for membership ${session.id} — the record is saved; backfill by hand`, err);
+            await ref.update({ resendAudienceError: message }).catch(() => undefined);
         }
     }
 
@@ -606,7 +667,7 @@ async function sendStaffAlert(subject: string, text: string): Promise<void> {
     if (error) throw new Error(`Resend rejected the staff alert: ${error.message}`);
 }
 
-export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'RESEND_API_KEY'] }, async (req, res) => {
+export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'RESEND_API_KEY', 'RESEND_AUDIENCE_ID'] }, async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
     let event: Stripe.Event;
