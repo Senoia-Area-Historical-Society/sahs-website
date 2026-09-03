@@ -112,7 +112,9 @@ const EVENTS = [
     // 7:00 PM Eastern. September is EDT (-04:00).
     eventDate: '2026-09-10T19:00:00-04:00',
     location: MUSEUM,
-    art: { bannerImage: 'sept-program-banner-1920x1080.jpg', mainImage: 'sept-program-card-1200x675.jpg' },
+    // Susan's hand-designed graphics, not the Nano Banana placeholder — do not
+    // overwrite these by re-running generate-fall-winter-2026.sh's sept_program().
+    art: { bannerImage: 'sept-program-banner-1920x1080.jpg', mainImage: 'sept-program-card-1200x628.jpg' },
     excerpt:
       'Nicole Williams, PhD joins us for our September Monthly Program with a presentation on the Declaration of Independence — the document, the arguments behind it, and what it set in motion. Free and open to all.',
     content: `
