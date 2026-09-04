@@ -14,7 +14,7 @@ export async function authHeaders(): Promise<Record<string, string>> {
   if (!user) throw new Error('You are signed out. Please sign in again.');
   return { Authorization: `Bearer ${await user.getIdToken()}` };
 }
-import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Membership, Ticket, VolunteerSheet, VolunteerSlot, VolunteerRegistration } from '../types/index';
+import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Membership, Ticket, VolunteerSheet, VolunteerSlot, VolunteerRegistration, Submission } from '../types/index';
 
 // Helpers to transform Firestore docs safely
 const toPost = (doc: any): Post => ({ id: doc.id, ...doc.data() } as Post);
@@ -167,6 +167,24 @@ export async function submitApplication(type: 'vendor' | 'sponsor' | 'contact', 
     console.error(`Error submitting ${type} application:`, err);
     throw err;
   }
+}
+
+/**
+ * Every public submission, newest first. Curators only, per `firestore.rules`.
+ *
+ * Throws rather than returning `[]` — an empty list and a permission failure must not
+ * render identically, or someone checking for enquiries during an outage concludes
+ * there are none. Same reasoning as `getMemberships`.
+ *
+ * `submittedAt` is an ISO string rather than a Timestamp (that is what
+ * `submitApplication` writes), so it sorts lexicographically, which for ISO-8601 is
+ * also chronologically.
+ */
+export async function getSubmissions(): Promise<Submission[]> {
+  const snapshot = await getDocs(collection(db, 'submissions'));
+  return snapshot.docs
+    .map(d => ({ id: d.id, ...d.data() } as Submission))
+    .sort((a, b) => (b.submittedAt ?? '').localeCompare(a.submittedAt ?? ''));
 }
 
 // `submitMembershipRequest` was removed along with the `createMembershipCheckoutSession`

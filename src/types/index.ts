@@ -193,3 +193,25 @@ export interface ShortLink {
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
 }
+
+/**
+ * A public form submission — a contact message, or a vendor/sponsor application.
+ *
+ * The fields vary by `type`, which is why most are optional: the contact form sends
+ * `name`/`message`, the vendor form sends `businessName`/`productDescription`, and
+ * `firestore.rules` allows the union while rejecting anything outside it.
+ */
+export interface Submission {
+  id: string;
+  type: 'contact' | 'vendor' | 'sponsor';
+  status: 'pending';
+  submittedAt: string;
+  email: string;
+  name?: string;
+  message?: string;
+  businessName?: string;
+  contactName?: string;
+  phone?: string;
+  website?: string;
+  productDescription?: string;
+}

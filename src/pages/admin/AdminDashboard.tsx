@@ -5,12 +5,14 @@ import { Link } from 'react-router-dom';
 import AdminHeader from './AdminHeader';
 import ErrorBanner from '../../components/admin/ErrorBanner';
 import { FileText, Calendar, Ticket, CalendarDays, Users, Plus, TrendingUp, Clock, Loader2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PostCounts { published: number; draft: number; archived: number; }
 interface UpcomingEvent { id: string; title: string; slug: string; eventDate: Timestamp | null; location?: string; }
 interface RecentTicket { id: string; eventTitle: string; email: string; quantity: number; totalAmount: number; purchasedAt: string; }
 
 export default function AdminDashboard() {
+  const { isEditor, isCurator } = useAuth();
   const [postCounts, setPostCounts] = useState<PostCounts | null>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [recentTickets, setRecentTickets] = useState<RecentTicket[]>([]);
@@ -99,12 +101,16 @@ export default function AdminDashboard() {
               {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
-          <Link
-            to="/admin/content"
-            className="flex items-center gap-2 bg-tan hover:bg-tan-dark text-white px-5 py-2 rounded-md transition-colors font-sans text-sm font-bold uppercase tracking-wider shadow-sm"
-          >
-            <Plus size={16} /> New Post
-          </Link>
+          {/* A write CTA, so editors and above only — it was a dead end for
+              read_only and board_member accounts. */}
+          {isEditor && (
+            <Link
+              to="/admin/content"
+              className="flex items-center gap-2 bg-tan hover:bg-tan-dark text-white px-5 py-2 rounded-md transition-colors font-sans text-sm font-bold uppercase tracking-wider shadow-sm"
+            >
+              <Plus size={16} /> New Post
+            </Link>
+          )}
         </div>
 
         {loadErrors.length > 0 && <ErrorBanner message={`Failed to load: ${loadErrors.join(', ')}.`} />}
@@ -194,14 +200,17 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* Quick Links */}
+            {/* Quick Links — role-filtered, exactly like AdminHeader's nav.
+                A read_only or board_member account previously saw all four and got a
+                permission error on three of them. `visible` mirrors firestore.rules
+                for the data behind each page; keep the two lists in step. */}
             <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: 'Manage Content', to: '/admin/content', icon: <FileText size={16} /> },
-                { label: 'Memberships', to: '/admin/memberships', icon: <Users size={16} /> },
-                { label: 'Volunteers', to: '/admin/volunteers', icon: <CalendarDays size={16} /> },
-                { label: 'Ticket Sales', to: '/admin/tickets', icon: <TrendingUp size={16} /> },
-              ].map(({ label, to, icon }) => (
+                { label: 'Manage Content', to: '/admin/content', icon: <FileText size={16} />, visible: isEditor },
+                { label: 'Memberships', to: '/admin/memberships', icon: <Users size={16} />, visible: isCurator },
+                { label: 'Volunteers', to: '/admin/volunteers', icon: <CalendarDays size={16} />, visible: isEditor },
+                { label: 'Ticket Sales', to: '/admin/tickets', icon: <TrendingUp size={16} />, visible: true },
+              ].filter(l => l.visible).map(({ label, to, icon }) => (
                 <Link
                   key={to}
                   to={to}

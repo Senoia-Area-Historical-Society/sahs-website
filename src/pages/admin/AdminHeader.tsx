@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   Mail,
   Landmark,
+  Inbox,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -83,6 +84,7 @@ export default function AdminHeader() {
       items: [
         { label: 'Volunteers', path: '/admin/volunteers', icon: HandHeart, description: 'Signups and volunteer tracking', visible: isEditor },
         { label: 'Memberships', path: '/admin/memberships', icon: Users, description: 'Member database and status', visible: isCurator },
+        { label: 'Submissions', path: '/admin/submissions', icon: Inbox, description: 'Contact messages and vendor applications', visible: isCurator },
       ]
     },
     {
