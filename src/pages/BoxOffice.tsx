@@ -18,9 +18,15 @@ export default function BoxOffice() {
       try {
         // Equality-only filters (no orderBy chained) so this never depends on a
         // composite index existing — sort client-side instead.
+        //
+        // Deliberately NOT filtered on `type`. There is no news/event split any more,
+        // and a `where('type','==','event')` clause is worse than redundant: Firestore
+        // treats a missing field as absent from the index rather than unequal, so a
+        // post created any way that skips `type` — the console, an import, a migration
+        // — silently disappears from the box office while still being on sale. The
+        // real predicate is having a ticket price, which is applied below.
         const q = query(
           collection(db, 'posts'),
-          where('type', '==', 'event'),
           where('status', '==', 'published')
         );
         const snapshot = await getDocs(q);

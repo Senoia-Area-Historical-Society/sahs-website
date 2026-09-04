@@ -44,6 +44,7 @@ import VolunteersAdmin from './pages/admin/VolunteersAdmin';
 import TicketScanner from './pages/admin/TicketScanner';
 
 import UsersAdmin from './pages/admin/UsersAdmin';
+import SubmissionsAdmin from './pages/admin/SubmissionsAdmin';
 import ShortLinksAdmin from './pages/admin/ShortLinksAdmin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import NewsletterComposer from './pages/admin/NewsletterComposer';
@@ -116,6 +117,11 @@ function App() {
           <Route path="/admin" element={
             <ProtectedRoute>
               <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/submissions" element={
+            <ProtectedRoute>
+              <SubmissionsAdmin />
             </ProtectedRoute>
           } />
           <Route path="/admin/users" element={

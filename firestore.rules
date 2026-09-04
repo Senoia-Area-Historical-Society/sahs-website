@@ -2,70 +2,111 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions: Flattened to avoid recursion and circular dependencies
-    // Admin = permanent hardcoded admins or an explicit 'admin' role override.
-    // Do NOT match on the @senoiahistory.com domain broadly here — that would grant
-    // every SAHS staff account admin rights regardless of their actual role.
-    function isAdmin() {
+    // ── Role helpers ────────────────────────────────────────────────────────────
+    //
+    // Access is granted by a `user_roles/{email}` document, never by the email
+    // domain. Do NOT match on @senoiahistory.com here — a domain match once lived in
+    // isAdmin() as a panic fix (d5059dc) and handed every staff account admin rights
+    // regardless of its actual role.
+    //
+    // `get()` and `exists()` inside a rule do NOT re-evaluate rules, so consulting
+    // user_roles from these helpers cannot recurse. They do count against the
+    // per-request document-access limit, which is why each helper reads the caller's
+    // own document once and the ladder is flat rather than nested any deeper.
+    function roleOf() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower()))
+        ? get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role
+        : '';
+    }
+
+    function isPermanentAdmin() {
       return request.auth != null && (
         request.auth.token.email.lower() == 'catnolan@senoiahistory.com' ||
-        request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com' ||
-        (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
-         get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'admin')
+        request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com'
       );
     }
 
-    function isCurator() {
-      return request.auth != null && (
-        isAdmin() || 
-        (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
-         get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'curator')
-      );
-    }
+    function isAdmin()   { return isPermanentAdmin() || roleOf() == 'admin'; }
+    function isCurator() { return isAdmin() || roleOf() == 'curator'; }
+    function isEditor()  { return isCurator() || roleOf() == 'editor'; }
 
-    function isEditor() {
-      return request.auth != null && (
-        isCurator() ||
-        (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
-         get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role == 'editor')
-      );
-    }
-
-    // Any SAHS staff account with *any* assigned role, including the view-only
-    // ones. This is the server-side mirror of `isSAHSUser` in AuthContext, which
-    // is what `ProtectedRoute` gates /admin/* on — so it must include
-    // 'board_member' as well as 'read_only', exactly as AuthContext does.
-    // A signed-in @senoiahistory.com account with NO user_roles document is
-    // deliberately not staff: the role doc is the grant, not the email domain.
+    // Any staff account with *any* assigned role, including the view-only ones. This
+    // is the server-side mirror of `isSAHSUser` in AuthContext, which is what
+    // `ProtectedRoute` gates /admin/* on — so it must include 'board_member' as well
+    // as 'read_only'. A signed-in @senoiahistory.com account with NO user_roles
+    // document is deliberately not staff: the role doc is the grant, not the domain.
     function isSAHSStaff() {
-      return request.auth != null && (
-        isEditor() ||
-        (exists(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())) &&
-         get(/databases/$(database)/documents/user_roles/$(request.auth.token.email.lower())).data.role in ['read_only', 'board_member'])
-      );
+      return isEditor() || roleOf() in ['read_only', 'board_member'];
     }
 
-    // Public Content: Anyone can read, Editors/Curators/Admins can write
-    match /posts/{doc} { allow read: if true; allow write: if isEditor(); }
+    // ── Value helpers for constrained public writes ─────────────────────────────
+    //
+    // `create: if true` on a public collection is not a shape: it accepts a 1MB
+    // document with any fields at all, including the server-controlled ones the admin
+    // views read to decide what is real. These bound both.
+    function textOk(v, max) {
+      return v == null || (v is string && v.size() <= max);
+    }
+
+    function sheetIsActive(sheetId) {
+      return get(/databases/$(database)/documents/volunteer_sheets/$(sheetId)).data.status == 'active';
+    }
+
+    // ── Public content ──────────────────────────────────────────────────────────
+    //
+    // Posts are readable when published; drafts and archived posts are staff-only.
+    // The client used to be the only gate (a `status !== 'published'` check in
+    // NewsDetail), which governed rendering but not the REST API underneath it —
+    // embargoed announcements were readable by anyone who asked for them directly.
+    //
+    // Because rules are not filters, a public *list* must carry its own
+    // `where('status','==','published')`; every public query does. Staff read is
+    // unconditional so admin previews and the dashboard's draft/archived counts work.
+    match /posts/{doc} {
+      allow read: if resource.data.status == 'published' || isSAHSStaff();
+      allow write: if isEditor();
+    }
+
     match /galleries/{doc} { allow read: if true; allow write: if isEditor(); }
     match /historical_places/{doc} { allow read: if true; allow write: if isEditor(); }
     match /organization_entities/{doc} { allow read: if true; allow write: if isEditor(); }
 
-    // Submissions: Public can ONLY create (useful for forms)
+    // ── Public form submissions ─────────────────────────────────────────────────
+    //
+    // Vendor/sponsor applications and contact-form messages. Create-only for the
+    // public, and shaped: `status` and `type` are pinned so a caller cannot file a
+    // pre-approved application, and every free-text field is capped so the collection
+    // cannot be used as free storage.
     match /submissions/{doc} {
-      allow create: if true;
+      allow create: if isCurator() || (
+        request.resource.data.keys().hasOnly([
+          'type', 'status', 'submittedAt',
+          'businessName', 'contactName', 'email', 'phone', 'website', 'productDescription',
+          'name', 'message'
+        ]) &&
+        request.resource.data.keys().hasAll(['type', 'status', 'submittedAt', 'email']) &&
+        request.resource.data.type in ['vendor', 'sponsor', 'contact'] &&
+        request.resource.data.status == 'pending' &&
+        textOk(request.resource.data.email, 200) &&
+        textOk(request.resource.data.get('name', null), 200) &&
+        textOk(request.resource.data.get('businessName', null), 200) &&
+        textOk(request.resource.data.get('contactName', null), 200) &&
+        textOk(request.resource.data.get('phone', null), 40) &&
+        textOk(request.resource.data.get('website', null), 300) &&
+        textOk(request.resource.data.get('productDescription', null), 5000) &&
+        textOk(request.resource.data.get('message', null), 5000)
+      );
       allow read, update, delete: if isCurator();
     }
 
-    // Sensitive Data: Strictly Curators/Admins only
+    // ── Sensitive data ──────────────────────────────────────────────────────────
     match /memberships/{doc} { allow read, write: if isCurator(); }
+
     match /tickets/{doc} {
-      // Read is open to all SAHS staff, not just curators: volunteers and event
-      // organizers are routinely asked "how many have we sold?", and /admin/tickets
-      // is gated on isSAHSUser by ProtectedRoute. Gating the read at isCurator()
-      // meant every read_only account reached the page and got a bare permission
-      // error (and a silent "No ticket sales yet" on the dashboard, whose query is
-      // wrapped in Promise.allSettled). Writing — cancelling a ticket — stays at
+      // Read is open to all staff, not just curators: volunteers and event organizers
+      // are routinely asked "how many have we sold?", and /admin/tickets is gated on
+      // isSAHSUser by ProtectedRoute. Writing — cancelling a ticket — stays at
       // isCurator(), mirrored client-side by the isCurator gate on the Cancel button.
       //
       // There is deliberately NO public read clause. This used to carry
@@ -73,58 +114,94 @@ service cloud.firestore {
       // look a ticket up by session id — but rules cannot inspect a query's `where`
       // clause, so that permitted *any* unauthenticated limit-1 query and let the
       // whole collection be paged through, exposing buyer names, emails and
-      // confirmation numbers (which are what `verifyTicket` admits people on).
-      // The confirmation page now goes through the `getTicketBySession` Cloud
-      // Function, which requires the buyer's own high-entropy Checkout Session id.
+      // confirmation numbers. The confirmation page now goes through the
+      // `getTicketBySession` Cloud Function, which requires the buyer's own
+      // high-entropy Checkout Session id.
       allow read: if isSAHSStaff();
       allow write: if isCurator();
     }
-    
-    // Internal Knowledge Base
+
+    // ── Internal knowledge base ─────────────────────────────────────────────────
     match /wiki/{doc} { allow read, write: if isEditor(); }
 
-    // Volunteer Management
-    // Sheets: public reads active ones; editors create/manage all
+    // ── Volunteer management ────────────────────────────────────────────────────
     match /volunteer_sheets/{sheetId} {
       allow read: if resource.data.status == 'active' || isEditor();
       allow create, update, delete: if isEditor();
 
-      // Slots: public can read if parent sheet is active; editors manage
       match /slots/{slotId} {
-        allow read: if get(/databases/$(database)/documents/volunteer_sheets/$(sheetId)).data.status == 'active' || isEditor();
+        allow read: if sheetIsActive(sheetId) || isEditor();
         allow write: if isEditor();
+
+        // The public signup path. `submitVolunteerSignup` writes the registration and
+        // this increment in ONE transaction, so without a public update clause here
+        // the whole signup rolled back and no member of the public could ever sign up
+        // — while staff, who pass isEditor(), saw it work.
+        //
+        // The grant is deliberately the narrowest thing that makes that transaction
+        // succeed: exactly one seat, never past capacity, and no other field touched.
+        // That keeps the counter honest without trusting the caller with it — a
+        // blanket public write would also let anyone reset filledCount to 0 and
+        // oversell the shift, or rewrite the label.
+        allow update: if sheetIsActive(sheetId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['filledCount']) &&
+          request.resource.data.filledCount == resource.data.filledCount + 1 &&
+          request.resource.data.filledCount <= resource.data.capacity;
       }
 
-      // Registrations: anyone can create (anonymous signup); curators manage
       match /registrations/{regId} {
-        allow create: if true;
-        allow read, update, delete: if isCurator();
+        // Anonymous signup, shaped. `status` is pinned so a signup cannot arrive
+        // pre-approved as something the roster treats differently, and the free-text
+        // fields are capped.
+        allow create: if isEditor() || (
+          sheetIsActive(sheetId) &&
+          request.resource.data.keys().hasOnly([
+            'slotId', 'slotLabel', 'slotTimeNote', 'firstName', 'lastName',
+            'email', 'phone', 'notes', 'status', 'signedUpAt'
+          ]) &&
+          request.resource.data.keys().hasAll(['slotId', 'firstName', 'lastName', 'email', 'status']) &&
+          request.resource.data.status == 'confirmed' &&
+          textOk(request.resource.data.firstName, 100) &&
+          textOk(request.resource.data.lastName, 100) &&
+          textOk(request.resource.data.email, 200) &&
+          textOk(request.resource.data.get('phone', null), 40) &&
+          textOk(request.resource.data.get('notes', null), 2000) &&
+          textOk(request.resource.data.get('slotLabel', null), 200) &&
+          textOk(request.resource.data.get('slotTimeNote', null), 200)
+        );
+        // Editors manage the sheets, so editors see the roster. Gating this at
+        // isCurator() while /admin/volunteers is gated on isSAHSUser gave editors a
+        // page that looked functional and never loaded.
+        allow read, update, delete: if isEditor();
       }
     }
 
-    // Shortlinks: admin-managed custom redirect slugs
+    // ── Shortlinks ──────────────────────────────────────────────────────────────
     match /shortlinks/{doc} { allow read, write: if isAdmin(); }
 
-    // Mail (Trigger Email extension): allow creation for all (even public for signups); deny read/update
-    match /mail/{doc} {
-      allow create: if true;
-      allow read, update, delete: if false;
-    }
+    // ── Mail (Trigger Email extension) ──────────────────────────────────────────
+    //
+    // Closed. The extension sends whatever lands here, so a public create clause is
+    // an open relay over SAHS's own sending domain — which is what this was, to let
+    // the contact form and volunteer confirmation queue their own mail client-side.
+    // Both now send server-side through Resend (see `functions/src/notifyEmail.ts`),
+    // and the extension's own service account bypasses rules entirely, so nothing
+    // legitimate needs to write here.
+    match /mail/{doc} { allow read, write: if false; }
 
-    // User Roles: Allow users to read their own role WITHOUT calling isAdmin() to avoid recursion
+    // ── User roles ──────────────────────────────────────────────────────────────
+    //
+    // Self-read is what AuthContext performs on every sign-in, so it must stay.
+    // Management is isAdmin() — including role-granted admins, who previously passed
+    // the client-side isAdmin gate on /admin/users, saw the full management UI, and
+    // were denied every read and write it attempted.
     match /user_roles/{email} {
-      allow read: if request.auth != null && (
-        request.auth.token.email.lower() == email.lower() || 
-        request.auth.token.email.lower() == 'catnolan@senoiahistory.com' || 
-        request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com'
-      );
-      allow write: if request.auth != null && (
-        request.auth.token.email.lower() == 'catnolan@senoiahistory.com' || 
-        request.auth.token.email.lower() == 'jeremywarren@senoiahistory.com'
-      );
+      allow read: if isAdmin() ||
+        (request.auth != null && request.auth.token.email.lower() == email.lower());
+      allow write: if isAdmin();
     }
 
-    // Default deny: Block all other access
+    // ── Default deny ────────────────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

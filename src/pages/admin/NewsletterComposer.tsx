@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Mail, Plus, Trash2, Send, Eye, Loader2, CheckCircle, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react';
 import AdminHeader from './AdminHeader';
 import { useAuth } from '../../contexts/AuthContext';
+import { authHeaders } from '../../services/api';
 
 interface NewsletterSection {
   title: string;
@@ -49,7 +50,7 @@ export default function NewsletterComposer() {
     try {
       const res = await fetch(`${getFunctionsBaseUrl()}/renderEmailPreview`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ template: 'newsletter', props: currentProps }),
       });
       const html = await res.text();
@@ -104,7 +105,7 @@ export default function NewsletterComposer() {
     try {
       const res = await fetch(`${getFunctionsBaseUrl()}/sendNewsletter`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ newsletterProps: props, testEmail }),
       });
       const data = await res.json() as { mode?: string; error?: string };
@@ -126,7 +127,7 @@ export default function NewsletterComposer() {
     try {
       const res = await fetch(`${getFunctionsBaseUrl()}/sendNewsletter`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ newsletterProps: props }),
       });
       const data = await res.json() as { broadcast?: { id?: string; name?: string }; error?: string };

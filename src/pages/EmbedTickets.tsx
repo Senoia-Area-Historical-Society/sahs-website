@@ -85,8 +85,19 @@ export default function EmbedTickets() {
     async function loadPost() {
       if (!slug) { setLoading(false); return; }
       try {
+        // `status == 'published'` is required, not merely tidy. This widget is
+        // embedded on third-party pages and always runs unauthenticated, and
+        // `firestore.rules` gates post reads on that field — Firestore rules are not
+        // filters, so a query that omits the constraint the rule tests is rejected
+        // outright and the embed renders empty. It also means an unpublished event's
+        // ticket form can never appear on someone else's site.
         const snap = await getDocs(
-          query(collection(db, 'posts'), where('slug', '==', slug), limit(1))
+          query(
+            collection(db, 'posts'),
+            where('slug', '==', slug),
+            where('status', '==', 'published'),
+            limit(1)
+          )
         );
         if (!snap.empty) {
           setPost({ id: snap.docs[0].id, ...snap.docs[0].data() } as Post);

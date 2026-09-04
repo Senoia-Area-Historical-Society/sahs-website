@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
-    "test:e2e:local": "PLAYWRIGHT_BASE_URL=http://localhost:5173 playwright test"
+    "test:e2e:local": "PLAYWRIGHT_BASE_URL=http://localhost:5173 playwright test",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project sahs-rules-test 'vitest run --config vitest.rules.config.mjs'"
   },
   "dependencies": {
     "@tiptap/extension-image": "^3.22.3",
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.9.1",

@@ -30,6 +30,9 @@ import {
     LifecycleEventType,
 } from './subscriptionLifecycle';
 import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
+import { randomBytes } from 'node:crypto';
+import { requireStaff } from './requireStaff';
+import { confirmationNumberFrom } from './confirmationNumber';
 
 admin.initializeApp();
 const db = getFirestore();
@@ -168,7 +171,10 @@ async function generateQRCode(text: string): Promise<string> {
 
 // ── Helper: Generate confirmation number ────────────────────────────────────
 function generateConfirmationNumber(): string {
-    return Math.random().toString(36).substring(2, 10).toUpperCase();
+    // Rejection sampling lives in ./confirmationNumber so it can be tested with a
+    // deterministic byte source; `randomBytes` is injected here. A plain
+    // `randomBytes(8)[i] % ALPHABET.length` biases the first eight letters.
+    return confirmationNumberFrom(() => randomBytes(1)[0]);
 }
 
 // Membership checkout is not ours to create.
@@ -247,6 +253,10 @@ export const createTicketCheckoutSession = onRequest({ secrets: ['STRIPE_SECRET_
 export const listStripeSubscriptions = onRequest({ secrets: ['STRIPE_SECRET_KEY'], cors: true }, async (req, res) => {
     try {
         if (req.method !== 'GET' && req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
+        // Curator, because this is the entire member roster: name, email, level,
+        // status and subscription id for everyone who has ever subscribed. It was
+        // reachable by an unauthenticated GET until this line existed.
+        if (!await requireStaff(req, res, 'curator')) return;
         const stripe = getStripe();
         // `active: true` is deliberately absent: 40% of the member base is still on the
         // retired Webflow products, and archiving one of those would silently rename
@@ -669,7 +679,17 @@ async function sendStaffAlert(subject: string, text: string): Promise<void> {
 
 export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'RESEND_API_KEY', 'RESEND_AUDIENCE_ID'] }, async (req, res) => {
     const sig = req.headers['stripe-signature'];
-    const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_mock';
+    // Fail CLOSED. This used to fall back to the publicly-known literal 'whsec_mock',
+    // which turns a missing secret into "accepts forged webhooks" rather than
+    // "refuses to run" — and CLAUDE.md documents that a secret can be undefined on
+    // Cloud Run even when it exists in Secret Manager. Forged webhooks mint free
+    // tickets and memberships, so there is no safe default here.
+    const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!STRIPE_WEBHOOK_SECRET) {
+        console.error('stripeWebhook: STRIPE_WEBHOOK_SECRET is not configured; refusing to process events');
+        res.status(500).send('Webhook secret not configured');
+        return;
+    }
     let event: Stripe.Event;
     try {
         const stripe = getStripe();
@@ -735,6 +755,11 @@ export const stripeWebhook = onRequest({ secrets: ['STRIPE_SECRET_KEY', 'STRIPE_
 // 7. Verify Ticket (at-the-door scanner)
 export const verifyTicket = onRequest({ cors: true }, async (req, res) => {
     try {
+        // The QR scanner at /admin/tickets/scan is already behind ProtectedRoute, so
+        // this endpoint never needed to be open — and it returns the buyer's name and
+        // email for any confirmation number presented. board_member is the floor
+        // because check-in is exactly the job a volunteer gets handed at the door.
+        if (!await requireStaff(req, res, 'board_member')) return;
         const confirmationNumber = (req.query.confirmationNumber || req.body?.confirmationNumber || '') as string;
 
         if (!confirmationNumber) {
@@ -991,6 +1016,9 @@ export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) =
 // 10. Render email preview (admin use — returns HTML for iframe display)
 export const renderEmailPreview = onRequest({ cors: true, invoker: 'public' }, async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
+    // Renders caller-supplied props as HTML from a Google-owned origin. Harmless to
+    // the site itself, but there is no reason for it to be an open HTML host.
+    if (!await requireStaff(req, res, 'editor')) return;
     try {
         const { template, props } = req.body as { template: string; props: Record<string, unknown> };
         let html = '';
@@ -1028,6 +1056,10 @@ export const renderEmailPreview = onRequest({ cors: true, invoker: 'public' }, a
 // 11. Send newsletter to all members via Resend
 export const sendNewsletter = onRequest({ secrets: ['RESEND_API_KEY', 'RESEND_AUDIENCE_ID'], cors: true, invoker: 'public' }, async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('Method Not Allowed'); return; }
+    // `invoker: 'public'` only means Cloud Run lets the request reach us; it is not
+    // authorization. Without this check any caller could broadcast arbitrary HTML to
+    // the whole member audience, or send it from the society's domain to any address.
+    if (!await requireStaff(req, res, 'curator')) return;
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     if (!RESEND_API_KEY) { res.status(500).json({ error: 'RESEND_API_KEY not configured' }); return; }
 
@@ -1110,3 +1142,11 @@ export const shortlinkRedirect = onRequest({ cors: true }, async (req, res): Pro
         res.redirect(301, FRONTEND_URL);
     }
 });
+
+// ── Notification email ──────────────────────────────────────────────────────────
+//
+// Firestore-triggered sends for the public contact/application form and volunteer
+// signups. Both used to be client-side writes to the `mail` collection for the
+// Trigger Email extension, which required `mail` to be public-writable (an open
+// relay) and sent from an unverified domain (so nothing was ever delivered).
+export { onSubmissionCreated, onVolunteerRegistration } from './notifyEmail';

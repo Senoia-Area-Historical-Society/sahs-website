@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { submitApplication } from '../services/api';
 import Seo from '../components/Seo';
 
 export default function Contact() {
@@ -15,21 +14,18 @@ export default function Contact() {
     
     setStatus('submitting');
     try {
-      await addDoc(collection(db, 'mail'), {
-        to: 'info@senoiahistory.com',
-        from: 'Senoia Area Historical Society <noreply@senoiahistory.com>',
-        replyTo: email,
-        message: {
-          subject: `New Contact Form Submission from ${name}`,
-          html: `
-            <h3>New Contact Form Submission</h3>
-            <p><strong>Name:</strong> ${name}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Message:</strong></p>
-            <p>${message.replace(/\n/g, '<br>')}</p>
-          `
-        }
-      });
+      // Files a `submissions` document; a Firestore trigger emails info@ from there.
+      //
+      // This used to write straight to the `mail` collection for the Trigger Email
+      // extension, which had two problems. The extension sends as
+      // `@senoiahistory.com`, a domain never verified in Resend, so every message
+      // since April bounced with a 550 and no one saw it — including real enquiries
+      // in May and August. And a public-writable `mail` collection is an open relay:
+      // anyone could send arbitrary HTML from the society's own domain.
+      //
+      // Filing the message as data rather than as an email also means it survives a
+      // delivery failure instead of being the only copy.
+      await submitApplication('contact', { name, email, message });
       setStatus('success');
       setName('');
       setEmail('');

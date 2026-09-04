@@ -10,7 +10,12 @@ vi.mock('firebase/firestore', () => ({
   runTransaction: vi.fn(), Timestamp: { now: vi.fn(), fromDate: vi.fn() }, deleteDoc: vi.fn(),
   serverTimestamp: vi.fn(),
 }));
-vi.mock('../lib/firebase', () => ({ db: {} }));
+// `auth` is stubbed with a signed-in user because `getMemberships` now attaches an
+// `Authorization: Bearer <ID token>` header — `listStripeSubscriptions` verifies it
+// and re-checks the caller's role server-side. Before that, the endpoint returned the
+// entire member roster to an unauthenticated GET.
+const currentUser = { getIdToken: vi.fn(async () => 'test-id-token') };
+vi.mock('../lib/firebase', () => ({ db: {}, auth: { get currentUser() { return currentUser; } } }));
 
 import { getMemberships } from '../services/api';
 
@@ -21,6 +26,27 @@ describe('getMemberships', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('sends the caller\'s ID token, so the endpoint is not open to the public', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: () => Promise.resolve([]) } as unknown as Response);
+
+    await getMemberships();
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer test-id-token');
+  });
+
+  it('refuses to call the endpoint at all when nobody is signed in', async () => {
+    currentUser.getIdToken.mockClear();
+    const signedOut = vi.mocked(fetch);
+    const { auth } = await import('../lib/firebase');
+    const spy = vi.spyOn(auth, 'currentUser', 'get').mockReturnValue(null as never);
+
+    await expect(getMemberships()).rejects.toThrow(/signed out/i);
+    expect(signedOut).not.toHaveBeenCalled();
+
+    spy.mockRestore();
   });
 
   it('returns the roster the function sends back', async () => {

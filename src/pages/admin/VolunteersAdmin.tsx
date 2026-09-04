@@ -44,6 +44,7 @@ export default function VolunteersAdmin() {
   const [rosterSlots, setRosterSlots] = useState<VolunteerSlot[]>([]);
   const [registrations, setRegistrations] = useState<VolunteerRegistration[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
+  const [rosterError, setRosterError] = useState<string | null>(null);
 
   const fetchSheets = useCallback(async () => {
     setLoading(true);
@@ -93,14 +94,25 @@ export default function VolunteersAdmin() {
   const openRoster = async (sheet: VolunteerSheet) => {
     setRosterSheet(sheet);
     setRosterLoading(true);
+    setRosterError(null);
     setView('roster');
-    const [sl, regs] = await Promise.all([
-      getVolunteerSlots(sheet.id),
-      getRegistrations(sheet.id),
-    ]);
-    setRosterSlots(sl);
-    setRegistrations(regs);
-    setRosterLoading(false);
+    // `getRegistrations` rethrows (unlike `getVolunteerSlots`, which swallows and
+    // returns []). Without this try/finally the rejection escaped, the loading flag
+    // was never cleared, and the roster span forever instead of reporting anything —
+    // which is what an editor saw, every time, while registrations were curator-only.
+    try {
+      const [sl, regs] = await Promise.all([
+        getVolunteerSlots(sheet.id),
+        getRegistrations(sheet.id),
+      ]);
+      setRosterSlots(sl);
+      setRegistrations(regs);
+    } catch (err) {
+      console.error('Failed to load volunteer roster', err);
+      setRosterError('We could not load the signups for this sheet. Please refresh, or ask an administrator to check your access.');
+    } finally {
+      setRosterLoading(false);
+    }
   };
 
   const handleEventLink = (postId: string) => {
@@ -266,6 +278,8 @@ export default function VolunteersAdmin() {
           </div>
           {rosterLoading ? (
             <div className="text-center py-12 text-charcoal/60">Loading roster...</div>
+          ) : rosterError ? (
+            <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg px-6 py-5 text-sm">{rosterError}</div>
           ) : (
             <div className="space-y-6">
               {confirmedBySlot.map(({ slot, regs }) => (
