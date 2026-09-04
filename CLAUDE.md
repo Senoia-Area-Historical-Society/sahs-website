@@ -129,16 +129,23 @@ All HTTP functions use `onRequest({ cors: true, secrets: [...] })`.
 
 | Function | Trigger | Purpose |
 |---|---|---|
-| `createMembershipCheckoutSession` | HTTP POST | Stripe checkout for membership tiers |
 | `createTicketCheckoutSession` | HTTP POST | Stripe checkout for event tickets |
 | `listStripeSubscriptions` | HTTP GET/POST | Lists all Stripe subscriptions for admin view |
 | `stripeWebhook` | HTTP POST | Handles `checkout.session.completed` — creates membership/ticket records, sends welcome email, adds Resend contact |
 | `verifyTicket` | HTTP GET/POST | QR scanner endpoint — validates ticket by `confirmationNumber` |
 | `onPostWritten` | Firestore trigger | Watches `posts/{id}`; syncs create/update/delete to the **Membership Calendar** (see Gotchas) |
-| `getMembershipByEmail` | HTTP GET/POST | Self-service Stripe lookup by email |
 | `renderEmailPreview` | HTTP POST | Returns rendered HTML for admin email preview iframe |
 | `sendNewsletter` | HTTP POST | Test send or Resend broadcast to audience |
 | `shortlinkRedirect` | HTTP GET | `shortlinks` → `posts` → homepage fallback 301 redirect |
+| `onSubmissionCreated` | Firestore trigger | Emails info@ when a contact/vendor/sponsor `submissions` doc is created |
+| `onVolunteerRegistration` | Firestore trigger | Sends a volunteer their confirmation once the registration exists |
+
+**Every admin-facing HTTP function verifies a Firebase ID token** via `requireStaff`
+(`functions/src/requireStaff.ts`) and re-reads the role from `user_roles` server-side.
+`onRequest` has no implicit auth, and these URLs are in the public JS bundle. Clients
+attach the header with `authHeaders()` from `src/services/api.ts`. Minimums today:
+`listStripeSubscriptions` and `sendNewsletter` are curator; `renderEmailPreview` is
+editor; `verifyTicket` is board_member (check-in is a volunteer's job).
 
 ## Common Edit Patterns
 
@@ -177,6 +184,7 @@ npm run emulators        # Firebase emulators with persisted data (import/export
 npm run build            # TypeScript compile + Vite production build
 npm run lint             # ESLint
 npm test                 # Vitest unit tests
+npm run test:rules       # firestore.rules + storage.rules against the emulators
 npm run test:watch       # Vitest in watch mode
 npm run test:ui          # Vitest with browser UI
 npm run test:e2e:local   # Playwright E2E against localhost:5173
@@ -339,7 +347,7 @@ Resend/`process.env` half lives in `ticketEmail.ts`, which re-exports the pure h
 callers keep one import site. Before pushing anything under `functions/src/`, run:
 
 ```bash
-npm run build && (cd functions && npm run build) && npx vitest run
+npm run build && (cd functions && npm run build) && npx vitest run && npm run test:rules
 ```
 
 **Emulator secret overrides in `functions/.secret.local` must be NON-EMPTY** — the file
@@ -436,3 +444,57 @@ Staging directories are ignored by the glob `public/*-art/`, so **name yours
 `<event>-art`** and it is covered automatically. It was a literal `public/poker-run-art/`
 line until a second event would have silently left its artwork copies committable;
 a name that misses the glob reintroduces exactly that.
+
+**Security rules are code, and they are tested — run `npm run test:rules`** — a
+September 2026 audit found six defects in `firestore.rules`/`storage.rules` and none
+anywhere else. The pure logic had 213 tests; authorization had zero, and was only ever
+exercised by clicking the admin UI *as an admin* — the one identity that passes every
+check. So public volunteer signup was denied for four and a half months (the slot
+`filledCount` write in `submitVolunteerSignup` needed a rule that did not exist, and it
+shares a transaction with the registration, so the whole signup rolled back), editors
+and curators could not upload any image, and `/admin/users` silently did nothing for
+anyone but the two hardcoded admins.
+
+`test/rules/` covers each collection from every seat — anonymous, `read_only`,
+`board_member`, `editor`, `curator`, role-granted admin, permanent admin. **Add a case
+whenever you touch a rule**, and write it failing first: a rules test written after the
+fix only proves the rules do what they do. The suites live outside `src/` and are `.mjs`
+on purpose — they need `node:fs` to read the rules files, and the site tsconfig has no
+`node` types, so under `src/` they would fail the ROOT build (the TS2591 trap above).
+
+Two things the emulator cannot do, so do not be misled:
+
+- **Storage rules cannot call `firestore.get()` in the emulator.**
+  `cloud-storage-rules-runtime` evaluates it to null and denies. It works in production.
+  Those cases are `describe.skip`'d in `test/rules/storage.test.mjs`; the role path that
+  *is* covered is the Auth custom claim. After changing `storage.rules`, verify the
+  document path by hand: sign in as an editor and attach an image to a post.
+- **Rules are not filters.** A `list` query is rejected outright unless the query itself
+  carries a constraint satisfying the rule — it does not silently return fewer rows. So
+  `posts` being gated on `status == 'published'` means every *public* query must include
+  `where('status','==','published')`: `NewsDetail` and `EmbedTickets` both do, and both
+  break loudly if it is removed. Staff queries may omit it because `isSAHSStaff()` does
+  not reference `resource`.
+
+**`storage.rules` is deployed to a bucket shared with archive-app, and the two repos
+overwrite each other** — both deploy `--only storage` to `sahs-archives.firebasestorage.app`,
+so whichever merged last owns the policy. The website's `allow read: if true` reverts
+archive-app's per-object-ACL fix for private media; archive-app's ruleset breaks the 13
+website images that carry no download token. It oscillates. `docs/storage-bucket-separation.md`
+is the runbook for giving the website its own bucket; until that lands, change
+`storage.rules` as little as possible and never assume only website objects live there.
+
+**Email sends server-side through Resend, from `updates.senoiahistory.com` only** — the
+apex `senoiahistory.com` is *not* a verified Resend domain. The Firebase Trigger Email
+extension was configured to send as the apex, so all sixteen messages it queued between
+April and August 2026 failed with `550 ... domain is not verified` — including real
+contact-form enquiries in May and August that nobody ever saw, because the extension
+records the error on the document and stops. The `mail` collection is now
+`allow read, write: if false`; the contact form files a `submissions` document and
+`onSubmissionCreated` sends the notification, while `onVolunteerRegistration` sends the
+volunteer confirmation. Both build their bodies in `functions/src/notifyEmailContent.ts`,
+which has **no imports** so a site test can pull it into the root build safely.
+
+Closing `mail` also shut an open relay: it was `allow create: if true` so the client
+could queue its own mail, which let anyone with the project id send arbitrary HTML from
+the society's own authenticated sending domain.

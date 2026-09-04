@@ -30,15 +30,27 @@ export default function NewsDetail() {
     async function loadPost() {
       if (!slug) return;
       try {
-        const q = query(collection(db, 'posts'), where('slug', '==', slug), limit(1));
+        // Two query shapes, and the difference is load-bearing rather than cosmetic.
+        //
+        // Staff match on slug alone so they can preview a draft before it goes live.
+        // The public MUST additionally constrain `status == 'published'`, because
+        // `firestore.rules` now gates post reads on that field and Firestore rules are
+        // not filters: a list query that does not carry the constraint the rule tests
+        // is rejected outright, rather than quietly returning fewer rows. Dropping the
+        // status filter from the public branch does not leak drafts — it breaks every
+        // event page with a permission error.
+        //
+        // The client-side status check below used to be the only gate on drafts, which
+        // governed rendering but not the REST API underneath it. The rule is the gate
+        // now; this check stays because staff share the unfiltered query.
+        const base = [collection(db, 'posts'), where('slug', '==', slug)] as const;
+        const q = isSAHSUser
+          ? query(...base, limit(1))
+          : query(...base, where('status', '==', 'published'), limit(1));
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
           const docSnap = snapshot.docs[0];
           const loadedPost = { id: docSnap.id, ...docSnap.data() } as Post;
-          // This query intentionally matches on slug alone so signed-in staff can
-          // preview a draft before it goes live. For everyone else — including
-          // crawlers — anything not published must read as though it doesn't exist.
-          // Firestore allows public read of every post, so this is the only gate.
           if (loadedPost.status !== 'published' && !isSAHSUser) return;
           setPost(loadedPost);
           if (loadedPost.volunteerSheetId) {

@@ -31,52 +31,78 @@ interface NavGroup {
   items: NavItem[];
 }
 
+/** A nav entry before role filtering. `visible` mirrors the rule guarding its data. */
+interface GatedNavItem extends NavItem {
+  visible: boolean;
+}
+
+interface GatedNavGroup extends Omit<NavGroup, 'items'> {
+  items: GatedNavItem[];
+}
+
+/** Drop entries the current role cannot use, then drop any group left empty. */
+function filterNav(groups: GatedNavGroup[]): NavGroup[] {
+  return groups
+    .map(group => ({ ...group, items: group.items.filter(item => item.visible) }))
+    .filter(group => group.items.length > 0);
+}
+
 export default function AdminHeader() {
   const { user, isAdmin, isCurator, isEditor, logout } = useAuth();
   const location = useLocation();
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navGroups: NavGroup[] = [
+  // Nav is filtered by role, not just by whether you can reach /admin/* at all.
+  //
+  // Every group below the System one used to be built unconditionally, so a
+  // read_only or board_member account was shown links to Wiki (editor-gated),
+  // Short Links (admin-gated) and the roster views — each of which then failed
+  // against the security rules. Advertising a page nobody can use reads as a broken
+  // portal rather than as a permission boundary, and it generated the support
+  // reports that started this audit.
+  //
+  // `visible` mirrors firestore.rules for the data behind each page. When you change
+  // one, change the other: these predicates are the UI half of the same decision.
+  const navGroups: NavGroup[] = filterNav([
     {
       label: 'Content',
       icon: FileText,
       items: [
-        { label: 'Dashboard', path: '/admin', icon: LayoutDashboard, description: 'Stats overview and quick links' },
-        { label: 'Site Content', path: '/admin/content', icon: FileText, description: 'Manage news, events, and pages' },
-        { label: 'Historic Places', path: '/admin/places', icon: Landmark, description: 'Historic structures, homes, and landmarks' },
-        { label: 'Wiki', path: '/admin/wiki', icon: BookOpen, description: 'Internal knowledge base' },
-        { label: 'Short Links', path: '/admin/shortlinks', icon: LinkIcon, description: 'Manage custom URLs' },
-        { label: 'Newsletter', path: '/admin/newsletter', icon: Mail, description: 'Compose and send member emails' },
+        { label: 'Dashboard', path: '/admin', icon: LayoutDashboard, description: 'Stats overview and quick links', visible: true },
+        { label: 'Site Content', path: '/admin/content', icon: FileText, description: 'Manage news, events, and pages', visible: isEditor },
+        { label: 'Historic Places', path: '/admin/places', icon: Landmark, description: 'Historic structures, homes, and landmarks', visible: isEditor },
+        { label: 'Wiki', path: '/admin/wiki', icon: BookOpen, description: 'Internal knowledge base', visible: isEditor },
+        { label: 'Short Links', path: '/admin/shortlinks', icon: LinkIcon, description: 'Manage custom URLs', visible: isAdmin },
+        { label: 'Newsletter', path: '/admin/newsletter', icon: Mail, description: 'Compose and send member emails', visible: isCurator },
       ]
     },
     {
       label: 'Operations',
       icon: HandHeart,
       items: [
-        { label: 'Volunteers', path: '/admin/volunteers', icon: HandHeart, description: 'Signups and volunteer tracking' },
-        { label: 'Memberships', path: '/admin/memberships', icon: Users, description: 'Member database and status' },
+        { label: 'Volunteers', path: '/admin/volunteers', icon: HandHeart, description: 'Signups and volunteer tracking', visible: isEditor },
+        { label: 'Memberships', path: '/admin/memberships', icon: Users, description: 'Member database and status', visible: isCurator },
       ]
     },
     {
       label: 'Commerce',
       icon: Ticket,
       items: [
-        { label: 'Ticketing', path: '/admin/tickets', icon: Ticket, description: 'Event ticket sales' },
-        { label: 'Scanner', path: '/admin/tickets/scan', icon: Shield, description: 'On-site check-in tool' },
+        // Ticket *reads* are open to all staff — "how many have we sold?" is a
+        // question volunteers get asked — so this stays visible below editor.
+        { label: 'Ticketing', path: '/admin/tickets', icon: Ticket, description: 'Event ticket sales', visible: true },
+        { label: 'Scanner', path: '/admin/tickets/scan', icon: Shield, description: 'On-site check-in tool', visible: true },
       ]
-    }
-  ];
-
-  if (isAdmin) {
-    navGroups.push({
+    },
+    {
       label: 'System',
       icon: Shield,
       items: [
-        { label: 'User Roles', path: '/admin/users', icon: Shield, description: 'Manage portal permissions' },
+        { label: 'User Roles', path: '/admin/users', icon: Shield, description: 'Manage portal permissions', visible: isAdmin },
       ]
-    });
-  }
+    }
+  ]);
 
   return (
     <header className="bg-white border-b border-tan-light px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50 relative">

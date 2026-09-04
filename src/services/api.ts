@@ -1,5 +1,19 @@
 import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc, serverTimestamp, type FirestoreError } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
+
+/**
+ * `Authorization: Bearer <ID token>` for the admin-facing Cloud Functions.
+ *
+ * Those endpoints are public HTTPS URLs with no implicit auth — they now verify this
+ * token and re-check the caller's role server-side (functions/src/requireStaff.ts).
+ * Throwing when nobody is signed in keeps the failure legible here rather than as a
+ * 401 the caller has to interpret.
+ */
+export async function authHeaders(): Promise<Record<string, string>> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('You are signed out. Please sign in again.');
+  return { Authorization: `Bearer ${await user.getIdToken()}` };
+}
 import type { Post, Gallery, HistoricalPlace, OrganizationEntity, Membership, Ticket, VolunteerSheet, VolunteerSlot, VolunteerRegistration } from '../types/index';
 
 // Helpers to transform Firestore docs safely
@@ -128,7 +142,19 @@ export async function getCorporateSponsors(): Promise<OrganizationEntity[]> {
   }
 }
 
-export async function submitApplication(type: 'vendor' | 'sponsor', data: any): Promise<void> {
+/**
+ * Files a public submission — a vendor/sponsor application or a contact message.
+ *
+ * `type` and `status` are pinned here AND in `firestore.rules`, which additionally
+ * caps every free-text field and rejects any key not on its allowlist. The rule is
+ * the real constraint: this collection is public-create, so a crafted request need
+ * never come through this function at all.
+ *
+ * A `submissions` document is also what triggers the notification email
+ * (`functions/src/notifyEmail.ts`), so the message is stored before anything tries
+ * to send it — losing a delivery no longer loses the enquiry.
+ */
+export async function submitApplication(type: 'vendor' | 'sponsor' | 'contact', data: any): Promise<void> {
   try {
     const colRef = collection(db, 'submissions');
     await addDoc(colRef, {
@@ -206,7 +232,10 @@ export async function getTicketBySessionId(sessionId: string): Promise<import('.
 
 export async function verifyTicketConfirmation(confirmationNumber: string): Promise<{ valid: boolean; reason?: string; ticket?: any }> {
   const baseUrl = getFunctionsBaseUrl();
-  const res = await fetch(`${baseUrl}/verifyTicket?confirmationNumber=${encodeURIComponent(confirmationNumber.trim())}`);
+  const res = await fetch(
+    `${baseUrl}/verifyTicket?confirmationNumber=${encodeURIComponent(confirmationNumber.trim())}`,
+    { headers: await authHeaders() }
+  );
   return res.json();
 }
 
@@ -229,6 +258,7 @@ export async function getMemberships(): Promise<Membership[]> {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      ...(await authHeaders()),
     },
   });
 
@@ -383,7 +413,6 @@ export async function submitVolunteerSignup(
 ): Promise<void> {
   const slotRef = doc(db, 'volunteer_sheets', sheetId, 'slots', data.slotId);
   const registrationsRef = collection(db, 'volunteer_sheets', sheetId, 'registrations');
-  const mailRef = collection(db, 'mail');
 
   await runTransaction(db, async (tx) => {
     const slotSnap = await tx.get(slotRef);
@@ -406,45 +435,18 @@ export async function submitVolunteerSignup(
     tx.update(slotRef, { filledCount: slot.filledCount + 1 });
   });
 
-  // After successful transaction, trigger confirmation email via Firebase extension
-  try {
-    const sheetSnap = await getDoc(doc(db, 'volunteer_sheets', sheetId));
-    const sheet = sheetSnap.data() as VolunteerSheet;
-    const slotSnap = await getDoc(slotRef);
-    const slot = slotSnap.data() as VolunteerSlot;
-
-    const eventDateStr = sheet.eventDate
-      ? sheet.eventDate.toDate().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-      : '';
-
-    await addDoc(mailRef, {
-      to: data.email,
-      from: 'Senoia Area Historical Society <volunteers@senoiahistory.com>',
-      replyTo: 'info@senoiahistory.com',
-      message: {
-        subject: `You're signed up! – ${sheet.title}`,
-        html: `
-          <div style="font-family: Georgia, serif; max-width: 560px; margin: 0 auto; color: #2c2c2c;">
-            <h2 style="color: #8B6914;">Senoia Area Historical Society</h2>
-            <p>Hi ${data.firstName},</p>
-            <p>Thank you for volunteering for <strong>${sheet.title}</strong>! Here are your signup details:</p>
-            <table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
-              <tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Role</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${data.slotLabel}</td></tr>
-              ${data.slotTimeNote ? `<tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Time</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${data.slotTimeNote}</td></tr>` : ''}
-              ${slot.shiftDuration ? `<tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Duration</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${slot.shiftDuration}</td></tr>` : ''}
-              ${eventDateStr ? `<tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Date</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${eventDateStr}</td></tr>` : ''}
-              ${sheet.eventLocation ? `<tr><td style="padding: 8px; border: 1px solid #e0d8c0; font-weight: bold;">Location</td><td style="padding: 8px; border: 1px solid #e0d8c0;">${sheet.eventLocation}</td></tr>` : ''}
-            </table>
-            <p>We look forward to seeing you there! If you have any questions, please contact us at <a href="mailto:info@senoiahistory.com">info@senoiahistory.com</a>.</p>
-            <p style="color: #888; font-size: 13px; margin-top: 32px;">Senoia Area Historical Society &bull; Senoia, GA</p>
-          </div>
-        `,
-      },
-    });
-  } catch (emailErr) {
-    // Don't fail the signup if the email write fails
-    console.warn('Confirmation email could not be queued:', emailErr);
-  }
+  // The confirmation email is NOT sent from here.
+  //
+  // It used to be: this function queued a document in the `mail` collection for the
+  // Trigger Email extension. That required `mail` to be public-writable, which made
+  // it an open relay for anyone who knew the project id — and it sent as
+  // `@senoiahistory.com`, a domain never verified in Resend, so every one of those
+  // messages bounced with a 550 anyway.
+  //
+  // `onVolunteerRegistration` in functions/src/notifyEmail.ts now sends it server-side
+  // through Resend on the verified subdomain, triggered by the registration document
+  // this transaction just wrote. That also means a failed send can no longer take the
+  // signup with it, and cannot be silently swallowed on the client.
 }
 
 /** Fetch all registrations for a sheet (admin) */

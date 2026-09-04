@@ -52,3 +52,23 @@ jobs:
 
       - name: Unit tests
         run: npx vitest run
+
+      # Authorization tests: firestore.rules and storage.rules, exercised from every
+      # seat in the role matrix (anonymous, read_only, board_member, editor, curator,
+      # role-granted admin, permanent admin) against the real emulators.
+      #
+      # This step exists because the September 2026 audit found six defects in the
+      # rules and none anywhere else — the pure logic was thoroughly covered while
+      # authorization was only ever exercised by clicking the admin UI *as an admin*,
+      # the one identity that passes every check. Public volunteer signup had been
+      # dead since the day it shipped, and editors could not upload an image at all.
+      #
+      # Needs a JRE for the Firestore and Storage emulators.
+      - name: Setup Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Security rules tests
+        run: npm run test:rules

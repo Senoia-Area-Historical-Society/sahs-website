@@ -31,7 +31,9 @@ export default function AdminDashboard() {
         // Equality-only filters (no orderBy chained) so this never depends on a
         // composite index existing — sort/filter for "upcoming" client-side instead.
         // A generous limit still bounds the worst-case read as the event archive grows.
-        { label: 'upcoming events', promise: getDocs(query(collection(db, 'posts'), where('type', '==', 'event'), where('status', '==', 'published'), limit(50))) },
+        // No `type` filter: every post is an event, and Firestore excludes documents
+        // missing a filtered field entirely, so the clause could only ever hide rows.
+        { label: 'upcoming events', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'published'), limit(50))) },
         { label: 'recent tickets', promise: getDocs(query(collection(db, 'tickets'), orderBy('purchasedAt', 'desc'), limit(5))) },
       ];
       // `settled` is derived from `specs` by a single map(), so it's always the same
