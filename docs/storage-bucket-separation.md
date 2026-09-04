@@ -69,10 +69,16 @@ shared bucket. Validated with `firebase deploy --only firestore:rules,storage --
 `allow read: if true` is now an honest statement about website images rather than a
 blanket grant over archive media.
 
-### 4. Migrate the existing objects — ⏳ SCRIPT READY, NOT YET RUN
+### 4. Migrate the existing objects — ✅ DONE (2026-09-04)
 
 `scripts/migrate_storage_to_website_bucket.cjs`, dry-run by default like the seed
-scripts. Latest dry run: **31 objects across 12 posts, 0 source objects missing.**
+scripts.
+
+**Run with `--prod` on 2026-09-04: 31 objects copied, 31 URLs rewritten across 12 posts,
+0 source objects missing.** Verified afterwards: all 31 migrated URLs return HTTP 200 to
+an anonymous fetch, and Home / News / Box Office render with **0 broken images and 0
+images still served from the shared bucket**. The originals were copied, not moved, so
+they remain on the old bucket as a fallback.
 
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/sahs-firebase-deploy.json \
@@ -123,7 +129,7 @@ undone.
 | 1 | Create + register `sahs-website-media` | owner | ✅ done |
 | 2 | Scope this repo's storage deploys to it (`firebase.json`, `.firebaserc`) | repo | ✅ done |
 | 3 | Rewrite `storage.rules` for a website-only bucket | repo | ✅ done |
-| 4 | Run the migration with `--prod` (31 objects, 12 posts) | either | ⏳ pending |
+| 4 | Run the migration with `--prod` (31 objects, 12 posts) | either | ✅ done 2026-09-04 |
 | 5 | Point `VITE_FIREBASE_STORAGE_BUCKET` at the new bucket | **owner** | ⏳ pending |
 | 6 | Trigger an archive-app deploy to restore its rules | **owner** | ⏳ pending |
 
@@ -131,7 +137,11 @@ undone.
 
 **5 is a GitHub Actions secret**, read at build time, so it is not in the codebase and
 cannot be changed from here. Until it changes, *new* uploads still land in the shared
-bucket. Existing images are unaffected either way — their URLs are absolute.
+bucket — everything already published is on the new bucket and unaffected.
+
+Set it to `sahs-website-media` in **Settings → Secrets and variables → Actions →
+`VITE_FIREBASE_STORAGE_BUCKET`**, then push anything to main (or re-run the latest deploy)
+so the bundle is rebuilt with it. Update your local `.env` to match.
 
 **6 must come last.** The shared bucket currently carries the website's old permissive
 ruleset, and archive-app's private-media protection stays reverted until archive-app
