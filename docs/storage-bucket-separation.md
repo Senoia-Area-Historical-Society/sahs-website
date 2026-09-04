@@ -1,7 +1,7 @@
 # Giving the website its own Storage bucket
 
-**Status: not done. This is a runbook, not a record.** It needs steps only a project
-owner can perform, so it could not land with the audit fixes.
+**Status: in progress.** The bucket exists and this repo is wired to it; three steps
+remain, two of which only a project owner can do. Checklist at the bottom.
 
 ## The problem
 
@@ -46,16 +46,12 @@ apply only to its own bucket, and neither deploy can affect the other.
 
 ## Runbook
 
-### 1. Create and register the bucket
+### 1. Create and register the bucket — ✅ DONE
 
-Firebase Security Rules only apply to buckets registered with Firebase, so a plain
-`gcloud storage buckets create` is not enough — it must be added in the Firebase console
-(**Storage → Add bucket**), or through the Firebase Management API. Match the existing
-bucket's region so latency and egress do not change:
-
-- Name: `sahs-website-media` (suggestion)
-- Location: `US-EAST1` (same as `sahs-archives.firebasestorage.app`)
-- Storage class: Regional
+`sahs-website-media`, US-EAST1, Regional, created 2026-09-04 and **registered with
+Firebase** (confirmed against the Firebase Storage API — registration is what makes
+Security Rules apply at all; a bucket created only through `gcloud` would silently
+ignore them).
 
 ### 2. Point the site at it
 
@@ -63,47 +59,82 @@ bucket's region so latency and egress do not change:
 secret** (`.github/workflows/deploy.yml`), so this must be changed in repository settings —
 it is not in the codebase. Update the local `.env` to match.
 
-### 3. Deploy rules only to the new bucket
+### 3. Deploy rules only to the new bucket — ✅ DONE (in this repo)
 
-`firebase.json` takes a list, with targets defined in `.firebaserc`:
+`firebase.json` now scopes storage to a target, and `.firebaserc` binds that target to
+`sahs-website-media`. `deploy --only storage` from this repo can no longer reach the
+shared bucket. Validated with `firebase deploy --only firestore:rules,storage --dry-run`.
 
-```json
-"storage": [
-  { "target": "website-media", "rules": "storage.rules" }
-]
-```
+`storage.rules` was rewritten accordingly: the shared-bucket warning is gone, and
+`allow read: if true` is now an honest statement about website images rather than a
+blanket grant over archive media.
+
+### 4. Migrate the existing objects — ⏳ SCRIPT READY, NOT YET RUN
+
+`scripts/migrate_storage_to_website_bucket.cjs`, dry-run by default like the seed
+scripts. Latest dry run: **31 objects across 12 posts, 0 source objects missing.**
 
 ```bash
-firebase target:apply storage website-media sahs-website-media
+GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/sahs-firebase-deploy.json \
+  node scripts/migrate_storage_to_website_bucket.cjs           # dry run
+GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/sahs-firebase-deploy.json \
+  node scripts/migrate_storage_to_website_bucket.cjs --prod    # apply
 ```
 
-Once this lands, `--only storage` from this repo can no longer touch the shared bucket.
+The URLs come in **two shapes**, and an early version of the script only handled the
+first — the dry run is what caught it:
 
-### 4. Migrate the existing objects
+| Shape | Count | Notes |
+|---|---|---|
+| `firebasestorage.googleapis.com/v0/b/<bucket>/o/…?token=` | 18 | token authorizes itself, survives any read rule |
+| `storage.googleapis.com/<bucket>/<path>` | 13 | **no token** — depends entirely on public read, so these are the ones that break |
 
-31 post images are hosted on the shared bucket, of which **18 carry a download token and
-13 do not** — the 13 rely on the blanket public read, so they are the ones that break if
-the website's rules stop applying to that bucket. Copy the objects, then rewrite the URLs
-stored on the `posts` documents. Write this as a script under `scripts/`, default it to a
-dry run, and require an explicit `--prod` flag, the same as the seed scripts.
+Everything else (~100 URLs) is Webflow CDN or site-relative and is left alone.
 
-Fields to rewrite: `mainImage`, `bannerImage`, `squareImage` on `posts`;
-`galleries.galleryImages` (currently 0 on Storage); `historical_places` photo fields.
+The script copies rather than moves, and mints a download token for each copy, so the
+migrated URLs no longer depend on the bucket's read rule at all. It is idempotent — a
+URL already pointing at the new bucket is skipped — so a re-run after a partial failure
+resumes cleanly.
 
-### 5. Verify, then let archive-app take its bucket back
+### 5. Verify, then let archive-app take its bucket back — ⏳ PENDING
 
-After the website deploys with the new bucket, **trigger an archive-app deploy** so its
-rules are re-applied to `sahs-archives.firebasestorage.app`. Until that runs, the shared
-bucket keeps the permissive ruleset that is live today. Then re-run the probe from the top
-of this document and confirm it returns **403**.
+Once the migration has run and the secret is changed, **trigger an archive-app deploy** so
+its rules are re-applied to `sahs-archives.firebasestorage.app`. Until that runs, the
+shared bucket keeps the permissive ruleset that is live today, and archive-app's
+private-media protection stays reverted.
 
-### 6. Simplify `storage.rules`
+Then re-run the probe from the top of this document. It should return **403**, not 404.
 
-Once the bucket is the website's alone, the warning banner at the top of `storage.rules`
-can go, `allow read: if true` becomes an honest statement about website images only, and
-the `firestore.get()` role lookup can stay as the single source of truth.
+That probe is also the regression test: if it ever returns 404 again, something has
+deployed website-shaped storage rules to the shared bucket, and the separation has come
+undone.
 
 ## Related
 
 - `AUDIT.md` — S1-8 (this) and S3-1 (the read exposure it causes)
 - `storage.rules` — carries a pointer to this file
+
+---
+
+## Checklist
+
+| # | Step | Who | Status |
+|---|---|---|---|
+| 1 | Create + register `sahs-website-media` | owner | ✅ done |
+| 2 | Scope this repo's storage deploys to it (`firebase.json`, `.firebaserc`) | repo | ✅ done |
+| 3 | Rewrite `storage.rules` for a website-only bucket | repo | ✅ done |
+| 4 | Run the migration with `--prod` (31 objects, 12 posts) | either | ⏳ pending |
+| 5 | Point `VITE_FIREBASE_STORAGE_BUCKET` at the new bucket | **owner** | ⏳ pending |
+| 6 | Trigger an archive-app deploy to restore its rules | **owner** | ⏳ pending |
+
+### Why this order
+
+**5 is a GitHub Actions secret**, read at build time, so it is not in the codebase and
+cannot be changed from here. Until it changes, *new* uploads still land in the shared
+bucket. Existing images are unaffected either way — their URLs are absolute.
+
+**6 must come last.** The shared bucket currently carries the website's old permissive
+ruleset, and archive-app's private-media protection stays reverted until archive-app
+deploys again. But once it does, every website image still living on that bucket without
+a token stops loading — so step 4 has to be finished first. After step 6, re-run the
+probe from the top of this document and confirm it returns **403**.

@@ -11,6 +11,18 @@
         "shortlinks": [
           "sahs-shortlinks"
         ]
+      },
+      "storage": {
+        "website-media": [
+          "sahs-website-media"
+        ]
+      }
+    },
+    "sahs-rules-test": {
+      "storage": {
+        "website-media": [
+          "sahs-rules-test.firebasestorage.app"
+        ]
       }
     }
   },

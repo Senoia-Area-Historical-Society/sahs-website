@@ -476,13 +476,18 @@ Two things the emulator cannot do, so do not be misled:
   break loudly if it is removed. Staff queries may omit it because `isSAHSStaff()` does
   not reference `resource`.
 
-**`storage.rules` is deployed to a bucket shared with archive-app, and the two repos
-overwrite each other** — both deploy `--only storage` to `sahs-archives.firebasestorage.app`,
-so whichever merged last owns the policy. The website's `allow read: if true` reverts
-archive-app's per-object-ACL fix for private media; archive-app's ruleset breaks the 13
-website images that carry no download token. It oscillates. `docs/storage-bucket-separation.md`
-is the runbook for giving the website its own bucket; until that lands, change
-`storage.rules` as little as possible and never assume only website objects live there.
+**The website has its own Storage bucket — keep it that way** — `sahs-website-media`,
+scoped in `firebase.json` to the `website-media` target and bound in `.firebaserc`. This
+matters because both repos used to deploy storage rules to `sahs-archives.firebasestorage.app`,
+so whichever merged last owned the policy: the website's `allow read: if true` reverted
+archive-app's per-object-ACL protection for private media, and archive-app's ruleset broke
+the 13 website images that carry no download token. It oscillated for months.
+
+Do **not** widen `firebase.json`'s storage list back to a bare `{ "rules": ... }` object —
+that is what re-couples the two repos. The regression check is a GET for a nonexistent
+object under `archive_media/` on the shared bucket: **403 is correct**, 404 means
+website-shaped rules have been deployed there again. `docs/storage-bucket-separation.md`
+has the full runbook and the remaining owner-only steps.
 
 **Email sends server-side through Resend, from `updates.senoiahistory.com` only** — the
 apex `senoiahistory.com` is *not* a verified Resend domain. The Firebase Trigger Email
