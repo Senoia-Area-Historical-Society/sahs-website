@@ -2,31 +2,39 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // ⚠️ THIS FILE IS DEPLOYED TO A BUCKET SHARED WITH archive-app ⚠️
+    // These rules govern `sahs-website-media` ONLY.
     //
-    // Both repos deploy storage rules to `sahs-archives.firebasestorage.app`, so
-    // whichever merged most recently wins and silently replaces the other's policy:
+    // They used to be deployed to `sahs-archives.firebasestorage.app`, which
+    // archive-app also deploys to — so whichever repo merged most recently owned the
+    // policy and silently discarded the other's. The two were incompatible: this file
+    // granted `allow read: if true` bucket-wide, while archive-app grants no anonymous
+    // read at all, having moved public visibility to per-object ACLs precisely so
+    // private items would stop being served. Every website deploy reverted that.
     //
-    //   sahs-website  .github/workflows/deploy.yml  --only firestore:rules,storage
-    //   archive-app   .github/workflows/deploy.yml  --only hosting,functions,storage,firestore
+    // `firebase.json` now scopes storage to the `website-media` target, so
+    // `deploy --only storage` from this repo cannot reach the shared bucket at all.
+    // Keep it that way — the coupling is only gone as long as that target list is.
     //
-    // That is a real problem, not a theoretical one — see AUDIT.md S1-8. The fix is
-    // to give the website its own bucket so the two policies stop overwriting each
-    // other; the runbook is in `docs/storage-bucket-separation.md`. Until that lands,
-    // change this file as little as possible, and never in a way that assumes only
-    // website objects live here.
+    // See docs/storage-bucket-separation.md.
+
+    // ── Role helpers ────────────────────────────────────────────────────────────
     //
-    // Role helpers. Unlike archive-app — whose Firestore is the *named* `sahs-archives`
-    // database, which Storage rules cannot query, and which is why it mirrors roles
-    // onto Auth custom claims — the website's `user_roles` lives in the DEFAULT
-    // database, which Storage rules CAN read. So this reads the same role documents
-    // `firestore.rules` does, and there is one source of truth rather than two.
+    // These mirror `firestore.rules`, and must keep mirroring it. This file once had
+    // its own `isSAHSUser()` comparing two hardcoded addresses that never read
+    // `user_roles`, so Storage and Firestore had drifted into two auth models under
+    // one name: an editor could write a post but not attach its artwork, and the
+    // failure landed mid-workflow rather than at the door.
+    //
+    // Unlike archive-app — whose Firestore is the *named* `sahs-archives` database,
+    // which Storage rules cannot query, and which is why it mirrors roles onto Auth
+    // custom claims — the website's `user_roles` lives in the DEFAULT database, which
+    // Storage rules CAN read. So the role document is the single source of truth.
     //
     // NOTE: `firestore.get()` from Storage rules is not implemented by the Storage
-    // emulator (cloud-storage-rules-runtime v1.1.3 evaluates it to null), so the
-    // role cases in `test/rules/storage.test.mjs` are skipped and this clause can
-    // only be verified against a deployed project. Verify it by hand after deploy:
-    // sign in as an editor and attach an image to a post.
+    // emulator (cloud-storage-rules-runtime evaluates it to null), so those cases are
+    // skipped in `test/rules/storage.test.mjs` and this clause can only be verified
+    // against a deployed project. The custom-claim path below IS covered by tests.
+    // After changing this file, check by hand: sign in as an editor, attach an image.
     function roleOf() {
       return request.auth != null &&
         firestore.exists(/databases/(default)/documents/user_roles/$(request.auth.token.email.lower()))
@@ -41,16 +49,9 @@ service firebase.storage {
       );
     }
 
-    // Editors and above may upload. This used to be two hardcoded addresses that never
-    // consulted `user_roles` at all, so Storage and Firestore had drifted into two
-    // different auth models under one helper name: an editor could write a post
-    // (Firestore honoured the role) but could not attach its artwork (Storage did not),
-    // and the failure landed mid-workflow rather than at the door.
-    //
-    // `role` is also honoured as an Auth custom claim, because archive-app's
-    // syncUserRoleClaims already mirrors user_roles onto the token — accepting it here
-    // means a website editor whose claim is set stays working no matter which repo's
-    // rules are live at the time.
+    // Editors and above may upload. `role` is also honoured as an Auth custom claim,
+    // which archive-app's syncUserRoleClaims already mirrors from user_roles — cheap
+    // to accept, and it keeps working if the Firestore lookup is ever unavailable.
     function isEditor() {
       return isPermanentAdmin() ||
         roleOf() in ['admin', 'curator', 'editor'] ||
@@ -58,18 +59,10 @@ service firebase.storage {
     }
 
     match /{allPaths=**} {
-      // Read is DELIBERATELY UNCHANGED from what is deployed today.
-      //
-      // It is too broad: this grants anonymous read of the whole shared bucket,
-      // including archive-app's `archive_media/`, which undoes the per-object ACL
-      // model archive-app adopted in its PR #19. Confirmed live — a GET for a
-      // nonexistent object under archive_media/ returns 404, not 403.
-      //
-      // It is not narrowed here on purpose. archive-app serves its public items from
-      // this same bucket, and tightening reads from the website's repo would risk
-      // breaking the public archive with no way to test that from here. Narrowing it
-      // belongs with the bucket separation, where the website's own bucket can be
-      // public and archive-app's can follow its own policy.
+      // Public read is correct here, and now it is also *honest*: this bucket holds
+      // only website images — post artwork, historic-place photos, inline article
+      // images — every one of which is served to anonymous visitors by download URL
+      // from the public site. It no longer says anything about archive media.
       allow read: if true;
       allow write: if isEditor();
     }
