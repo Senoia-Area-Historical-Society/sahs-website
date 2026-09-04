@@ -32,6 +32,7 @@ import {
 import { NewsletterEmail, NewsletterEmailProps } from './emails/NewsletterEmail';
 import { randomBytes } from 'node:crypto';
 import { requireStaff } from './requireStaff';
+import { confirmationNumberFrom } from './confirmationNumber';
 
 admin.initializeApp();
 const db = getFirestore();
@@ -170,16 +171,10 @@ async function generateQRCode(text: string): Promise<string> {
 
 // ── Helper: Generate confirmation number ────────────────────────────────────
 function generateConfirmationNumber(): string {
-    // `crypto.randomBytes`, not `Math.random()`. This value is the sole credential
-    // `verifyTicket` admits people on at the door, and Math.random is a PRNG whose
-    // internal state is recoverable from observed outputs — the wrong primitive for
-    // anything security-bearing, however unlikely the attack. Base32-ish alphabet with
-    // the ambiguous characters removed, since these get read aloud and typed in by hand.
-    const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no I, L, O, 0, 1
-    const bytes = randomBytes(8);
-    let out = '';
-    for (let i = 0; i < 8; i++) out += ALPHABET[bytes[i] % ALPHABET.length];
-    return out;
+    // Rejection sampling lives in ./confirmationNumber so it can be tested with a
+    // deterministic byte source; `randomBytes` is injected here. A plain
+    // `randomBytes(8)[i] % ALPHABET.length` biases the first eight letters.
+    return confirmationNumberFrom(() => randomBytes(1)[0]);
 }
 
 // Membership checkout is not ours to create.
