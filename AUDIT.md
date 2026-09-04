@@ -567,7 +567,7 @@ answering before deleting the collection.
 ```
 npm run build                     ✅  (root — the build CI gates on)
 cd functions && npm run build     ✅
-npx vitest run                    ✅  234 passed (was 213; +21 new)
+npx vitest run                    ✅  241 passed (was 213; +28 new)
 npm run test:rules                ✅  33 passed, 3 skipped (new suite)
 npm run lint                      ✅  0 errors, 58 pre-existing warnings
 ```
