@@ -498,3 +498,29 @@ which has **no imports** so a site test can pull it into the root build safely.
 Closing `mail` also shut an open relay: it was `allow create: if true` so the client
 could queue its own mail, which let anyone with the project id send arbitrary HTML from
 the society's own authenticated sending domain.
+
+**A site test may only import a functions module that is itself import-free** — this is
+the sharper form of the root-build rule above, and the loose form is not enough. TypeScript
+type-checks per **module**, not per imported symbol: importing one pure function from
+`requireStaff.ts` still makes `tsc -b` resolve *that file's* `firebase-functions/v2/https`
+and `express` types.
+
+The trap is that `ci.yml` and `deploy.yml` differ in step order. CI used to install
+functions dependencies before building, so those types resolved and the PR went green;
+`deploy.yml` installs them *after* the build, so main failed with `TS2307: Cannot find
+module 'firebase-functions/v2/https'` and released nothing, leaving the previous revision
+serving. PR #71 shipped exactly that.
+
+Two things now prevent it. `ci.yml` builds the site **before** installing functions
+dependencies, mirroring deploy.yml so the PR fails instead of main. And every
+functions module a site test imports is import-free by construction:
+`calendarTime.ts`, `calendarSync.ts`, `ticketPricing.ts`, `checkoutFulfillment.ts`,
+`ticketEmailContent.ts`, `notifyEmailContent.ts`, `confirmationNumber.ts` and
+`roleLadder.ts`. The dependency-carrying halves — `ticketEmail.ts`, `notifyEmail.ts`,
+`requireStaff.ts` — re-export their pure counterparts so callers keep one import site.
+
+Before pushing anything under `functions/src/`, reproduce the deploy condition:
+
+```bash
+mv functions/node_modules /tmp/fn_nm && npm run build; mv /tmp/fn_nm functions/node_modules
+```

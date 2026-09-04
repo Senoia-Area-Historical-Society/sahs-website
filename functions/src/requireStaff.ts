@@ -2,6 +2,14 @@ import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { LADDER, PERMANENT_ADMINS, isRole, satisfies, type Role } from './roleLadder';
+
+// Re-exported so callers have one import site. The definitions live in roleLadder.ts,
+// which is import-free — a site test can pull `satisfies` into the ROOT build from there
+// without the build also having to resolve this file's `firebase-functions` and `express`
+// types. Importing them from *here* is what broke a production deploy; see the note at
+// the top of roleLadder.ts.
+export { LADDER, PERMANENT_ADMINS, isRole, satisfies, type Role };
 
 /**
  * ID-token authorization for the admin-facing HTTP functions.
@@ -25,21 +33,9 @@ import { getFirestore } from 'firebase-admin/firestore';
  * token expires.
  */
 
-export type Role = 'admin' | 'curator' | 'editor' | 'read_only' | 'board_member';
-
-/** Highest-privilege first; index order is the ladder. */
-const LADDER: Role[] = ['admin', 'curator', 'editor', 'read_only', 'board_member'];
-
-const PERMANENT_ADMINS = ['catnolan@senoiahistory.com', 'jeremywarren@senoiahistory.com'];
-
 export interface StaffIdentity {
   email: string;
   role: Role;
-}
-
-/** True when `role` is at least as privileged as `minimum`. */
-export function satisfies(role: Role, minimum: Role): boolean {
-  return LADDER.indexOf(role) <= LADDER.indexOf(minimum);
 }
 
 /**
@@ -79,8 +75,8 @@ export async function requireStaff(
   // Access is granted by a user_roles document, never by the email domain — a
   // brand-new @senoiahistory.com account has no access until someone grants it.
   const snap = await getFirestore().doc(`user_roles/${email}`).get();
-  const role = snap.get('role') as Role | undefined;
-  if (!role || !LADDER.includes(role)) {
+  const role = snap.get('role');
+  if (!isRole(role)) {
     res.status(403).json({ error: 'Your account does not have access to this feature.' });
     return null;
   }

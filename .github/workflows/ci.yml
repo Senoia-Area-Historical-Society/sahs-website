@@ -29,6 +29,25 @@ jobs:
       - name: Install site dependencies
         run: npm ci
 
+      # Build the site BEFORE installing functions dependencies. The order is the
+      # point, not an accident.
+      #
+      # `npm run build` is `tsc -b && vite build`, and `tsc -b` type-checks src/ —
+      # which means it follows imports in src/test/*.test.ts into whatever
+      # functions/src/ module they name, and then type-checks THAT module's own
+      # imports too. Type-checking is per module, not per imported symbol.
+      #
+      # deploy.yml installs functions dependencies *after* it builds, so a site test
+      # importing a functions module that itself imports `firebase-functions` or
+      # `express` fails there with TS2307 — while passing here, if functions/node_modules
+      # already exists. That combination is the worst one available: a green PR and a
+      # failed deploy on main, nothing released, previous revision left serving. It
+      # happened on 2026-09-04 (PR #71).
+      #
+      # Matching deploy.yml's order makes the PR fail instead.
+      - name: Build site (no functions dependencies — mirrors deploy.yml)
+        run: npm run build
+
       - name: Install functions dependencies
         run: npm ci --prefix functions
 
@@ -38,14 +57,6 @@ jobs:
       # genuine errors — unused variables, bad imports, hook rule violations.
       - name: Lint
         run: npm run lint
-
-      # The site build is `tsc -b && vite build`, and `tsc -b` type-checks
-      # src/ — which means it follows imports in src/test/*.test.ts into any
-      # functions/src/ module they name. This is the same build deploy.yml
-      # runs, so a failure here is a failure that would otherwise have shipped
-      # as a failed deploy on main with nothing released. See CLAUDE.md.
-      - name: Build site
-        run: npm run build
 
       - name: Build functions
         run: npm run build --prefix functions
