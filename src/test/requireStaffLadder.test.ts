@@ -1,15 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { satisfies, type Role } from '../../functions/src/requireStaff';
+import { satisfies, type Role } from '../../functions/src/roleLadder';
 
 /**
  * The role ladder used by the admin-facing Cloud Functions.
  *
- * Only the pure comparison is exercised here. `requireStaff` itself needs
- * firebase-admin and is covered by the rules suite and by manual verification —
- * importing it from a site test would drag `firebase-admin` into the ROOT build,
- * which has neither its types nor `@types/node`. That is the TS2591 trap in
- * CLAUDE.md, and it is why only `satisfies` and the `Role` type are imported here.
- * Keep it that way: this file must not import the module's side-effecting half.
+ * Imported from `roleLadder.ts`, NOT from `requireStaff.ts`, and that distinction
+ * broke a production deploy once. TypeScript type-checks per *module*, not per imported
+ * symbol: importing only `satisfies` from requireStaff.ts still made the root build
+ * resolve that file's own `firebase-functions` and `express` types. The PR workflow
+ * installs functions dependencies before building so it passed; deploy.yml installs them
+ * *after* the build, so main failed with TS2307 and shipped nothing.
+ *
+ * So: a site test may only import a functions module that is itself import-free.
  */
 
 const ALL: Role[] = ['admin', 'curator', 'editor', 'read_only', 'board_member'];
