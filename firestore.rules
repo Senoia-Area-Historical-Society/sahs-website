@@ -181,12 +181,33 @@ service cloud.firestore {
 
     // ── Mail (Trigger Email extension) ──────────────────────────────────────────
     //
-    // Closed. The extension sends whatever lands here, so a public create clause is
-    // an open relay over SAHS's own sending domain — which is what this was, to let
-    // the contact form and volunteer confirmation queue their own mail client-side.
-    // Both now send server-side through Resend (see `functions/src/notifyEmail.ts`),
-    // and the extension's own service account bypasses rules entirely, so nothing
-    // legitimate needs to write here.
+    // Closed. The extension (firestore-send-email, ACTIVE since 2026-04-23) sends
+    // whatever lands here, so a public create clause is an open relay over SAHS's own
+    // sending domain — which is what this was, to let the contact form and volunteer
+    // confirmation queue their own mail client-side. Both now send server-side through
+    // Resend (see `functions/src/notifyEmail.ts`), and the extension's own service
+    // account bypasses rules entirely.
+    //
+    // ⚠️ ARCHIVE-APP ALSO WRITES HERE, and closing this broke it.
+    //
+    // `MyResearch.tsx:481` queues a research-folder share notification against the
+    // DEFAULT database — this one — so it is governed by this rule even though it
+    // lives in the other repo. Its share flow now shows "Failed to share folder."
+    // although the share itself succeeded, because the `addDoc` throws after the
+    // `updateDoc` that applies it.
+    //
+    // Do NOT reopen this to fix that. Folder sharing is available to *members*
+    // (`hasResearchAccess = isSAHSUser || isMember` in archive-app's AuthContext), and
+    // members have no `user_roles` document — so any rule permissive enough to let
+    // them through is a relay again, just with a sign-in step. Reopening also buys
+    // nothing: all three share notifications ever queued (2026-06-13) failed with
+    // `550 ... domain is not verified`, because the extension was pointed at the apex
+    // domain rather than the verified `updates.senoiahistory.com`. Those emails have
+    // never been delivered.
+    //
+    // The fix belongs in archive-app, and it is the same one made here: send
+    // server-side through Resend from the verified subdomain, with the Admin SDK,
+    // which bypasses rules entirely.
     match /mail/{doc} { allow read, write: if false; }
 
     // ── User roles ──────────────────────────────────────────────────────────────
