@@ -48,6 +48,13 @@ beforeEach(async () => {
     await setDoc(doc(db, 'organization_entities/o1'), { type: 'board_member', name: 'B' });
     await setDoc(doc(db, 'galleries/g1'), { title: 'Photos', sortOrder: 1 });
     await setDoc(doc(db, 'historical_places/h1'), { name: 'Carmichael House' });
+    // Written by the OCR extension, not by us — see the rules comment.
+    await setDoc(doc(db, 'extractedText/ocr1'), {
+      file: 'gs://sahs-archives.firebasestorage.app/accession_paperwork/donor-form.jpg',
+      text: 'DONOR AGREEMENT — name, address, provenance…',
+    });
+    await setDoc(doc(db, 'bookings/b1'), { contactName: 'Pat', email: 'pat@example.com' });
+    await setDoc(doc(db, 'organization/org1'), { name: 'Pat', title: 'Board Member' });
   });
 });
 
@@ -253,6 +260,22 @@ describe('sensitive collections stay closed', () => {
     for (const seat of ['overrideAdmin', 'permanentAdmin']) {
       await allowed(`${seat} writes a shortlink`, () =>
         setDoc(doc(as(seat), 'shortlinks/sl3'), { slug: 'z', targetUrl: 'https://example.com' }));
+    }
+  });
+
+  it('collections nothing in the app reads are closed to EVERY seat', async () => {
+    // `extractedText` holds OCR of every image in the shared bucket, donor and
+    // provenance paperwork included. It was protected only by the catch-all, which
+    // records no intent — so it is pinned here as well as stated in the rules. A
+    // future permissive rule (say, to make OCR text searchable) has to delete a
+    // failing test rather than quietly widen a wildcard.
+    for (const path of ['extractedText/ocr1', 'bookings/b1', 'organization/org1']) {
+      for (const seat of Object.keys(ROLES)) {
+        await denied(`${seat} reads ${path}`, () => getDoc(doc(as(seat), path)));
+        await denied(`${seat} lists ${path.split('/')[0]}`, () =>
+          getDocs(collection(as(seat), path.split('/')[0])));
+        await denied(`${seat} writes ${path}`, () => setDoc(doc(as(seat), path), { x: 1 }));
+      }
     }
   });
 
