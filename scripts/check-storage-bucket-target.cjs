@@ -20,6 +20,13 @@
 //      character of config is the whole coupling.
 //   2. VITE_FIREBASE_STORAGE_BUCKET must name the website bucket, or new uploads land
 //      in the shared bucket and break the next time archive-app deploys.
+//   3. No script may hardcode the shared bucket. Three seed scripts still named it in
+//      September 2026 — months after the separation — because each was copied from an
+//      older one. Nothing was broken at the time; a `--prod` run of any of them would
+//      have uploaded its event's artwork to the shared bucket and repointed the post
+//      there, undoing the separation for those events with no visible symptom. The
+//      shared mechanics now live in scripts/lib/seedEvent.cjs, but a library only helps
+//      the scripts that use it — this check is what stops the next copy-paste.
 //
 // (2) is only checked when the variable is present, so local runs and PR CI — which have
 // no secret — still pass. The deploy workflow sets it, which is where it matters.
@@ -81,6 +88,53 @@ if (envBucket && envBucket !== WEBSITE_BUCKET) {
       'New uploads would go to the wrong bucket — silently, until archive-app next ' +
       'deploys and its rules stop serving them.'
   );
+}
+
+// ── 3. No script may hardcode the shared bucket ─────────────────────────────────
+// Allowlisted by exact path, never by directory: these two legitimately name the shared
+// bucket — one migrates away from it, the other is this file. A directory-shaped
+// exemption would have covered nothing today and everything tomorrow.
+const BUCKET_LITERAL_ALLOWED = new Set([
+  'scripts/migrate_storage_to_website_bucket.cjs',
+  'scripts/check-storage-bucket-target.cjs',
+]);
+
+/**
+ * Drop comments so prose about the shared bucket does not trip the check.
+ *
+ * Deliberately conservative: block comments, and lines that *begin* with `//` or `*`.
+ * Stripping from any mid-line `//` would also eat the rest of a line containing a URL,
+ * turning a real hardcoded bucket into a false negative — and a guard that misses is
+ * worse than one that occasionally over-reports. A trailing comment mentioning the
+ * bucket therefore fails the check; reword it or use the allowlist.
+ */
+function stripComments(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((line) => !/^\s*(\/\/|\*)/.test(line))
+    .join('\n');
+}
+
+const scriptsDir = path.join(repoRoot, 'scripts');
+function walk(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) return walk(full);
+    return /\.(cjs|mjs|js|ts)$/.test(e.name) ? [full] : [];
+  });
+}
+
+for (const file of walk(scriptsDir)) {
+  const rel = path.relative(repoRoot, file);
+  if (BUCKET_LITERAL_ALLOWED.has(rel)) continue;
+  if (stripComments(fs.readFileSync(file, 'utf8')).includes(SHARED_BUCKET)) {
+    problems.push(
+      `${rel} hardcodes ${SHARED_BUCKET}, the bucket archive-app owns. Website artwork ` +
+        `belongs in ${WEBSITE_BUCKET} — use the shared constant from scripts/lib/seedEvent.cjs ` +
+        'rather than copying a bucket name into a new script.'
+    );
+  }
 }
 
 if (problems.length > 0) {

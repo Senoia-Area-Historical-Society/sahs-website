@@ -11,8 +11,14 @@ description: >
 # Author a SAHS Event
 
 An event is a Firestore `posts` document created by a script in `scripts/`, not a
-committed content file. `scripts/seed_poker_run.cjs` is the reference implementation —
-copy that one.
+committed content file. The shared mechanics live in **`scripts/lib/seedEvent.cjs`**;
+`scripts/seed_poker_run.cjs` is the reference *caller* — copy that one, and read the
+library before changing how any of it works.
+
+The library exists because these scripts used to be copies of each other and drifted:
+two of them were still uploading to the shared archive bucket months after the website
+got its own, and two rewrote `publishDate` on every run. Nothing per-event belongs in the
+library, and nothing shared belongs in your script.
 
 > **Do not copy `scripts/seed_july4_event.cjs`.** It now upserts by slug and leaves
 > `ticketsSold` alone, but it is still only a local fixture: it hardcodes the emulator
@@ -34,37 +40,34 @@ copying. Then `npm install` — worktrees start with no `node_modules`.
 
 ## 1. Draft the content
 
-Copy `scripts/seed_poker_run.cjs` to `scripts/seed_<event>.cjs` and edit:
+Copy `scripts/seed_poker_run.cjs` to `scripts/seed_<event>.cjs`. It is a `CONTENT`
+string plus one `runSeed({...})` call; edit:
 
-- **`SLUG`** — permanent. It is both the upsert key and the public URL (`/news/<slug>`).
+- **`slug`** — permanent. It is both the upsert key and the public URL (`/news/<slug>`).
   Include the year for a recurring event.
+- **`artwork`** — the nickname that names *both* `.artwork/<name>/` and the local staging
+  directory `public/<name>-art/`. One value, so they cannot disagree.
+- **`eventDate`** — pass a plain `Date`; the library converts it. Never a `Timestamp`.
 - **`CONTENT`** — a TipTap-compatible HTML string. Use the tags the editor emits
   (`<p> <h3> <ul> <ol> <strong> <a>`) and HTML entities for typographic punctuation, so
   the post stays editable in `ContentAdmin` afterwards.
-- **`eventDate`** — a `Timestamp` built from a date with an **explicit offset**:
-  `new Date('2026-09-25T18:00:00-04:00')`. That is absolute and safe to convert, unlike
-  the naive `datetime-local` strings the admin form produces — see the timezone gotcha
-  in CLAUDE.md.
+- Give `eventDate` an **explicit offset** — `new Date('2026-09-25T15:00:00-04:00')`. That
+  is an absolute instant. `eventEndDate`, if you set one, is the opposite: a *naive*
+  Eastern wall-clock string (`'2026-09-25T18:30'`) of the shape the admin form produces,
+  which the Calendar request interprets with its own `timeZone`. Never convert one of
+  those — see the timezone gotcha in CLAUDE.md.
 - **`ticketPrice`** in cents; `capacity: null` for unlimited (a falsy capacity disables
   the remaining-count UI).
+- **`excerpt`** is also the Google Calendar description and the `og:description`, so it
+  is the field that cannot be quietly wrong.
 
-### Upsert by slug — never `.add()` unconditionally
+### The library owns the upsert — do not hand-roll it
 
-```js
-const existing = await db.collection('posts').where('slug', '==', SLUG).limit(1).get();
-
-if (existing.empty) {
-  await db.collection('posts').add({ ...data, ticketsSold: 0, createdAt: now });
-} else {
-  // Never clobber ticketsSold — the Stripe webhook owns that counter.
-  await existing.docs[0].ref.set({ ...data, ticketsSold: FieldValue.increment(0) }, { merge: true });
-}
-```
-
-The document ID is the join key for the post's Google Calendar entry
-(`googleCalendarEventId`) and for every sold ticket. A fresh ID on re-run strands both
-*and* leaves a duplicate post live on the site. Matching on `slug` is what makes the
-script safe to run repeatedly while you iterate.
+`seedEventPost` matches on `slug` and never `.add()`s unconditionally. The document ID is
+the join key for the post's Google Calendar entry (`googleCalendarEventId`) and for every
+sold ticket; a fresh ID on re-run strands both *and* leaves a duplicate post live on the
+site. Matching on `slug` is what makes the script safe to run repeatedly while you
+iterate. `ticketsSold` is written as `increment(0)` and `publishDate` only on create.
 
 ## 2. Generate three graphics
 
@@ -73,9 +76,16 @@ Ratios, sizes, and the ratio-vs-pixels rule are in CLAUDE.md. Generate them with
 in the filename — e.g. `.artwork/poker-run/poker-run-banner-1920x1080.jpg`.
 
 The directory is a **short nickname, not the slug** (`poker-run`, for slug
-`cruisin-for-history-poker-run-2026`), and `seed_poker_run.cjs` hardcodes both that path
-and the staging path rather than deriving them from `SLUG`. Set them explicitly in your
-copy; there is no naming convention to inherit.
+`cruisin-for-history-poker-run-2026`). Pass it once as `artwork:` and the library derives
+both `.artwork/<name>/` and the staging directory `public/<name>-art/` from it — the
+`-art` suffix matters, because `.gitignore` covers exactly `public/*-art/` and a
+directory missing that shape leaves binary artwork copies committable.
+
+Write a `.artwork/generate-<event>.sh` alongside the images, modelled on
+`.artwork/generate-poker-run-2026.sh`, and copy its `STYLE` / `LAYOUT` / `TYPO` /
+`NEGATIVE` blocks verbatim so the set stays one family. Masters are gitignored, so
+without a generator there is no way to re-render the poster when a detail changes — which
+is exactly the hole the poker run fell into. Derive with `./.artwork/derive-sizes.sh <name>`.
 
 **This machine needs a CA bundle for that skill.** Without it every call dies with
 `CERTIFICATE_VERIFY_FAILED`, which reads like an auth failure and invites a wrong
@@ -88,19 +98,17 @@ export SSL_CERT_FILE=$(python3 -c "import certifi;print(certifi.where())")
 Pass `--env-file ~/.claude/skills/nanobanana/.env` when running from another directory;
 the `.env` search walks up from cwd.
 
-Compose `mainImage` so the subject survives a **square** crop — it is reused as a 64×64
-thumbnail on the Home sidebar and as the `og:image`.
+Compose `mainImage` so the subject survives a **square** crop. The reason usually given —
+"a 64×64 thumbnail on the Home sidebar" — is only half right: that sidebar is **Past
+Events**, so it does not apply to an upcoming event at all. What does apply immediately is
+the `og:image` (`Seo.tsx`) and the JSON-LD image (`EventCard.tsx`), and the square crop
+becomes real once the event is over. `mainImage` has no enforced ratio; every consumer is
+a fixed-height `object-cover` box.
 
-### Derive the download token from the object path
+### The download token is derived from the object path (library-owned)
 
-```js
-function tokenFor(objectPath) {
-  const h = crypto.createHash('sha256').update(objectPath).digest('hex');
-  return [h.slice(0,8), h.slice(8,12), h.slice(12,16), h.slice(16,20), h.slice(20,32)].join('-');
-}
-```
-
-Set it as `metadata.firebaseStorageDownloadTokens` on upload. Firebase embeds the token
+`seedEvent.cjs` sets `metadata.firebaseStorageDownloadTokens` to a SHA-256 of the object
+path. You do not write this, but you should know why it exists. Firebase embeds the token
 in the download URL, so a **random** token would mint a brand-new URL on every re-run —
 silently breaking the images already rendered into sent ticket emails and scraped social
 previews, neither of which can be re-issued. Deriving it from the path makes re-uploading
@@ -159,5 +167,7 @@ be the same constant).
 ## See Also
 
 - `CLAUDE.md` — event gotchas, artwork contract, calendar and Stripe invariants
-- `scripts/seed_poker_run.cjs` — reference implementation
+- `scripts/lib/seedEvent.cjs` — the shared seeding mechanics
+- `scripts/seed_poker_run.cjs` — reference caller
+- `/update-sahs-post` — changing an event that is already live
 - `/run-sahs-website` — dev server, screenshots, Vite port drift

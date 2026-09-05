@@ -14,6 +14,7 @@ import { TicketConfirmationEmail, TicketConfirmationEmailProps } from './emails/
 import { resolveEventWindow, isLongPast } from './calendarTime';
 import { PUBLIC_EVENTS_CALENDAR_ID } from './calendarIds';
 import { calendarFieldsChanged } from './calendarSync';
+import { shouldSkipCalendarWrites } from './calendarGuard';
 import { resolveTicketOrder, rejectionStatus } from './ticketPricing';
 import { sendTicketConfirmation, formatEventWhen, resolveEventLocation } from './ticketEmail';
 import {
@@ -873,6 +874,18 @@ export const getTicketBySession = onRequest({ cors: true }, async (req, res) => 
 
 // 8b. Sync Published Event Posts to Google Calendar
 export const onPostWritten = onDocumentWritten('posts/{postId}', async (event) => {
+    // Before anything reaches getCalendarAuth(). There is no Calendar emulator, so an
+    // emulated run authenticates with real ADC and writes to the calendar members
+    // subscribe to — see calendarGuard.ts. Guarding here rather than inside Case A/B/C
+    // means one site instead of four to forget.
+    if (shouldSkipCalendarWrites(process.env)) {
+        console.log(
+            `Skipping calendar sync for post ${event.params.postId}: emulated runtime ` +
+            `(set ALLOW_EMULATOR_CALENDAR_WRITES=1 to write to the real calendar anyway)`
+        );
+        return;
+    }
+
     const beforeData = event.data?.before.data();
     const afterData = event.data?.after.data();
     

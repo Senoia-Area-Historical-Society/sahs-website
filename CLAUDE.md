@@ -103,6 +103,7 @@ Flow: Stripe Checkout → `stripeWebhook` function → Resend welcome email → 
 | `functions/src/emails/WelcomeEmail.tsx` | React Email welcome template |
 | `functions/src/emails/NewsletterEmail.tsx` | React Email newsletter template |
 | `firestore.rules` | Security rules — mirrors auth role logic |
+| `scripts/lib/seedEvent.cjs` | Shared event-seeding mechanics — bucket, upsert on slug, `ticketsSold`, `publishDate`, artwork staging |
 | `scripts/` | Ad-hoc Firestore maintenance scripts |
 
 ## Routes
@@ -448,6 +449,50 @@ Staging directories are ignored by the glob `public/*-art/`, so **name yours
 line until a second event would have silently left its artwork copies committable;
 a name that misses the glob reintroduces exactly that.
 
+**Seeding a post to the emulator writes a REAL entry on the public Google Calendar** —
+the same class of bug as the Storage note above, and the one with the worse blast
+radius, because the write lands somewhere members can see. `npm run emulators` starts
+the Functions emulator, which runs `onPostWritten` for real; `getCalendarAuth()` builds
+a `GoogleAuth` from Application Default Credentials, and **nothing emulates Google
+Calendar**, so the insert goes to `PUBLIC_EVENTS_CALENDAR_ID` on the live SAHS
+Membership Calendar. The emulator says so on startup and it is easy to read past:
+
+```
+⚠  functions: Application Default Credentials detected.
+   Non-emulated services will access production using these credentials. Be careful!
+```
+
+A local `node scripts/seed_poker_run.cjs` — the emulator default, the *safe*-looking
+invocation — therefore published a Poker Run entry to the members' calendar. Worse, the
+emulator persists the resulting `googleCalendarEventId` into `./emulator-data`, so the
+next local edit of that post takes Case B and **patches the production entry**.
+
+**This is now guarded.** `functions/src/calendarGuard.ts` suppresses calendar writes
+whenever `FUNCTIONS_EMULATOR` is set, at the top of `onPostWritten` — before anything
+reaches `getCalendarAuth()`, so there is one site rather than four. Verified against a
+running emulator, not just unit-tested: the same seed that published a real entry now
+logs `Skipping calendar sync … emulated runtime` and makes zero Calendar calls. Set
+`ALLOW_EMULATOR_CALENDAR_WRITES=1` to exercise the sync locally on purpose — which does
+write to the calendar members subscribe to.
+
+Still start only what you need, because the guard covers this trigger and not the general
+problem (Storage has the same shape, and the next non-emulated service will too):
+
+```bash
+npx firebase emulators:start --only firestore,auth   # no Functions, no trigger at all
+```
+
+**The room-resource migration is unfinished, and the sync account cannot finish it** —
+`scripts/migrate_calendar_to_membership.cjs --dry-run` still reports five posts holding
+entries on the meeting-room resource calendar (June/August programs, Croesy McIntosh,
+Family Day, Yacht Rock). They are all past events. The reason they were left behind is
+that `sahs-calendar-sync@sahs-archives.iam.gserviceaccount.com` has **reader, not
+writer, on the room resource**, so the script's `events.delete` 403s and it skips the
+post to keep the id recoverable — exactly as designed, and silent unless you read the
+output. Deleting a room-calendar entry currently requires a human in the Calendar UI, or
+a `writer` grant on the resource. Do not add one casually: write access to a room
+resource is write access to everyone's room bookings.
+
 **Security rules are code, and they are tested — run `npm run test:rules`** — a
 September 2026 audit found six defects in `firestore.rules`/`storage.rules` and none
 anywhere else. The pure logic had 213 tests; authorization had zero, and was only ever
@@ -495,7 +540,12 @@ Three things hold it apart, and all three are load-bearing:
    read **at build time**, so changing it does nothing until a deploy runs again —
    re-running the latest deploy suffices, since secrets are read fresh per run.
 3. `scripts/check-storage-bucket-target.cjs` fails the build on any of the above: the
-   config half in PR CI, the env-var half in `deploy.yml` (which passes the secret in).
+   config half in PR CI, the env-var half in `deploy.yml` (which passes the secret in),
+   and — since September 2026 — any script under `scripts/` that hardcodes the shared
+   bucket at all. Three seed scripts still named it months after the cutover, each
+   inherited by copy-paste; `scripts/lib/seedEvent.cjs` now holds the constant once, and
+   the check is what stops the next copy. `migrate_storage_to_website_bucket.cjs` and the
+   checker itself are allowlisted by exact path.
    It exists because none of these failures has a visible symptom in production — new
    uploads simply go to the wrong bucket and keep working until archive-app next deploys.
 
