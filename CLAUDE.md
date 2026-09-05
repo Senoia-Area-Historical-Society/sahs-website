@@ -103,6 +103,7 @@ Flow: Stripe Checkout → `stripeWebhook` function → Resend welcome email → 
 | `functions/src/emails/WelcomeEmail.tsx` | React Email welcome template |
 | `functions/src/emails/NewsletterEmail.tsx` | React Email newsletter template |
 | `firestore.rules` | Security rules — mirrors auth role logic |
+| `scripts/lib/seedEvent.cjs` | Shared event-seeding mechanics — bucket, upsert on slug, `ticketsSold`, `publishDate`, artwork staging |
 | `scripts/` | Ad-hoc Firestore maintenance scripts |
 
 ## Routes
@@ -466,14 +467,20 @@ invocation — therefore published a Poker Run entry to the members' calendar. W
 emulator persists the resulting `googleCalendarEventId` into `./emulator-data`, so the
 next local edit of that post takes Case B and **patches the production entry**.
 
-To verify a page locally, start only what you need:
+**This is now guarded.** `functions/src/calendarGuard.ts` suppresses calendar writes
+whenever `FUNCTIONS_EMULATOR` is set, at the top of `onPostWritten` — before anything
+reaches `getCalendarAuth()`, so there is one site rather than four. Verified against a
+running emulator, not just unit-tested: the same seed that published a real entry now
+logs `Skipping calendar sync … emulated runtime` and makes zero Calendar calls. Set
+`ALLOW_EMULATOR_CALENDAR_WRITES=1` to exercise the sync locally on purpose — which does
+write to the calendar members subscribe to.
+
+Still start only what you need, because the guard covers this trigger and not the general
+problem (Storage has the same shape, and the next non-emulated service will too):
 
 ```bash
-firebase emulators:start --only auth,firestore     # no Functions, no trigger, no calendar
+npx firebase emulators:start --only firestore,auth   # no Functions, no trigger at all
 ```
-
-Use the full `npm run emulators` when you are actually testing a function, and know that
-any post write you make is a live calendar operation.
 
 **The room-resource migration is unfinished, and the sync account cannot finish it** —
 `scripts/migrate_calendar_to_membership.cjs --dry-run` still reports five posts holding
@@ -533,7 +540,12 @@ Three things hold it apart, and all three are load-bearing:
    read **at build time**, so changing it does nothing until a deploy runs again —
    re-running the latest deploy suffices, since secrets are read fresh per run.
 3. `scripts/check-storage-bucket-target.cjs` fails the build on any of the above: the
-   config half in PR CI, the env-var half in `deploy.yml` (which passes the secret in).
+   config half in PR CI, the env-var half in `deploy.yml` (which passes the secret in),
+   and — since September 2026 — any script under `scripts/` that hardcodes the shared
+   bucket at all. Three seed scripts still named it months after the cutover, each
+   inherited by copy-paste; `scripts/lib/seedEvent.cjs` now holds the constant once, and
+   the check is what stops the next copy. `migrate_storage_to_website_bucket.cjs` and the
+   checker itself are allowlisted by exact path.
    It exists because none of these failures has a visible symptom in production — new
    uploads simply go to the wrong bucket and keep working until archive-app next deploys.
 

@@ -30,7 +30,11 @@ const { getStorage } = require('firebase-admin/storage');
 
 const PROD = process.argv.includes('--prod');
 const PROJECT_ID = 'sahs-archives';
-const BUCKET = 'sahs-archives.firebasestorage.app';
+// The website's own bucket, NOT the shared `sahs-archives.firebasestorage.app`. This
+// script keeps its own copy of the seeding mechanics — it seeds six posts in one run
+// with a selection argument, so it was deliberately left off scripts/lib/seedEvent.cjs.
+// scripts/check-storage-bucket-target.cjs is what keeps this constant honest.
+const BUCKET = 'sahs-website-media';
 const KEY_FILE = path.join(process.env.HOME, '.config/gcloud/sahs-firebase-deploy.json');
 
 // Artwork is committed alongside the script so re-runs are reproducible from a

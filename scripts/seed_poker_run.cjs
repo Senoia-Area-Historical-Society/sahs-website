@@ -1,97 +1,23 @@
 /**
- * Creates (or updates) the "Cruisin' for History Poker Run" ticketed event post
- * and uploads its artwork to Firebase Storage.
+ * Creates (or updates) the "Cruisin' for History Poker Run" ticketed event post.
  *
  *   node scripts/seed_poker_run.cjs                 # local emulator (default)
  *   node scripts/seed_poker_run.cjs --prod          # production Firestore + Storage
  *   node scripts/seed_poker_run.cjs --content-only  # copy/date fields only, no artwork
  *
- * Writing a *published* event to production fires the onPostWritten trigger,
- * which inserts a real Google Calendar event — hence the explicit --prod gate.
+ * Writing a *published* event to production fires the onPostWritten trigger, which
+ * inserts a real Google Calendar event — hence the explicit --prod gate. Everything
+ * shared with the other seed scripts (bucket, upsert, ticketsSold, publishDate,
+ * artwork staging) lives in ./lib/seedEvent.cjs; read that first.
  *
- * Re-running is safe: the post is matched on slug and updated in place, so the
- * doc ID (and therefore the calendar event and any sold tickets) is preserved.
- *
- * Use --content-only for a copy correction on a post that is already live. The
- * artwork upload below mints a *deterministic* token so re-uploads keep existing
- * URLs valid — but the migration to the `sahs-website-media` bucket copied these
- * objects and Firebase minted fresh random tokens on the copies, so that promise
- * no longer holds for this post. A full re-run would rotate all three image URLs
- * out from under anything that already embeds them (emails, social previews).
- * Text edits have no reason to touch Storage at all, so don't.
+ * Use --content-only for a copy correction on a post that is already live. The artwork
+ * upload mints a *deterministic* token so re-uploads keep existing URLs valid — but the
+ * migration to the `sahs-website-media` bucket copied these objects and Firebase minted
+ * fresh random tokens on the copies, so that promise no longer holds for this post. A
+ * full re-run would rotate all three image URLs out from under anything that already
+ * embeds them. Text edits have no reason to touch Storage at all, so don't.
  */
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const { initializeApp, cert, applicationDefault } = require('firebase-admin/app');
-const { getFirestore, Timestamp, FieldValue } = require('firebase-admin/firestore');
-const { getStorage } = require('firebase-admin/storage');
-
-const PROD = process.argv.includes('--prod');
-// Skip Storage entirely and merge only the copy/date fields — see the note above.
-const CONTENT_ONLY = process.argv.includes('--content-only');
-const PROJECT_ID = 'sahs-archives';
-const BUCKET = 'sahs-website-media';
-const SLUG = 'cruisin-for-history-poker-run-2026';
-const KEY_FILE = path.join(
-  process.env.HOME,
-  '.config/gcloud/sahs-firebase-deploy.json'
-);
-
-// Artwork is committed alongside the script so re-runs are reproducible from a
-// fresh clone; override the location with POKER_RUN_ART_DIR.
-const ART_DIR = process.env.POKER_RUN_ART_DIR || path.join(__dirname, '../.artwork/poker-run');
-const ART = [
-  { field: 'bannerImage', file: 'poker-run-banner-1920x1080.jpg' },
-  { field: 'mainImage', file: 'poker-run-card-1200x675.jpg' },
-  { field: 'squareImage', file: 'poker-run-square-1200x1200.jpg' },
-];
-
-if (!PROD) {
-  process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
-}
-
-// The emulator needs no credential, and passing an undefined one is rejected.
-initializeApp({
-  projectId: PROJECT_ID,
-  storageBucket: BUCKET,
-  ...(PROD && {
-    credential: fs.existsSync(KEY_FILE) ? cert(require(KEY_FILE)) : applicationDefault(),
-  }),
-});
-
-const db = getFirestore();
-
-/** Stable UUID-shaped download token derived from the object path. */
-function tokenFor(objectPath) {
-  const h = crypto.createHash('sha256').update(objectPath).digest('hex');
-  return [h.slice(0, 8), h.slice(8, 12), h.slice(12, 16), h.slice(16, 20), h.slice(20, 32)].join('-');
-}
-
-/**
- * Uploads one image and returns a download URL in the same shape the client SDK's
- * getDownloadURL() produces, so admin-uploaded and script-uploaded images are
- * indistinguishable to the app.
- */
-async function uploadArtwork(file) {
-  const localPath = path.join(ART_DIR, file);
-  if (!fs.existsSync(localPath)) {
-    throw new Error(`Missing artwork: ${localPath}`);
-  }
-  const objectPath = `content_images/${SLUG}_${file}`;
-  // Deterministic, not random: re-uploading must not invalidate URLs already
-  // rendered into pages, emails, or social previews.
-  const token = tokenFor(objectPath);
-  await getStorage().bucket(BUCKET).upload(localPath, {
-    destination: objectPath,
-    metadata: {
-      contentType: 'image/jpeg',
-      cacheControl: 'public, max-age=31536000',
-      metadata: { firebaseStorageDownloadTokens: token },
-    },
-  });
-  return `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(objectPath)}?alt=media&token=${token}`;
-}
+const { runSeed } = require('./lib/seedEvent.cjs');
 
 const CONTENT = `
 <p>Back for its second year, the <strong>Cruisin&rsquo; for History Poker Run</strong> is a laid-back fundraiser for the Senoia Area Historical Society, held the afternoon before the 21st Annual Senoia Car Show. Drive a loop of five local landmarks, photograph yourself with your ride at each, then trade your photos for a poker hand. Best hand takes half the proceeds.</p>
@@ -125,85 +51,33 @@ const CONTENT = `
 <p>Then come see the show: the <strong>21st Annual Senoia Car Show</strong> is the next morning, Saturday, September 26, from 10 AM to 4 PM on Historic Main Street. Full details at <a href="https://senoiacar.show" target="_blank" rel="noopener noreferrer">senoiacar.show</a>.</p>
 `.trim();
 
-async function main() {
-  console.log(`${PROD ? '🚀 PRODUCTION' : '🌱 Emulator'} — seeding Poker Run…`);
-
-  const images = {};
-  for (const { field, file } of (CONTENT_ONLY ? [] : ART)) {
-    if (PROD) {
-      images[field] = await uploadArtwork(file);
-      console.log(`  ✅ uploaded ${file}`);
-    } else {
-      // Emulator runs have no Storage, so stage the art in Vite's public/ dir
-      // (gitignored) and reference it by path so local pages render for real.
-      const publicDir = path.join(__dirname, '../public/poker-run-art');
-      fs.mkdirSync(publicDir, { recursive: true });
-      fs.copyFileSync(path.join(ART_DIR, file), path.join(publicDir, file));
-      images[field] = `/poker-run-art/${file}`;
-    }
-  }
-  if (CONTENT_ONLY) {
-    console.log('  ✍️  content-only — image fields left exactly as they are');
-  }
-
-  // 3:00 PM EDT — the finish line opens. `eventDate` is an absolute Timestamp,
-  // so it is safe to convert; `eventEndDate` is a naive Eastern wall-clock string
-  // of the shape the admin editor produces, which the calendar request interprets
-  // with its own timeZone field (see functions/src/calendarTime.ts — never
-  // .toISOString() one of these). Together they give the Calendar entry the real
-  // 3:00–6:30 window instead of the default 2-hour block off eventDate alone.
-  const eventDate = new Date('2026-09-25T15:00:00-04:00');
-  const eventEndDate = '2026-09-25T18:30';
-
-  const data = {
+runSeed({
+  label: 'Poker Run',
+  slug: 'cruisin-for-history-poker-run-2026',
+  artwork: 'poker-run',
+  art: [
+    { field: 'bannerImage', file: 'poker-run-banner-1920x1080.jpg' },
+    { field: 'mainImage', file: 'poker-run-card-1200x675.jpg' },
+    { field: 'squareImage', file: 'poker-run-square-1200x1200.jpg' },
+  ],
+  data: {
     type: 'event',
     status: 'published',
-    title: 'Cruisin’ for History Poker Run',
-    slug: SLUG,
-    eventDate: Timestamp.fromDate(eventDate),
-    eventEndDate,
+    title: 'Cruisin\u2019 for History Poker Run',
+    // 3:00 PM EDT — the finish line opens. This is an absolute instant, so it is safe
+    // to convert. `eventEndDate` beside it is a NAIVE Eastern wall-clock string of the
+    // shape the admin editor produces, which the Calendar request interprets with its
+    // own timeZone field — never .toISOString() one of those (see calendarTime.ts).
+    // Together they give the calendar entry the real 3:00–6:30 window instead of the
+    // default two-hour block off eventDate alone.
+    eventDate: new Date('2026-09-25T15:00:00-04:00'),
+    eventEndDate: '2026-09-25T18:30',
     content: CONTENT,
     excerpt:
-      'A laid-back fundraiser the afternoon before the Senoia Car Show. Drive a loop of five local landmarks, photographing yourself with your ride at each, then trade your photos for a poker hand. It’s a 50/50 contest — the best hand takes half the proceeds, with a guaranteed $200 minimum. Any car, truck, or motorcycle welcome.',
+      'A laid-back fundraiser the afternoon before the Senoia Car Show. Drive a loop of five local landmarks, photographing yourself with your ride at each, then trade your photos for a poker hand. It\u2019s a 50/50 contest — the best hand takes half the proceeds, with a guaranteed $200 minimum. Any car, truck, or motorcycle welcome.',
     location: 'Stone Lodge at Marimac Lakes, 148 Pylant St, Senoia, GA 30276',
     galleryImages: [],
     ticketPrice: 2500, // $25.00, in cents
     capacity: null, // unlimited — falsy capacity disables the remaining-count UI
-    updatedAt: Timestamp.fromDate(new Date()),
-    ...images,
-  };
-
-  const existing = await db
-    .collection('posts')
-    .where('slug', '==', SLUG)
-    .limit(1)
-    .get();
-
-  if (existing.empty && CONTENT_ONLY) {
-    throw new Error(`No post with slug "${SLUG}" — --content-only updates an existing post, it does not create one.`);
-  }
-
-  if (existing.empty) {
-    const ref = await db.collection('posts').add({
-      ...data,
-      ticketsSold: 0,
-      // Only on create: `publishDate` is a fallback sort key on every past-events
-      // surface, so re-running must leave an already-published post where it is.
-      publishDate: Timestamp.fromDate(new Date()),
-      createdAt: Timestamp.fromDate(new Date()),
-    });
-    console.log(`✅ Created posts/${ref.id}`);
-  } else {
-    const ref = existing.docs[0].ref;
-    // Never clobber ticketsSold — the Stripe webhook owns that counter.
-    await ref.set({ ...data, ticketsSold: FieldValue.increment(0) }, { merge: true });
-    console.log(`✅ Updated existing posts/${ref.id}`);
-  }
-  console.log(`   /news/${SLUG}`);
-  console.log(`   /embed/tickets/${SLUG}`);
-}
-
-main().catch(err => {
-  console.error('❌', err);
-  process.exit(1);
+  },
 });
