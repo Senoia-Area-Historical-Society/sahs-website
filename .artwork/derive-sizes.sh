@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Turns the Nano Banana masters into the exact files the seed script uploads.
 #
-#   ./.artwork/derive-sizes.sh
+#   ./.artwork/derive-sizes.sh                # fall-winter-2026 (default)
+#   ./.artwork/derive-sizes.sh poker-run      # any other .artwork/<set>/
 #
 # Two jobs, both of which have to be done in code rather than in the prompt:
 #
@@ -13,8 +14,13 @@
 #     to a true 16:9 or 1:1 and then resampled to the sizes the poker-run set
 #     established: 1920x1080 banner, 1200x675 card, 1200x1200 square.
 # Masters are gitignored (60MB of 4K PNGs); the derived JPEGs are committed. From a
-# fresh clone, run generate-fall-winter-2026.sh first — note that regenerating gives
-# *new* images, since the model is not deterministic.
+# fresh clone, run the matching generate-<set>.sh first — note that regenerating
+# gives *new* images, since the model is not deterministic.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-python3 "$DIR/derive_sizes.py" "$DIR/fall-winter-2026/masters" "$DIR/fall-winter-2026"
+SET="${1:-fall-winter-2026}"
+if [ ! -d "$DIR/$SET/masters" ]; then
+  echo "No masters at $DIR/$SET/masters — run the generator for '$SET' first." >&2
+  exit 1
+fi
+python3 "$DIR/derive_sizes.py" "$DIR/$SET/masters" "$DIR/$SET"

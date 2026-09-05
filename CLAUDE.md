@@ -448,6 +448,44 @@ Staging directories are ignored by the glob `public/*-art/`, so **name yours
 line until a second event would have silently left its artwork copies committable;
 a name that misses the glob reintroduces exactly that.
 
+**Seeding a post to the emulator writes a REAL entry on the public Google Calendar** —
+the same class of bug as the Storage note above, and the one with the worse blast
+radius, because the write lands somewhere members can see. `npm run emulators` starts
+the Functions emulator, which runs `onPostWritten` for real; `getCalendarAuth()` builds
+a `GoogleAuth` from Application Default Credentials, and **nothing emulates Google
+Calendar**, so the insert goes to `PUBLIC_EVENTS_CALENDAR_ID` on the live SAHS
+Membership Calendar. The emulator says so on startup and it is easy to read past:
+
+```
+⚠  functions: Application Default Credentials detected.
+   Non-emulated services will access production using these credentials. Be careful!
+```
+
+A local `node scripts/seed_poker_run.cjs` — the emulator default, the *safe*-looking
+invocation — therefore published a Poker Run entry to the members' calendar. Worse, the
+emulator persists the resulting `googleCalendarEventId` into `./emulator-data`, so the
+next local edit of that post takes Case B and **patches the production entry**.
+
+To verify a page locally, start only what you need:
+
+```bash
+firebase emulators:start --only auth,firestore     # no Functions, no trigger, no calendar
+```
+
+Use the full `npm run emulators` when you are actually testing a function, and know that
+any post write you make is a live calendar operation.
+
+**The room-resource migration is unfinished, and the sync account cannot finish it** —
+`scripts/migrate_calendar_to_membership.cjs --dry-run` still reports five posts holding
+entries on the meeting-room resource calendar (June/August programs, Croesy McIntosh,
+Family Day, Yacht Rock). They are all past events. The reason they were left behind is
+that `sahs-calendar-sync@sahs-archives.iam.gserviceaccount.com` has **reader, not
+writer, on the room resource**, so the script's `events.delete` 403s and it skips the
+post to keep the id recoverable — exactly as designed, and silent unless you read the
+output. Deleting a room-calendar entry currently requires a human in the Calendar UI, or
+a `writer` grant on the resource. Do not add one casually: write access to a room
+resource is write access to everyone's room bookings.
+
 **Security rules are code, and they are tested — run `npm run test:rules`** — a
 September 2026 audit found six defects in `firestore.rules`/`storage.rules` and none
 anywhere else. The pure logic had 213 tests; authorization had zero, and was only ever
