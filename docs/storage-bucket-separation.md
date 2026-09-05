@@ -1,7 +1,9 @@
 # Giving the website its own Storage bucket
 
-**Status: in progress.** The bucket exists and this repo is wired to it; three steps
-remain, two of which only a project owner can do. Checklist at the bottom.
+**Status: one step from done.** The website no longer touches the shared bucket at all —
+its rules, its images and its uploads are all on `sahs-website-media`. What remains is
+on the *archive-app* side: until it deploys again, the shared bucket still carries the
+website's old permissive ruleset. Checklist at the bottom.
 
 ## The problem
 
@@ -53,11 +55,19 @@ Firebase** (confirmed against the Firebase Storage API — registration is what 
 Security Rules apply at all; a bucket created only through `gcloud` would silently
 ignore them).
 
-### 2. Point the site at it
+### 2. Point the site at it — ✅ DONE (2026-09-04)
 
-`VITE_FIREBASE_STORAGE_BUCKET` is read at build time and comes from a **GitHub Actions
-secret** (`.github/workflows/deploy.yml`), so this must be changed in repository settings —
-it is not in the codebase. Update the local `.env` to match.
+`VITE_FIREBASE_STORAGE_BUCKET` is read at build time from a **GitHub Actions secret**, so
+it lives in repository settings rather than the codebase. Set to `sahs-website-media`, and
+the deploy re-run afterwards picked it up — **confirmed in the live bundle**, which now
+carries `sahs-website-media` where it previously carried `sahs-archives.firebasestorage.app`.
+
+Note the ordering trap: the secret is read *at run time by the workflow*, so simply
+setting it changes nothing until a deploy runs again. Re-running the most recent deploy
+is enough — no new commit needed — because a re-run reads secrets fresh.
+
+Remember to update your local `.env` to match, or local uploads will still go to the
+shared bucket.
 
 ### 3. Deploy rules only to the new bucket — ✅ DONE (in this repo)
 
@@ -102,12 +112,15 @@ migrated URLs no longer depend on the bucket's read rule at all. It is idempoten
 URL already pointing at the new bucket is skipped — so a re-run after a partial failure
 resumes cleanly.
 
-### 5. Verify, then let archive-app take its bucket back — ⏳ PENDING
+### 6. Let archive-app take its bucket back — ⏳ THE LAST STEP
 
-Once the migration has run and the secret is changed, **trigger an archive-app deploy** so
-its rules are re-applied to `sahs-archives.firebasestorage.app`. Until that runs, the
-shared bucket keeps the permissive ruleset that is live today, and archive-app's
-private-media protection stays reverted.
+Steps 1–5 are complete, so this is now safe: no website image lives on the shared bucket
+any more, and nothing the website does will put one there.
+
+**Trigger a deploy of `SAHS-archive-app`** so its rules are re-applied to
+`sahs-archives.firebasestorage.app`. Its workflow triggers on push to main only, so either
+push something or re-run its most recent deploy — check first that its main HEAD still
+matches that run's commit, or a re-run deploys an older revision.
 
 Then re-run the probe from the top of this document. It should return **403**, not 404.
 
@@ -130,18 +143,10 @@ undone.
 | 2 | Scope this repo's storage deploys to it (`firebase.json`, `.firebaserc`) | repo | ✅ done |
 | 3 | Rewrite `storage.rules` for a website-only bucket | repo | ✅ done |
 | 4 | Run the migration with `--prod` (31 objects, 12 posts) | either | ✅ done 2026-09-04 |
-| 5 | Point `VITE_FIREBASE_STORAGE_BUCKET` at the new bucket | **owner** | ⏳ pending |
+| 5 | Point `VITE_FIREBASE_STORAGE_BUCKET` at the new bucket | **owner** | ✅ done 2026-09-04 |
 | 6 | Trigger an archive-app deploy to restore its rules | **owner** | ⏳ pending |
 
 ### Why this order
-
-**5 is a GitHub Actions secret**, read at build time, so it is not in the codebase and
-cannot be changed from here. Until it changes, *new* uploads still land in the shared
-bucket — everything already published is on the new bucket and unaffected.
-
-Set it to `sahs-website-media` in **Settings → Secrets and variables → Actions →
-`VITE_FIREBASE_STORAGE_BUCKET`**, then push anything to main (or re-run the latest deploy)
-so the bundle is rebuilt with it. Update your local `.env` to match.
 
 **6 must come last.** The shared bucket currently carries the website's old permissive
 ruleset, and archive-app's private-media protection stays reverted until archive-app
