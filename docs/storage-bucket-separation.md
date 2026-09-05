@@ -1,9 +1,9 @@
 # Giving the website its own Storage bucket
 
-**Status: one step from done.** The website no longer touches the shared bucket at all —
-its rules, its images and its uploads are all on `sahs-website-media`. What remains is
-on the *archive-app* side: until it deploys again, the shared bucket still carries the
-website's old permissive ruleset. Checklist at the bottom.
+**Status: ✅ COMPLETE (2026-09-04).** The website owns `sahs-website-media` — its rules,
+its images and its uploads. archive-app has its bucket back: the probe below now returns
+**403**, so its private-media protection is restored after having been reverted since
+09-02. Two CI guards keep the two apart; see step 7.
 
 ## The problem
 
@@ -28,10 +28,10 @@ not compatible:
 So every website deploy reverts that fix, and every archive-app deploy re-breaks the
 website's images. It oscillates, and nobody is watching which side is up.
 
-**As of 2026-09-04 the website's ruleset is the live one** — it deployed 09-02, after
+**This was the state before the cutover: the website's ruleset was the live one** — it deployed 09-02, after
 archive-app's 08-30. Verified without touching archive material: a GET for a path that
-does not exist under `archive_media/` returns **404, not 403**, and rules are evaluated
-before existence, so anonymous read is currently permitted bucket-wide.
+did not exist under `archive_media/` returned **404, not 403**, and rules are evaluated
+before existence, so anonymous read was permitted bucket-wide. **It now returns 403.**
 
 ```bash
 # 404 => anonymous read allowed (website ruleset live). 403 => denied (archive-app's).
@@ -112,7 +112,7 @@ migrated URLs no longer depend on the bucket's read rule at all. It is idempoten
 URL already pointing at the new bucket is skipped — so a re-run after a partial failure
 resumes cleanly.
 
-### 6. Let archive-app take its bucket back — ⏳ THE LAST STEP
+### 6. Let archive-app take its bucket back — ✅ DONE (2026-09-04)
 
 Steps 1–5 are complete, so this is now safe: no website image lives on the shared bucket
 any more, and nothing the website does will put one there.
@@ -122,11 +122,25 @@ any more, and nothing the website does will put one there.
 push something or re-run its most recent deploy — check first that its main HEAD still
 matches that run's commit, or a re-run deploys an older revision.
 
-Then re-run the probe from the top of this document. It should return **403**, not 404.
+Re-ran its most recent deploy (`d53ca7a`, identical to its main HEAD, so no rollback
+risk). The probe now returns **403** for both `archive_media/` and `content_images/`.
 
-That probe is also the regression test: if it ever returns 404 again, something has
-deployed website-shaped storage rules to the shared bucket, and the separation has come
+Verified immediately afterwards — this is the moment a missed image would have broken:
+**120/120 published post images still return HTTP 200**, and `/news` renders with 0
+broken images and nothing served from the shared bucket.
+
+That probe remains the regression test: if it ever returns 404 again, something has
+deployed website-shaped storage rules to the shared bucket and the separation has come
 undone.
+
+### 7. Guard against it coming back — ✅ DONE
+
+`scripts/check-storage-bucket-target.cjs`, modelled on the existing
+`check-firestore-database-target.cjs`. It fails the build if `firebase.json` loses its
+storage `target` (which would deploy to the default — shared — bucket), if `.firebaserc`
+re-points that target at the shared bucket, or if `VITE_FIREBASE_STORAGE_BUCKET` names
+the wrong bucket. Runs in PR CI for the config half and in `deploy.yml` for the env-var
+half. All three failure modes were tested by inducing them.
 
 ## Related
 
@@ -144,7 +158,8 @@ undone.
 | 3 | Rewrite `storage.rules` for a website-only bucket | repo | ✅ done |
 | 4 | Run the migration with `--prod` (31 objects, 12 posts) | either | ✅ done 2026-09-04 |
 | 5 | Point `VITE_FIREBASE_STORAGE_BUCKET` at the new bucket | **owner** | ✅ done 2026-09-04 |
-| 6 | Trigger an archive-app deploy to restore its rules | **owner** | ⏳ pending |
+| 6 | Trigger an archive-app deploy to restore its rules | **owner** | ✅ done 2026-09-04 |
+| 7 | CI guard against re-coupling (`check-storage-bucket-target.cjs`) | repo | ✅ done 2026-09-04 |
 
 ### Why this order
 

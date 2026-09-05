@@ -29,6 +29,13 @@ jobs:
       - name: Install site dependencies
         run: npm ci
 
+      # Config-only, no secret needed: catches firebase.json or .firebaserc being
+      # re-coupled to archive-app's shared Storage bucket. The env-var half of the
+      # check is skipped here (the secret is a deploy-time concern) and runs in
+      # deploy.yml instead.
+      - name: Check Storage bucket target
+        run: node scripts/check-storage-bucket-target.cjs
+
       # Build the site BEFORE installing functions dependencies. The order is the
       # point, not an accident.
       #
