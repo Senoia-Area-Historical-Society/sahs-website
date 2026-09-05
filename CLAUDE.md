@@ -75,8 +75,11 @@ Flow: Stripe Checkout → `stripeWebhook` function → Resend welcome email → 
 | `volunteer_sheets/{id}/registrations` | Individual volunteer signups | Public create; editors read |
 | `shortlinks` | Custom 301 redirect slugs | Admin only |
 | `user_roles` | Role overrides by email address | Self-read; admin-write |
-| `mail` | Trigger Email extension queue | Public create; no read |
+| `mail` | Trigger Email extension queue — **closed**, see Gotchas | Nobody; Admin SDK only |
 | `wiki` | Internal knowledge base articles | Editors+ only |
+| `extractedText` | **Not ours.** OCR of every image in the shared Storage bucket, written by the `storage-extract-image-text` extension — 12,732 docs, includes `accession_paperwork/` | Closed to everyone |
+| `bookings` | Retired room-booking system, 1 doc | Closed to everyone |
+| `organization` | Predecessor of `organization_entities`, 18 docs | Closed to everyone |
 
 ## Critical File Map
 
@@ -540,3 +543,31 @@ Before pushing anything under `functions/src/`, reproduce the deploy condition:
 ```bash
 mv functions/node_modules /tmp/fn_nm && npm run build; mv /tmp/fn_nm functions/node_modules
 ```
+
+**An extension writes an undocumented collection: `extractedText`** — the
+`googlecloud/storage-extract-image-text` extension is ACTIVE with
+`COLLECTION_PATH=extractedText`, `IMG_BUCKET=sahs-archives.firebasestorage.app` and
+**no path filter**. Every image landing in the shared bucket is OCR'd and its full text
+written to this database — 12,732 documents as of 2026-09-05. Nothing in either repo
+reads it, and it appears in no data model.
+
+A path sample confirms the sources include `accession_paperwork/`, so the transcribed
+contents of donor and provenance paperwork sit in the default database. archive-app has
+put the paperwork *URLs* behind a staff-only rule; **this collection is the same
+information in another place and is not covered by that fix.**
+
+It was never exposed — the catch-all `match /{document=**}` denied it — but that is
+*incidental* protection, not a decision, and the catch-all records no intent. It now has
+an explicit `allow read, write: if false`, pinned by a rules test across every seat, so
+anyone widening it has to delete a failing test rather than quietly extend a wildcard.
+The same treatment covers `bookings` (retired) and `organization` (superseded).
+
+Two things this does **not** settle, both belonging to archive-app: whether accession
+paperwork should be OCR'd at all (the extension needs a path filter, or the paperwork
+needs its own bucket), and whether the 12,732 existing documents should be pruned.
+
+**Check `firebase ext:list` when auditing** — three extensions write to this project and
+none of them are in either codebase: `firestore-send-email` (the `mail` queue),
+`storage-extract-image-text` (above), and `storage-resize-images`. An audit that only
+reads the repo will miss all three, which is how a public-writable `mail` collection and
+a 12,732-document OCR store both went unnoticed.

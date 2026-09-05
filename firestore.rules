@@ -222,6 +222,34 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Collections nothing in this app reads, denied ON PURPOSE ────────────────
+    //
+    // All three were already denied by the catch-all below. They are written out
+    // anyway because *incidental* protection is not the same as a decision, and the
+    // catch-all records no intent: the next person to add a permissive rule — or to
+    // make OCR text searchable — has nothing telling them what they would expose.
+    //
+    // `extractedText` is the one that matters. The googlecloud/storage-extract-image-text
+    // extension is ACTIVE with COLLECTION_PATH=extractedText and
+    // IMG_BUCKET=sahs-archives.firebasestorage.app and **no path filter**, so every
+    // image landing in the shared bucket is OCR'd and its full text written here.
+    // 12,732 documents as of 2026-09-05, and a path sample confirms the sources
+    // include `accession_paperwork/` — the transcribed contents of donor and
+    // provenance paperwork. archive-app has put the paperwork *URLs* behind a
+    // staff-only rule; this collection is the same information in another place, and
+    // it is not covered by that fix. Whether that paperwork should be OCR'd at all is
+    // an open question for archive-app — it needs either a path filter on the
+    // extension or a separate bucket. Until then: closed, loudly.
+    //
+    // `bookings` (1 doc) is the retired room-booking system; only
+    // `scripts/replay_stripe_webhook.cjs` touches it, against the emulator.
+    // `organization` (18 docs) predates `organization_entities`; only
+    // `scripts/sync-board-sponsors.ts` reads it. Both scripts use the Admin SDK,
+    // which bypasses rules entirely, so denying here costs them nothing.
+    match /extractedText/{doc} { allow read, write: if false; }
+    match /bookings/{doc} { allow read, write: if false; }
+    match /organization/{doc} { allow read, write: if false; }
+
     // ── Default deny ────────────────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
