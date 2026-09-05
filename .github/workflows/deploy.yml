@@ -51,6 +51,16 @@ jobs:
       - name: Check Firestore database target
         run: node scripts/check-firestore-database-target.cjs
 
+      # Same idea, for Storage. Fails the deploy before it starts if firebase.json or
+      # .firebaserc would send storage rules to the bucket archive-app owns, or if
+      # VITE_FIREBASE_STORAGE_BUCKET names the wrong bucket. Both failures are silent
+      # in production — see docs/storage-bucket-separation.md. The secret is passed in
+      # so the env-var half is actually exercised.
+      - name: Check Storage bucket target
+        run: node scripts/check-storage-bucket-target.cjs
+        env:
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+
       - name: Install Dependencies
         run: npm ci
         

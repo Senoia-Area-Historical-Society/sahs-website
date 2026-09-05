@@ -483,11 +483,22 @@ so whichever merged last owned the policy: the website's `allow read: if true` r
 archive-app's per-object-ACL protection for private media, and archive-app's ruleset broke
 the 13 website images that carry no download token. It oscillated for months.
 
-Do **not** widen `firebase.json`'s storage list back to a bare `{ "rules": ... }` object —
-that is what re-couples the two repos. The regression check is a GET for a nonexistent
-object under `archive_media/` on the shared bucket: **403 is correct**, 404 means
-website-shaped rules have been deployed there again. `docs/storage-bucket-separation.md`
-has the full runbook and the remaining owner-only steps.
+Three things hold it apart, and all three are load-bearing:
+
+1. `firebase.json` scopes storage to the `website-media` **target**. Do not widen it back
+   to a bare `{ "rules": ... }` object — that deploys to the project's *default* bucket,
+   which is the shared one, so that single edit is the entire coupling.
+2. `VITE_FIREBASE_STORAGE_BUCKET` is `sahs-website-media`. It is a GitHub Actions secret
+   read **at build time**, so changing it does nothing until a deploy runs again —
+   re-running the latest deploy suffices, since secrets are read fresh per run.
+3. `scripts/check-storage-bucket-target.cjs` fails the build on any of the above: the
+   config half in PR CI, the env-var half in `deploy.yml` (which passes the secret in).
+   It exists because none of these failures has a visible symptom in production — new
+   uploads simply go to the wrong bucket and keep working until archive-app next deploys.
+
+The regression probe is a GET for a nonexistent object under `archive_media/` on the
+shared bucket: **403 is correct**; 404 means website-shaped rules have been deployed there
+again. `docs/storage-bucket-separation.md` has the full history and the cutover record.
 
 **Email sends server-side through Resend, from `updates.senoiahistory.com` only** — the
 apex `senoiahistory.com` is *not* a verified Resend domain. The Firebase Trigger Email

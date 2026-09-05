@@ -1,7 +1,9 @@
 # Giving the website its own Storage bucket
 
-**Status: in progress.** The bucket exists and this repo is wired to it; three steps
-remain, two of which only a project owner can do. Checklist at the bottom.
+**Status: ✅ COMPLETE (2026-09-04).** The website owns `sahs-website-media` — its rules,
+its images and its uploads. archive-app has its bucket back: the probe below now returns
+**403**, so its private-media protection is restored after having been reverted since
+09-02. Two CI guards keep the two apart; see step 7.
 
 ## The problem
 
@@ -26,10 +28,10 @@ not compatible:
 So every website deploy reverts that fix, and every archive-app deploy re-breaks the
 website's images. It oscillates, and nobody is watching which side is up.
 
-**As of 2026-09-04 the website's ruleset is the live one** — it deployed 09-02, after
+**This was the state before the cutover: the website's ruleset was the live one** — it deployed 09-02, after
 archive-app's 08-30. Verified without touching archive material: a GET for a path that
-does not exist under `archive_media/` returns **404, not 403**, and rules are evaluated
-before existence, so anonymous read is currently permitted bucket-wide.
+did not exist under `archive_media/` returned **404, not 403**, and rules are evaluated
+before existence, so anonymous read was permitted bucket-wide. **It now returns 403.**
 
 ```bash
 # 404 => anonymous read allowed (website ruleset live). 403 => denied (archive-app's).
@@ -53,11 +55,19 @@ Firebase** (confirmed against the Firebase Storage API — registration is what 
 Security Rules apply at all; a bucket created only through `gcloud` would silently
 ignore them).
 
-### 2. Point the site at it
+### 2. Point the site at it — ✅ DONE (2026-09-04)
 
-`VITE_FIREBASE_STORAGE_BUCKET` is read at build time and comes from a **GitHub Actions
-secret** (`.github/workflows/deploy.yml`), so this must be changed in repository settings —
-it is not in the codebase. Update the local `.env` to match.
+`VITE_FIREBASE_STORAGE_BUCKET` is read at build time from a **GitHub Actions secret**, so
+it lives in repository settings rather than the codebase. Set to `sahs-website-media`, and
+the deploy re-run afterwards picked it up — **confirmed in the live bundle**, which now
+carries `sahs-website-media` where it previously carried `sahs-archives.firebasestorage.app`.
+
+Note the ordering trap: the secret is read *at run time by the workflow*, so simply
+setting it changes nothing until a deploy runs again. Re-running the most recent deploy
+is enough — no new commit needed — because a re-run reads secrets fresh.
+
+Remember to update your local `.env` to match, or local uploads will still go to the
+shared bucket.
 
 ### 3. Deploy rules only to the new bucket — ✅ DONE (in this repo)
 
@@ -102,18 +112,35 @@ migrated URLs no longer depend on the bucket's read rule at all. It is idempoten
 URL already pointing at the new bucket is skipped — so a re-run after a partial failure
 resumes cleanly.
 
-### 5. Verify, then let archive-app take its bucket back — ⏳ PENDING
+### 6. Let archive-app take its bucket back — ✅ DONE (2026-09-04)
 
-Once the migration has run and the secret is changed, **trigger an archive-app deploy** so
-its rules are re-applied to `sahs-archives.firebasestorage.app`. Until that runs, the
-shared bucket keeps the permissive ruleset that is live today, and archive-app's
-private-media protection stays reverted.
+Steps 1–5 are complete, so this is now safe: no website image lives on the shared bucket
+any more, and nothing the website does will put one there.
 
-Then re-run the probe from the top of this document. It should return **403**, not 404.
+**Trigger a deploy of `SAHS-archive-app`** so its rules are re-applied to
+`sahs-archives.firebasestorage.app`. Its workflow triggers on push to main only, so either
+push something or re-run its most recent deploy — check first that its main HEAD still
+matches that run's commit, or a re-run deploys an older revision.
 
-That probe is also the regression test: if it ever returns 404 again, something has
-deployed website-shaped storage rules to the shared bucket, and the separation has come
+Re-ran its most recent deploy (`d53ca7a`, identical to its main HEAD, so no rollback
+risk). The probe now returns **403** for both `archive_media/` and `content_images/`.
+
+Verified immediately afterwards — this is the moment a missed image would have broken:
+**120/120 published post images still return HTTP 200**, and `/news` renders with 0
+broken images and nothing served from the shared bucket.
+
+That probe remains the regression test: if it ever returns 404 again, something has
+deployed website-shaped storage rules to the shared bucket and the separation has come
 undone.
+
+### 7. Guard against it coming back — ✅ DONE
+
+`scripts/check-storage-bucket-target.cjs`, modelled on the existing
+`check-firestore-database-target.cjs`. It fails the build if `firebase.json` loses its
+storage `target` (which would deploy to the default — shared — bucket), if `.firebaserc`
+re-points that target at the shared bucket, or if `VITE_FIREBASE_STORAGE_BUCKET` names
+the wrong bucket. Runs in PR CI for the config half and in `deploy.yml` for the env-var
+half. All three failure modes were tested by inducing them.
 
 ## Related
 
@@ -130,18 +157,11 @@ undone.
 | 2 | Scope this repo's storage deploys to it (`firebase.json`, `.firebaserc`) | repo | ✅ done |
 | 3 | Rewrite `storage.rules` for a website-only bucket | repo | ✅ done |
 | 4 | Run the migration with `--prod` (31 objects, 12 posts) | either | ✅ done 2026-09-04 |
-| 5 | Point `VITE_FIREBASE_STORAGE_BUCKET` at the new bucket | **owner** | ⏳ pending |
-| 6 | Trigger an archive-app deploy to restore its rules | **owner** | ⏳ pending |
+| 5 | Point `VITE_FIREBASE_STORAGE_BUCKET` at the new bucket | **owner** | ✅ done 2026-09-04 |
+| 6 | Trigger an archive-app deploy to restore its rules | **owner** | ✅ done 2026-09-04 |
+| 7 | CI guard against re-coupling (`check-storage-bucket-target.cjs`) | repo | ✅ done 2026-09-04 |
 
 ### Why this order
-
-**5 is a GitHub Actions secret**, read at build time, so it is not in the codebase and
-cannot be changed from here. Until it changes, *new* uploads still land in the shared
-bucket — everything already published is on the new bucket and unaffected.
-
-Set it to `sahs-website-media` in **Settings → Secrets and variables → Actions →
-`VITE_FIREBASE_STORAGE_BUCKET`**, then push anything to main (or re-run the latest deploy)
-so the bundle is rebuilt with it. Update your local `.env` to match.
 
 **6 must come last.** The shared bucket currently carries the website's old permissive
 ruleset, and archive-app's private-media protection stays reverted until archive-app
