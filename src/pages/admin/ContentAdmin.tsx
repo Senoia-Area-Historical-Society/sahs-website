@@ -10,6 +10,7 @@ import { uploadFile } from '../../services/storage';
 import { getVolunteerSheets } from '../../services/api';
 import type { VolunteerSheet } from '../../types';
 import { buildEditorState, buildPostData, type Post } from '../../lib/postEditorMapping';
+import { formatDate, toDate } from '../../lib/firestoreDates';
 
 export default function ContentAdmin() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -799,8 +800,11 @@ export default function ContentAdmin() {
                         </td>
                         <td className="p-4 font-serif text-charcoal">{post.title}</td>
                         <td className="p-4 text-sm text-charcoal/80 whitespace-nowrap">
-                          {post.eventDate
-                            ? post.eventDate.toDate().toLocaleDateString()
+                          {/* Coerced, never `.toDate()`d directly: a document whose date
+                              field is a string throws during render and blanks the page.
+                              See src/lib/firestoreDates.ts. */}
+                          {toDate(post.eventDate)
+                            ? formatDate(post.eventDate)
                             : <span className="text-charcoal/30 italic">no date</span>}
                         </td>
                         <td className="p-4">
@@ -814,7 +818,10 @@ export default function ContentAdmin() {
                         </td>
                         <td className="p-4 text-xs text-charcoal/60">
                           {post.author || 'Admin'}<br/>
-                          {post.updatedAt?.toDate().toLocaleDateString() || post.createdAt?.toDate().toLocaleDateString() || 'N/A'}
+                          {/* `toDate` first so an unusable `updatedAt` falls back to
+                              `createdAt`, matching the old `||` chain — which could not
+                              reach its fallback, because it threw on the way there. */}
+                          {formatDate(toDate(post.updatedAt) ?? post.createdAt)}
                         </td>
                         <td className="p-4 flex gap-3 justify-end items-center">
                           {post.status === 'published' && post.slug && (

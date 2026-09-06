@@ -47,6 +47,7 @@ import UsersAdmin from './pages/admin/UsersAdmin';
 import SubmissionsAdmin from './pages/admin/SubmissionsAdmin';
 import ShortLinksAdmin from './pages/admin/ShortLinksAdmin';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminErrorBoundary from './components/admin/AdminErrorBoundary';
 import NewsletterComposer from './pages/admin/NewsletterComposer';
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isSAHSUser, loading } = useAuth();
@@ -60,7 +61,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
-  return <>{children}</>;
+  // Inside the access check, not around it: a redirect decision should never be
+  // swallowed by a boundary. Every /admin/* route goes through here, so this is the
+  // one place that covers the whole portal. See AdminErrorBoundary for why a render
+  // throw would otherwise blank it entirely.
+  return <AdminErrorBoundary>{children}</AdminErrorBoundary>;
 }
 
 // Layout wrapper for public pages to ensure Header/Footer are rendered

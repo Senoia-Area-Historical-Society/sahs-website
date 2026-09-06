@@ -87,6 +87,8 @@ Flow: Stripe Checkout → `stripeWebhook` function → Resend welcome email → 
 |---|---|
 | `src/lib/firebase.ts` | Firebase init; auto-connects emulators on localhost |
 | `src/services/api.ts` | All Firestore read/write operations (20KB+) |
+| `src/lib/firestoreDates.ts` | Date coercion for document values — render through this, never `.toDate()` |
+| `src/lib/eventSchedule.ts` | The upcoming/past partition, shared by the public site and the dashboard |
 | `src/services/storage.ts` | Firebase Storage upload helpers |
 | `src/contexts/AuthContext.tsx` | Auth state and role flags (`isAdmin`, `isCurator`, `isEditor`, `isReadOnly`, `isSAHSUser`) |
 | `src/types/index.ts` | TypeScript interfaces for all data models (Post, Membership, Ticket, Gallery, etc.) |
@@ -252,6 +254,54 @@ therefore leads its denial message with "switch accounts" and only offers
 Adding a domain check to the rules would close (2), but it would also lock out
 any personal address already relied on, so it is a deliberate change and not a
 tidy-up. Roles are managed at `/admin/users`, admin-only.
+
+**Never call `.toDate()` on a Firestore document value while rendering — coerce through
+`src/lib/firestoreDates.ts`** — `value?.toDate()` reads as defensive and is not.
+Optional chaining guards `null` and `undefined`; it says nothing about the *type*, so on
+a value that is a string it still resolves `.toDate` and invokes it. React unmounts the
+entire tree when a render throws, so the page goes **blank white** — no error banner, no
+partial render, nothing but the background colour.
+
+`posts/N2B4Aq2bwjytBWPe7bVy` ("Yacht Rock Party") carries `updatedAt` as the ISO string
+`"2026-08-25T04:13:41.139Z"`, and `ContentAdmin`'s
+`post.updatedAt?.toDate().toLocaleDateString()` made `/admin/content` blank for every
+user, on every post, on every visit. The `|| post.createdAt?.toDate()` fallback beside it
+could never be reached: the expression threw on the way there.
+
+These documents have four producers — the admin editor (`buildPostData`), the seed
+scripts, the Cloud Functions, and the one-time Webflow migration — so their field shapes
+are conventional, not enforced. `toDate` / `toMillis` / `formatDate` accept a
+`Timestamp`, a `Date`, an ISO string, epoch millis and the `{ seconds }` shape, and
+return `null`/`0`/a fallback string instead of throwing. `src/lib/eventSchedule.ts`
+(the upcoming/past partition, shared by the public site and the dashboard) is built on
+them, so a malformed date degrades one cell rather than one page.
+`src/test/contentAdminDates.test.tsx` renders the real component over a mixed-shape
+fixture and fails on the old expression.
+
+Every `/admin/*` page also sits behind `AdminErrorBoundary` (wired once inside
+`ProtectedRoute`), so the *next* unexpected value shows a message with a working nav
+rather than a blank portal. Its `key={pathname}` is load-bearing: each route renders its
+own `ProtectedRoute` at the same position and type, so React reconciles and reuses the
+instance across navigations — without the key the boundary stays `failed` and every
+later admin page renders the fallback until a manual reload.
+
+**`limit()` without `orderBy` is an id-ordered window, not "the most relevant N"** —
+Firestore's implicit ordering is `__name__ ASC`, so
+`query(posts, where('status','==','published'), limit(50))` returns the fifty
+*alphabetically-first document ids*. That has no relationship to dates. Once the archive
+passed fifty published posts, every future event sorted outside the window and
+`AdminDashboard` reported **0 upcoming events** while `/news` listed eight. Nothing
+errored — the query succeeded, it just described the wrong fifty documents — so the
+dashboard's per-query error banner stayed silent, and the comment above it claimed the
+limit "bounds the worst-case read".
+
+The dashboard now derives upcoming events in memory from the published snapshot it
+already fetches for the "Published" count (a complete, unlimited read), which is exact,
+needs no composite index, and is ~50 document reads *cheaper*. Both surfaces call
+`upcomingEvents` from `src/lib/eventSchedule.ts`, so they cannot drift apart again.
+A bounded query over this collection needs an `orderBy` on the field that defines the
+bound — and that means a composite index, which the deploy workflow deliberately never
+ships (see Deployment).
 
 **macOS / Linux filesystem casing** — macOS is case-insensitive; Linux Cloud Run is not. If a compiled output file gets wrong casing (e.g. `welcomeEmail.js` instead of `WelcomeEmail.js`), the container fails at startup. Fix: `rm -rf functions/lib && cd functions && npm run build`.
 

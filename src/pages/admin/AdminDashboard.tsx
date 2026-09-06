@@ -6,6 +6,10 @@ import AdminHeader from './AdminHeader';
 import ErrorBanner from '../../components/admin/ErrorBanner';
 import { FileText, Calendar, Ticket, CalendarDays, Users, Plus, TrendingUp, Clock, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+// Aliased: the component's state variable is also called `upcomingEvents`, and an
+// unaliased import would be shadowed by it inside the component.
+import { upcomingEvents as selectUpcomingEvents } from '../../lib/eventSchedule';
+import { formatDate as formatDateValue } from '../../lib/firestoreDates';
 
 interface PostCounts { published: number; draft: number; archived: number; }
 interface UpcomingEvent { id: string; title: string; slug: string; eventDate: Timestamp | null; location?: string; }
@@ -30,19 +34,13 @@ export default function AdminDashboard() {
         { label: 'published posts', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'published'))) },
         { label: 'draft posts', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'draft'))) },
         { label: 'archived posts', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'archived'))) },
-        // Equality-only filters (no orderBy chained) so this never depends on a
-        // composite index existing — sort/filter for "upcoming" client-side instead.
-        // A generous limit still bounds the worst-case read as the event archive grows.
-        // No `type` filter: every post is an event, and Firestore excludes documents
-        // missing a filtered field entirely, so the clause could only ever hide rows.
-        { label: 'upcoming events', promise: getDocs(query(collection(db, 'posts'), where('status', '==', 'published'), limit(50))) },
         { label: 'recent tickets', promise: getDocs(query(collection(db, 'tickets'), orderBy('purchasedAt', 'desc'), limit(5))) },
       ];
       // `settled` is derived from `specs` by a single map(), so it's always the same
       // length and order as `specs` — positionally destructuring it here is safe
       // because label and query live together in one array, not two synced-by-hand ones.
       const settled = await Promise.allSettled(specs.map(s => s.promise));
-      const [publishedRes, draftRes, archivedRes, eventsRes, ticketsRes] = settled;
+      const [publishedRes, draftRes, archivedRes, ticketsRes] = settled;
 
       const errors: string[] = [];
       specs.forEach((s, i) => {
@@ -59,14 +57,27 @@ export default function AdminDashboard() {
         archived: archivedRes.status === 'fulfilled' ? archivedRes.value.size : 0,
       });
 
-      const events: UpcomingEvent[] = eventsRes.status === 'fulfilled'
-        ? eventsRes.value.docs
-            .map(d => ({ id: d.id, ...d.data() } as UpcomingEvent))
-            // An event with no scheduled date isn't "upcoming" — exclude it, matching
-            // what the previous Firestore-side orderBy('eventDate') silently did.
-            .filter(e => e.eventDate && (e.eventDate.toDate ? e.eventDate.toDate() : new Date(e.eventDate as any)) >= now)
-            .sort((a, b) => (a.eventDate?.toMillis() ?? 0) - (b.eventDate?.toMillis() ?? 0))
-            .slice(0, 3)
+      // Derived from the published snapshot above rather than queried separately.
+      //
+      // The old query was `where('status','==','published')` with `limit(50)` and no
+      // `orderBy`, which inherits Firestore's implicit `__name__ ASC` — the 50
+      // alphabetically-first document *ids*, a window with no relationship to dates.
+      // Once the archive passed 50 published posts every future event fell outside it,
+      // and the dashboard read "0 upcoming events" while /news listed eight. Nothing
+      // errored, so there was no banner: the query succeeded on the wrong 50 documents.
+      //
+      // The published snapshot is already a complete, unlimited read (the "Published"
+      // count needs it), so selecting in memory is both exact and strictly cheaper —
+      // it removes ~50 document reads per dashboard load. `upcomingEvents` is the same
+      // helper `getEventsSplit` uses, so this can no longer disagree with the public
+      // site, and it treats an event earlier today as still upcoming.
+      // Held in full, not pre-truncated: the stat card reports the real number of
+      // upcoming events, and only the panel beneath it shows the next few.
+      const events: UpcomingEvent[] = publishedRes.status === 'fulfilled'
+        ? selectUpcomingEvents(
+            publishedRes.value.docs.map(d => ({ id: d.id, ...d.data() } as UpcomingEvent)),
+            now
+          )
         : [];
       setUpcomingEvents(events);
 
@@ -81,11 +92,10 @@ export default function AdminDashboard() {
     });
   }, []);
 
-  const formatDate = (val: any): string => {
-    if (!val) return 'N/A';
-    const d = val.toDate ? val.toDate() : new Date(val);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  // Coercion lives in one place now — a ticket or post whose date field is a string
+  // formats rather than throwing. See src/lib/firestoreDates.ts.
+  const formatDate = (val: unknown): string =>
+    formatDateValue(val, 'N/A', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const formatCurrency = (cents: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
@@ -162,7 +172,7 @@ export default function AdminDashboard() {
                   {upcomingEvents.length === 0 ? (
                     <EmptyState message="No upcoming events" />
                   ) : (
-                    upcomingEvents.map(event => (
+                    upcomingEvents.slice(0, 3).map(event => (
                       <div key={event.id} className="px-5 py-4">
                         <p className="font-serif text-sm font-bold text-charcoal leading-tight mb-1">{event.title}</p>
                         <p className="text-xs text-charcoal/50 font-sans">{formatDate(event.eventDate)}</p>
