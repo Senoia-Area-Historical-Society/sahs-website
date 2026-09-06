@@ -1,5 +1,6 @@
 import { collection, getDocs, query, orderBy, limit, where, addDoc, doc, updateDoc, getDoc, runTransaction, Timestamp, deleteDoc, serverTimestamp, type FirestoreError } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
+import { pastEvents, upcomingEvents } from '../lib/eventSchedule';
 
 /**
  * `Authorization: Bearer <ID token>` for the admin-facing Cloud Functions.
@@ -30,14 +31,13 @@ const getFunctionsBaseUrl = () => {
       : 'http://127.0.0.1:5001/sahs-archives/us-central1');
 };
 
-/**
- * When a post happened. `eventDate` is the real date for anything scheduled;
- * legacy news articles carry only a `publishDate`, and a handful of imported
- * documents carry neither, so `createdAt` is the last resort.
+/*
+ * `occurredAt` moved to `occurredAtMillis` in src/lib/eventSchedule.ts, alongside the
+ * partition that was its only caller. The inline version called `.toMillis()` on the
+ * document value directly, which throws on a document whose date field is a string
+ * rather than a Timestamp — and `getEventsSplit` catches, so one such document would
+ * have emptied Home, /news and /past-sahs-events at once, silently.
  */
-function occurredAt(post: Post): number {
-  return post.eventDate?.toMillis() || post.publishDate?.toMillis() || post.createdAt?.toMillis() || 0;
-}
 
 /**
  * Every published post, partitioned around a single midnight cutoff.
@@ -60,18 +60,12 @@ export async function getEventsSplit(): Promise<{ upcoming: Post[]; past: Post[]
     const q = query(collection(db, 'posts'), where('status', '==', 'published'));
     const snapshot = await getDocs(q);
     const allPosts = snapshot.docs.map(toPost);
-    const cutoff = new Date();
-    cutoff.setHours(0, 0, 0, 0); // An event happening today still counts as upcoming
 
-    const upcoming = allPosts
-      .filter(post => post.eventDate && post.eventDate.toDate() >= cutoff)
-      .sort((a, b) => (a.eventDate?.toMillis() || 0) - (b.eventDate?.toMillis() || 0));
-
-    const past = allPosts
-      .filter(post => !post.eventDate || post.eventDate.toDate() < cutoff)
-      .sort((a, b) => occurredAt(b) - occurredAt(a));
-
-    return { upcoming, past };
+    // The partition itself lives in src/lib/eventSchedule.ts, shared with the admin
+    // dashboard so the two surfaces cannot disagree about what "upcoming" means —
+    // they did, and the dashboard reported zero while these lists showed eight.
+    // The cutoff is still local midnight: an event happening today is upcoming.
+    return { upcoming: upcomingEvents(allPosts), past: pastEvents(allPosts) };
   } catch (err) {
     console.error('Error fetching posts:', err);
     return { upcoming: [], past: [] };
