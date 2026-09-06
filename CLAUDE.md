@@ -278,6 +278,13 @@ them, so a malformed date degrades one cell rather than one page.
 `src/test/contentAdminDates.test.tsx` renders the real component over a mixed-shape
 fixture and fails on the old expression.
 
+Every `/admin/*` page also sits behind `AdminErrorBoundary` (wired once inside
+`ProtectedRoute`), so the *next* unexpected value shows a message with a working nav
+rather than a blank portal. Its `key={pathname}` is load-bearing: each route renders its
+own `ProtectedRoute` at the same position and type, so React reconciles and reuses the
+instance across navigations — without the key the boundary stays `failed` and every
+later admin page renders the fallback until a manual reload.
+
 **`limit()` without `orderBy` is an id-ordered window, not "the most relevant N"** —
 Firestore's implicit ordering is `__name__ ASC`, so
 `query(posts, where('status','==','published'), limit(50))` returns the fifty
