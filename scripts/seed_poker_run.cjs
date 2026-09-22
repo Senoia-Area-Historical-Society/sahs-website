@@ -34,7 +34,7 @@ const CONTENT = `
 <h3>The Route</h3>
 <p>Five stops, roughly a 33-mile loop &mdash; about 50 minutes of driving without the photo breaks. The order below is the suggested route; you&rsquo;re free to run it however you like.</p>
 <ul>
-  <li><strong>Stop 1 &mdash; Seavy Street Park</strong><br>Seavy St, Senoia, GA 30276</li>
+  <li><strong>Stop 1 &mdash; Seavy Street Park</strong><br>423 Seavy St, Senoia, GA 30276</li>
   <li><strong>Stop 2 &mdash; Clayton Appliances</strong><br>51 Marion Beavers Rd, Sharpsburg, GA 30277</li>
   <li><strong>Stop 3 &mdash; 1 Wood Dr, Newnan</strong><br>1 Wood Dr, Newnan, GA 30263</li>
   <li><strong>Stop 4 &mdash; Aqua Design Systems</strong><br>5127 GA-16, Senoia, GA 30276</li>
