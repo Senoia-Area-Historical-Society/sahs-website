@@ -180,7 +180,10 @@ Date line: DECEMBER 2026
 Detail line: Date to be confirmed'
 }
 
-ALL=(sept_program volunteers oct_program auction christmas hotchocolate
+# oct_program is deliberately absent: the live October art is cropped from Susan
+# Stitt's hand-designed flyer (oct-program-flyer-source.pdf), so running it here
+# would overwrite the real artwork with an unrelated placeholder.
+ALL=(sept_program volunteers auction christmas hotchocolate
      volunteers_square auction_square christmas_square)
 
 if [ $# -gt 0 ]; then
