@@ -166,19 +166,33 @@ ${PROGRAM_FOOTER}
   },
   {
     key: 'oct-program',
-    slug: 'october-2026-program-historic-preservation',
-    title: 'October 2026 Program: Historic Preservation with Professor Mark Janzen',
+    slug: 'october-2026-program-caring-for-family-treasures',
+    // The slot first held a placeholder on historic preservation; the real
+    // program is Dr. Janzen on caring for family heirlooms. Rename in place so
+    // the existing calendar entry is patched rather than duplicated.
+    renameFrom: 'october-2026-program-historic-preservation',
+    title: 'October 2026 Program: Caring for Your Family Treasures',
+    // 7:00 PM Eastern. October is EDT (-04:00).
     eventDate: '2026-10-08T19:00:00-04:00',
     location: MUSEUM,
+    // Cropped from Susan Stitt's flyer (oct-program-flyer-source.pdf), not the
+    // Nano Banana placeholder — generate-fall-winter-2026.sh no longer makes it.
     art: { bannerImage: 'oct-program-banner-1920x1080.jpg', mainImage: 'oct-program-card-1200x675.jpg' },
     excerpt:
-      'Professor Mark Janzen of the University of West Georgia joins us for our October Monthly Program to talk about historic preservation — why buildings are saved, how it is done, and what it takes locally. Free and open to all.',
+      'Dr. Mark Janzen of the University of West Georgia shows how to protect and preserve family heirlooms, and invites you to bring one for advice. Thursday, October 8 at 7:00 PM. Members free; guests $5 suggested donation.',
     content: `
-<h3>Historic Preservation</h3>
-<p>Join us at the Senoia Area Historical Society for our October Monthly Program, featuring a presentation by <strong>Professor Mark Janzen</strong> of the University of West Georgia on historic preservation.</p>
-<p>Dr. Janzen is a Professor of History at UWG, Director of its Center for Public History, and coordinator of the university&rsquo;s Public History and Museum Studies programs. He brings decades of museum experience to the subject, and his work ranges across architectural history, preservation, and the ways communities choose what to remember.</p>
-<p>It is a subject Senoia knows well. A town whose historic district is its calling card has a direct stake in the questions Dr. Janzen works on &mdash; what is worth saving, who decides, and what preservation actually asks of the people who live with it.</p>
-${PROGRAM_FOOTER}
+<h3>Caring for Your Family Treasures</h3>
+<p>Join us for our October Monthly Program with <strong>Dr. Mark Janzen</strong> of the University of West Georgia.</p>
+<p>Old photographs, letters, quilts and keepsakes tell your family&rsquo;s story. Drawing on material culture and museum practice, Dr. Janzen will show you how to protect and preserve the treasures that matter most to you.</p>
+
+<h3>Bring Your Treasures</h3>
+<p>Bring a family heirloom or keepsake, and Dr. Janzen will help you work out how best to care for it.</p>
+
+<h3>About the Speaker</h3>
+<p>A native of Texas, Dr. Janzen has lived in Georgia since 2022 and brings several decades of museum experience to his work at UWG. A public historian, he explores the history of science and technology, architectural history, preservation, and public memory and memorialization. He also loves his many pets, sci-fi and gaming, and collecting everything Garfield.</p>
+
+<h3>Details</h3>
+<p>Doors open at 6:30 PM for light refreshments and socializing. The program begins at 7:00 PM. Admission is free for members, with a suggested donation of $5 per person for guests.</p>
 `,
   },
   {
@@ -304,7 +318,9 @@ async function seed(ev) {
   } else {
     const renamed = existing.matchedSlug !== ev.slug;
     // Never clobber ticketsSold — the Stripe webhook owns that counter.
-    await existing.ref.set({ ...data, ticketsSold: FieldValue.increment(0) }, { merge: true });
+    // publishDate is create-only: rewriting it reorders the past-events surfaces.
+    const { publishDate: _keep, ...updateData } = data;
+    await existing.ref.set({ ...updateData, ticketsSold: FieldValue.increment(0) }, { merge: true });
     console.log(`  ✅ updated posts/${existing.ref.id}` + (renamed ? ` (slug ${existing.matchedSlug} → ${ev.slug})` : ''));
   }
   console.log(`     /news/${ev.slug}`);
