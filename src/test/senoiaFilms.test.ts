@@ -51,11 +51,12 @@ describe('Senoia Film Catalog Data Integrity', () => {
       for (const loc of film.locations) {
         if (loc.coordinates) {
           const [lat, lng] = loc.coordinates;
-          // Around Senoia / Coweta / Fayette GA (lat ~33.2 to 33.4, lng ~-84.6 to -84.5)
-          expect(lat).toBeGreaterThan(33.0);
-          expect(lat).toBeLessThan(34.0);
-          expect(lng).toBeGreaterThan(-85.0);
-          expect(lng).toBeLessThan(-84.0);
+          // Senoia / Starr's Mill area (Coweta + Fayette). Tight enough that a
+          // county-centroid or state-level placeholder fails.
+          expect(lat).toBeGreaterThan(33.25);
+          expect(lat).toBeLessThan(33.35);
+          expect(lng).toBeGreaterThan(-84.6);
+          expect(lng).toBeLessThan(-84.45);
         }
       }
     }
@@ -66,7 +67,7 @@ describe('Senoia Film Catalog Data Integrity', () => {
     expect(plaqueFilms.length).toBeGreaterThanOrEqual(10);
     for (const film of plaqueFilms) {
       expect(film.plaque.installed).toBe(true);
-      expect(film.plaque.locationDescription).toBeDefined();
+      expect(film.plaque.locationDescription?.trim().length).toBeGreaterThan(10);
     }
   });
 

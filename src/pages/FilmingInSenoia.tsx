@@ -24,6 +24,13 @@ import type {
   ProductionType,
   FilmingScope
 } from '../data/senoiaFilms';
+import {
+  DECADES,
+  filterFilms,
+  hasActiveFilmFilters,
+  type Decade,
+  type FilmFilters,
+} from '../lib/filmFilters';
 import FilmCard from '../components/film/FilmCard';
 import FilmDetailModal from '../components/film/FilmDetailModal';
 import WalkOfFameGuide from '../components/film/WalkOfFameGuide';
@@ -31,11 +38,39 @@ import WalkOfFameGuide from '../components/film/WalkOfFameGuide';
 // Lazy-load Leaflet map to keep initial page bundle lean
 const FilmsMap = lazy(() => import('../components/film/FilmsMap'));
 
+const PAGE_URL = 'https://senoiahistory.com/filming-in-senoia';
+
+// Structured data: an ItemList of Movies and TV Series. Items link to the card anchors on
+// this page. There is no artwork in the catalog yet, so this describes the page to crawlers
+// but won't qualify for image-based rich results until each production has an `image`.
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'Movies and TV Productions Filmed in Senoia, GA',
+  description: 'A comprehensive index of cinematic and television productions filmed on location and in soundstages in Senoia, Georgia.',
+  itemListElement: SENOIA_FILM_CATALOG.map((film, index) => ({
+    '@type': 'ListItem',
+    position: index + 1,
+    url: `${PAGE_URL}#film-${film.id}`,
+    item: {
+      '@type': film.type === 'series' ? 'TVSeries' : 'Movie',
+      name: film.title,
+      datePublished: `${film.releaseYear}`,
+      description: film.logline,
+      director: film.directors.map(name => ({ '@type': 'Person', name })),
+      actor: film.keyCast.map(name => ({ '@type': 'Person', name })),
+    },
+  })),
+};
+
+const YEARS_OF_SCREEN_HISTORY =
+  new Date().getFullYear() - Math.min(...SENOIA_FILM_CATALOG.map(f => f.releaseYear));
+
 export default function FilmingInSenoia() {
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | ProductionType>('all');
-  const [selectedDecade, setSelectedDecade] = useState<'all' | '1980s' | '1990s' | '2000s' | '2010s' | '2020s'>('all');
+  const [selectedDecade, setSelectedDecade] = useState<'all' | Decade>('all');
   const [selectedScope, setSelectedScope] = useState<'all' | FilmingScope>('all');
   const [plaqueOnly, setPlaqueOnly] = useState(false);
   const [landmarksOnly, setLandmarksOnly] = useState(false);
@@ -50,68 +85,20 @@ export default function FilmingInSenoia() {
     []
   );
 
-  // Filtered productions
-  const filteredFilms = useMemo(() => {
-    return SENOIA_FILM_CATALOG.filter((film) => {
-      // Search query (title, directors, cast, locations, logline)
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        const matchesTitle = film.title.toLowerCase().includes(query);
-        const matchesCast = film.keyCast.some(c => c.toLowerCase().includes(query));
-        const matchesDirector = film.directors.some(d => d.toLowerCase().includes(query));
-        const matchesStory = film.senoiaStory.toLowerCase().includes(query);
-        const matchesLogline = film.logline.toLowerCase().includes(query);
-        const matchesLocation = film.locations.some(l =>
-          l.name.toLowerCase().includes(query) || (l.address && l.address.toLowerCase().includes(query))
-        );
-
-        if (!matchesTitle && !matchesCast && !matchesDirector && !matchesStory && !matchesLogline && !matchesLocation) {
-          return false;
-        }
-      }
-
-      // Production Type
-      if (selectedType !== 'all' && film.type !== selectedType) {
-        return false;
-      }
-
-      // Decade
-      if (selectedDecade !== 'all') {
-        const year = film.releaseYear;
-        if (selectedDecade === '1980s' && (year < 1980 || year > 1989)) return false;
-        if (selectedDecade === '1990s' && (year < 1990 || year > 1999)) return false;
-        if (selectedDecade === '2000s' && (year < 2000 || year > 2009)) return false;
-        if (selectedDecade === '2010s' && (year < 2010 || year > 2019)) return false;
-        if (selectedDecade === '2020s' && (year < 2020 || year > 2029)) return false;
-      }
-
-      // Filming Scope
-      if (selectedScope !== 'all' && !film.filmingScopes.includes(selectedScope)) {
-        return false;
-      }
-
-      // Plaque Only
-      if (plaqueOnly && !film.plaque.installed) {
-        return false;
-      }
-
-      // Landmarks Only
-      if (landmarksOnly && !film.locations.some(l => Boolean(l.historicalPlaceSlug))) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [searchQuery, selectedType, selectedDecade, selectedScope, plaqueOnly, landmarksOnly]);
-
-  const hasActiveFilters = Boolean(
-    searchQuery.trim() ||
-    selectedType !== 'all' ||
-    selectedDecade !== 'all' ||
-    selectedScope !== 'all' ||
-    plaqueOnly ||
-    landmarksOnly
+  const filters = useMemo<FilmFilters>(
+    () => ({
+      query: searchQuery,
+      type: selectedType,
+      decade: selectedDecade,
+      scope: selectedScope,
+      plaqueOnly,
+      landmarksOnly,
+    }),
+    [searchQuery, selectedType, selectedDecade, selectedScope, plaqueOnly, landmarksOnly]
   );
+
+  const filteredFilms = useMemo(() => filterFilms(SENOIA_FILM_CATALOG, filters), [filters]);
+  const hasActiveFilters = hasActiveFilmFilters(filters);
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -120,26 +107,6 @@ export default function FilmingInSenoia() {
     setSelectedScope('all');
     setPlaqueOnly(false);
     setLandmarksOnly(false);
-  };
-
-  // Structured Data (JSON-LD ItemList of Movies and TV Series for Google Rich Snippets)
-  const structuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    name: 'Movies and TV Productions Filmed in Senoia, GA',
-    description: 'A comprehensive index of cinematic and television productions filmed on location and in soundstages in Senoia, Georgia.',
-    itemListElement: SENOIA_FILM_CATALOG.map((film, index) => ({
-      '@type': 'ListItem',
-      position: index + 1,
-      item: {
-        '@type': film.type === 'series' ? 'TVSeries' : 'Movie',
-        name: film.title,
-        datePublished: `${film.releaseYear}`,
-        description: film.logline,
-        director: film.directors.map(name => ({ '@type': 'Person', name })),
-        actor: film.keyCast.map(name => ({ '@type': 'Person', name })),
-      },
-    })),
   };
 
   return (
@@ -190,7 +157,7 @@ export default function FilmingInSenoia() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 font-sans">
           <div className="bg-white p-5 rounded-lg border border-tan/20 shadow-sm text-center">
             <span className="block text-3xl font-bold text-tan-dark font-serif">
-              {SENOIA_FILM_CATALOG.length}+
+              {SENOIA_FILM_CATALOG.length}
             </span>
             <span className="text-xs text-charcoal/70 font-semibold uppercase tracking-wider mt-1 block">
               Documented Productions
@@ -199,7 +166,7 @@ export default function FilmingInSenoia() {
 
           <div className="bg-white p-5 rounded-lg border border-tan/20 shadow-sm text-center">
             <span className="block text-3xl font-bold text-tan-dark font-serif">
-              37+
+              {YEARS_OF_SCREEN_HISTORY}+
             </span>
             <span className="text-xs text-charcoal/70 font-semibold uppercase tracking-wider mt-1 block">
               Years of Screen History
@@ -227,32 +194,41 @@ export default function FilmingInSenoia() {
 
         {/* View Switcher & Filter Bar */}
         <section className="bg-white rounded-xl border border-tan/20 p-6 shadow-sm mb-8 font-sans">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-tan/15 pb-5 mb-5">
-            {/* Search Input */}
-            <div className="relative flex-grow max-w-lg">
-              <Search
-                size={18}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-charcoal/40"
-                aria-hidden="true"
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by title, actor, director, location, or keyword…"
-                className="w-full pl-10 pr-10 py-2.5 text-sm rounded-lg border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-tan focus:border-transparent text-charcoal placeholder:text-charcoal/40 transition-colors"
-                aria-label="Search film productions"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal p-1"
-                  aria-label="Clear search"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
+          <div
+            className={`flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+              viewMode === 'grid' ? 'border-b border-tan/15 pb-5 mb-5' : ''
+            }`}
+          >
+            {viewMode === 'grid' ? (
+              <div className="relative flex-grow max-w-lg">
+                <Search
+                  size={18}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-charcoal/40"
+                  aria-hidden="true"
+                />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by title, actor, director, location, or keyword…"
+                  className="w-full pl-10 pr-10 py-2.5 text-sm rounded-lg border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-tan focus:border-transparent text-charcoal placeholder:text-charcoal/40 transition-colors"
+                  aria-label="Search film productions"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 hover:text-charcoal p-1"
+                    aria-label="Clear search"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-charcoal/70 max-w-lg">
+                The map shows every mapped filming site. Switch to Production Cards to search and filter the catalog.
+              </p>
+            )}
 
             {/* View Mode Toggle: Grid vs Map */}
             <div className="flex items-center gap-2 self-start md:self-auto">
@@ -288,130 +264,134 @@ export default function FilmingInSenoia() {
             </div>
           </div>
 
-          {/* Filter Pills & Toggles */}
-          <div className="space-y-4 text-xs">
-            {/* Format filter */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold text-charcoal/70 uppercase tracking-wider min-w-[70px]">
-                Format:
-              </span>
-              {(['all', 'feature', 'series', 'tv_movie'] as const).map((type) => {
-                const label =
-                  type === 'all'
-                    ? 'All Formats'
-                    : type === 'feature'
-                    ? 'Feature Films'
-                    : type === 'series'
-                    ? 'TV Series'
-                    : 'TV Movies';
-                const isActive = selectedType === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setSelectedType(type)}
-                    className={`px-3 py-1.5 rounded-full font-semibold transition-all ${
-                      isActive
-                        ? 'bg-tan text-white shadow-sm'
-                        : 'bg-stone-100 text-charcoal/70 hover:bg-stone-200'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Decade filter */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold text-charcoal/70 uppercase tracking-wider min-w-[70px]">
-                Decade:
-              </span>
-              {(['all', '1980s', '1990s', '2000s', '2010s', '2020s'] as const).map((decade) => {
-                const isActive = selectedDecade === decade;
-                return (
-                  <button
-                    key={decade}
-                    onClick={() => setSelectedDecade(decade)}
-                    className={`px-3 py-1.5 rounded-full font-semibold transition-all ${
-                      isActive
-                        ? 'bg-tan text-white shadow-sm'
-                        : 'bg-stone-100 text-charcoal/70 hover:bg-stone-200'
-                    }`}
-                  >
-                    {decade === 'all' ? 'All Decades' : decade}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Scope filter */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold text-charcoal/70 uppercase tracking-wider min-w-[70px]">
-                Scope:
-              </span>
-              {(['all', 'on_location', 'soundstage', 'regional_landmark'] as const).map((scope) => {
-                const label =
-                  scope === 'all'
-                    ? 'All Types'
-                    : scope === 'on_location'
-                    ? 'On-Location in Town'
-                    : scope === 'soundstage'
-                    ? 'Studio Soundstage'
-                    : 'Regional Landmark';
-                const isActive = selectedScope === scope;
-                return (
-                  <button
-                    key={scope}
-                    onClick={() => setSelectedScope(scope)}
-                    className={`px-3 py-1.5 rounded-full font-semibold transition-all ${
-                      isActive
-                        ? 'bg-tan text-white shadow-sm'
-                        : 'bg-stone-100 text-charcoal/70 hover:bg-stone-200'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Checkbox Toggles & Reset */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-stone-100">
-              <div className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-charcoal/80 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={plaqueOnly}
-                    onChange={(e) => setPlaqueOnly(e.target.checked)}
-                    className="rounded text-tan focus:ring-tan w-4 h-4 border-stone-300"
-                  />
-                  <Award size={14} className="text-amber-700" />
-                  Main Street Walk of Fame Plaques Only
-                </label>
-
-                <label className="flex items-center gap-2 cursor-pointer select-none text-charcoal/80 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={landmarksOnly}
-                    onChange={(e) => setLandmarksOnly(e.target.checked)}
-                    className="rounded text-tan focus:ring-tan w-4 h-4 border-stone-300"
-                  />
-                  <Building2 size={14} className="text-tan-dark" />
-                  Linked to Verified Historic Structures
-                </label>
+          {viewMode === 'grid' && (
+            <div className="space-y-4 text-xs">
+              {/* Format filter */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-charcoal/70 uppercase tracking-wider min-w-[70px]">
+                  Format:
+                </span>
+                {(['all', 'feature', 'series', 'tv_movie'] as const).map((type) => {
+                  const label =
+                    type === 'all'
+                      ? 'All Formats'
+                      : type === 'feature'
+                      ? 'Feature Films'
+                      : type === 'series'
+                      ? 'TV Series'
+                      : 'TV Movies';
+                  const isActive = selectedType === type;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setSelectedType(type)}
+                      aria-pressed={isActive}
+                      className={`px-3 py-1.5 rounded-full font-semibold transition-all ${
+                        isActive
+                          ? 'bg-tan text-white shadow-sm'
+                          : 'bg-stone-100 text-charcoal/70 hover:bg-stone-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
 
-              {hasActiveFilters && (
-                <button
-                  onClick={resetFilters}
-                  className="text-tan-dark hover:text-tan font-bold flex items-center gap-1.5 transition-colors"
-                >
-                  <RotateCcw size={13} />
-                  Reset All Filters
-                </button>
-              )}
+              {/* Decade filter */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-charcoal/70 uppercase tracking-wider min-w-[70px]">
+                  Decade:
+                </span>
+                {(['all', ...DECADES] as const).map((decade) => {
+                  const isActive = selectedDecade === decade;
+                  return (
+                    <button
+                      key={decade}
+                      onClick={() => setSelectedDecade(decade)}
+                      aria-pressed={isActive}
+                      className={`px-3 py-1.5 rounded-full font-semibold transition-all ${
+                        isActive
+                          ? 'bg-tan text-white shadow-sm'
+                          : 'bg-stone-100 text-charcoal/70 hover:bg-stone-200'
+                      }`}
+                    >
+                      {decade === 'all' ? 'All Decades' : decade}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Scope filter */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-charcoal/70 uppercase tracking-wider min-w-[70px]">
+                  Scope:
+                </span>
+                {(['all', 'on_location', 'soundstage', 'regional_landmark'] as const).map((scope) => {
+                  const label =
+                    scope === 'all'
+                      ? 'All Types'
+                      : scope === 'on_location'
+                      ? 'On-Location in Town'
+                      : scope === 'soundstage'
+                      ? 'Studio Soundstage'
+                      : 'Regional Landmark';
+                  const isActive = selectedScope === scope;
+                  return (
+                    <button
+                      key={scope}
+                      onClick={() => setSelectedScope(scope)}
+                      aria-pressed={isActive}
+                      className={`px-3 py-1.5 rounded-full font-semibold transition-all ${
+                        isActive
+                          ? 'bg-tan text-white shadow-sm'
+                          : 'bg-stone-100 text-charcoal/70 hover:bg-stone-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Checkbox Toggles & Reset */}
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-stone-100">
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-charcoal/80 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={plaqueOnly}
+                      onChange={(e) => setPlaqueOnly(e.target.checked)}
+                      className="rounded text-tan focus:ring-tan w-4 h-4 border-stone-300"
+                    />
+                    <Award size={14} className="text-amber-700" />
+                    Main Street Walk of Fame Plaques Only
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-charcoal/80 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={landmarksOnly}
+                      onChange={(e) => setLandmarksOnly(e.target.checked)}
+                      className="rounded text-tan focus:ring-tan w-4 h-4 border-stone-300"
+                    />
+                    <Building2 size={14} className="text-tan-dark" />
+                    Linked to Verified Historic Structures
+                  </label>
+                </div>
+
+                {hasActiveFilters && (
+                  <button
+                    onClick={resetFilters}
+                    className="text-tan-dark hover:text-tan font-bold flex items-center gap-1.5 transition-colors"
+                  >
+                    <RotateCcw size={13} />
+                    Reset All Filters
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </section>
 
         {/* Content Section: Map vs Grid */}
@@ -441,7 +421,10 @@ export default function FilmingInSenoia() {
             </ErrorBoundary>
           </section>
         ) : (
-          <section aria-label="Film and Television Catalog" className="mb-12">
+          <section aria-labelledby="film-catalog-heading" className="mb-12">
+            <h2 id="film-catalog-heading" className="sr-only">
+              Film and Television Catalog
+            </h2>
             {/* Results counter */}
             <div className="flex items-center justify-between mb-6 font-sans text-xs text-charcoal/70">
               <span>

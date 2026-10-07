@@ -44,34 +44,61 @@ export default function FilmDetailModal({ film, onClose }: FilmDetailModalProps)
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Close on Escape & trap focus
+  // Keep the latest onClose without making it an effect dependency: the parent passes a
+  // fresh arrow every render, and re-running the effect would reset focus and scroll-lock.
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    if (!film) return;
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const isOpen = film !== null;
+
+  // Close on Escape, trap Tab inside the dialog, lock page scroll, restore focus on close
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const FOCUSABLE =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== 'Tab' || !modalRef.current) return;
+
+      const focusable = Array.from(modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (!modalRef.current.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
       }
     }
 
     document.addEventListener('keydown', handleKeyDown);
     const prevActiveElement = document.activeElement as HTMLElement | null;
+    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 50);
 
-    // Focus close button on open
-    setTimeout(() => {
-      closeButtonRef.current?.focus();
-    }, 50);
-
-    // Prevent body scrolling
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     return () => {
+      window.clearTimeout(focusTimer);
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = originalOverflow;
       prevActiveElement?.focus();
     };
-  }, [film, onClose]);
+  }, [isOpen]);
 
   if (!film) return null;
 
@@ -96,7 +123,7 @@ export default function FilmDetailModal({ film, onClose }: FilmDetailModalProps)
     >
       <div
         ref={modalRef}
-        className="bg-cream rounded-xl border border-tan/30 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden text-charcoal font-sans animate-in fade-in zoom-in-95 duration-150"
+        className="bg-cream rounded-xl border border-tan/30 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden text-charcoal font-sans"
       >
         {/* Header */}
         <div className="bg-white p-6 border-b border-tan/20 flex items-start justify-between sticky top-0 z-10">

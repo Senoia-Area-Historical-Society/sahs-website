@@ -1,4 +1,4 @@
-export type ProductionType = 'feature' | 'series' | 'tv_movie' | 'short';
+export type ProductionType = 'feature' | 'series' | 'tv_movie';
 
 export type FilmingScope = 'on_location' | 'soundstage' | 'regional_landmark';
 
@@ -42,8 +42,6 @@ export interface FilmProduction {
   plaque: WalkOfFamePlaque;
   studioNote?: string;
   verifiedBy: string[];
-  featuredImage?: string;
-  imdbId?: string;
 }
 
 export interface FilmMapPin {
@@ -121,7 +119,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     },
     studioNote: 'From Season 3 (2012) through the series finale, Riverwood Studios served as the production headquarters, soundstage facility, and backlot. AMC Studios purchased the 140-acre studio complex outright in 2017.',
     verifiedBy: ['SAHS Museum Film Exhibition', 'Main Street Walk of Fame Plaque', 'AMC Studios Production Records', 'Coweta County Film Commission'],
-    imdbId: 'tt1520211',
   },
   {
     id: 'fried-green-tomatoes',
@@ -161,7 +158,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     },
     studioNote: 'Filmed on location throughout Senoia and Juliette, Georgia, utilizing Riverwood Studios for staging and production logistics.',
     verifiedBy: ['SAHS Museum Permanent Records', 'Main Street Walk of Fame Plaque', 'Universal Pictures Credits', 'Coweta County Film Commission'],
-    imdbId: 'tt0101921',
   },
   {
     id: 'driving-miss-daisy',
@@ -191,7 +187,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Main Street sidewalk in downtown Senoia.',
     },
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Coweta County Film Commission', 'Academy Award Filmography'],
-    imdbId: 'tt0097239',
   },
   {
     id: 'the-conjuring-the-devil-made-me-do-it',
@@ -221,7 +216,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Filmed in 2019; released in 2021.',
     },
     verifiedBy: ['SAHS Archives', 'Coweta County Film Commission', 'Warner Bros. Production Notes'],
-    imdbId: 'tt7069210',
   },
   {
     id: 'sweet-home-alabama',
@@ -252,7 +246,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Main Street sidewalk in downtown Senoia.',
     },
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Georgia Department of Economic Development Film Office', 'Touchstone Pictures Credits'],
-    imdbId: 'tt0256415',
   },
   {
     id: 'pet-sematary-ii',
@@ -290,7 +283,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     },
     studioNote: 'Utilized Riverwood Studios soundstage facilities for interior set staging and effects prep.',
     verifiedBy: ['SAHS Permanent Display', 'Main Street Walk of Fame Plaque', 'Paramount Pictures Records'],
-    imdbId: 'tt0105128',
   },
   {
     id: 'freejack',
@@ -321,7 +313,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     },
     studioNote: 'Key demonstration of Riverwood Studios’ capacity to handle major Hollywood genre productions in Coweta County.',
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Riverwood Studios Historical Records', 'Warner Bros. Credits'],
-    imdbId: 'tt0104299',
   },
   {
     id: 'the-war',
@@ -352,7 +343,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     },
     studioNote: 'Based out of Riverwood Studios under producer Jon Avnet and studio head Paul Lombardi.',
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Universal Pictures Records', 'Coweta County Film Commission'],
-    imdbId: 'tt0111667',
   },
   {
     id: 'andersonville',
@@ -383,7 +373,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     },
     studioNote: 'One of the largest historical backlot set builds erected in Georgia prior to the 2000s.',
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Emmy Award Records', 'Riverwood Studios Production History'],
-    imdbId: 'tt0115085',
   },
   {
     id: 'a-christmas-memory',
@@ -413,7 +402,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Main Street sidewalk in downtown Senoia.',
     },
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Hallmark Hall of Fame Archive', 'SAHS Museum Records'],
-    imdbId: 'tt0118541',
   },
   {
     id: 'the-fighting-temptations',
@@ -443,7 +431,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Main Street sidewalk in downtown Senoia.',
     },
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Paramount Pictures Production Records', 'Coweta County Film Commission'],
-    imdbId: 'tt0310793',
   },
   {
     id: 'broken-bridges',
@@ -473,7 +460,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Main Street sidewalk in downtown Senoia.',
     },
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Paramount Classics Credits', 'Coweta County Film Commission'],
-    imdbId: 'tt0478096',
   },
   {
     id: 'meet-the-browns',
@@ -503,7 +489,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Main Street sidewalk in downtown Senoia.',
     },
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Lionsgate Production Notes', 'Georgia Film Office'],
-    imdbId: 'tt1093357',
   },
   {
     id: 'drop-dead-diva',
@@ -542,7 +527,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     },
     studioNote: 'Brought hundreds of cast and crew members to Senoia continuously between 2009 and 2014, playing a major role in downtown revitalization.',
     verifiedBy: ['SAHS Permanent Exhibition', 'Main Street Walk of Fame Plaque', 'Sony Pictures Television Records'],
-    imdbId: 'tt1280822',
   },
   {
     id: 'killers',
@@ -572,7 +556,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Main Street sidewalk in downtown Senoia.',
     },
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Lionsgate Credits', 'Coweta County Film Commission'],
-    imdbId: 'tt1103153',
   },
   {
     id: 'footloose',
@@ -602,7 +585,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Main Street sidewalk in downtown Senoia.',
     },
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Paramount Pictures Records', 'Coweta County Film Commission'],
-    imdbId: 'tt1068982',
   },
   {
     id: 'ill-fly-away',
@@ -633,7 +615,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Main Street sidewalk in downtown Senoia.',
     },
     verifiedBy: ['Main Street Walk of Fame Plaque', 'Emmy Award Archive', 'SAHS Museum Records'],
-    imdbId: 'tt0101124',
   },
   {
     id: 'joyful-noise',
@@ -661,7 +642,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Filmed in 2011; released in 2012.',
     },
     verifiedBy: ['Coweta County Film Commission', 'Warner Bros. Production Records'],
-    imdbId: 'tt1710396',
   },
   {
     id: 'lawless',
@@ -689,7 +669,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       locationDescription: 'Filmed throughout Coweta County in 2011.',
     },
     verifiedBy: ['Coweta County Film Commission', 'Georgia Film Office', 'Production Notes'],
-    imdbId: 'tt1212450',
   },
   {
     id: 'thunder-road',

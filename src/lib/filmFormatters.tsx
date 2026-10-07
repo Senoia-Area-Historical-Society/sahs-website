@@ -7,8 +7,6 @@ export function formatProductionType(type: FilmProduction['type']): { label: str
       return { label: 'TV Series', icon: Tv };
     case 'tv_movie':
       return { label: 'TV Movie', icon: Video };
-    case 'short':
-      return { label: 'Short Film', icon: Video };
     case 'feature':
     default:
       return { label: 'Feature Film', icon: Film };

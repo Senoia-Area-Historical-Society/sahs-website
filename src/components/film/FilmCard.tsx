@@ -15,6 +15,7 @@ export default function FilmCard({ film, onSelect }: FilmCardProps) {
 
   return (
     <article
+      id={`film-${film.id}`}
       className="bg-white rounded-lg border border-tan/30 shadow-sm hover:shadow-md hover:border-tan transition-all flex flex-col h-full overflow-hidden group focus-within:ring-2 focus-within:ring-tan"
       aria-labelledby={`film-title-${film.id}`}
     >
