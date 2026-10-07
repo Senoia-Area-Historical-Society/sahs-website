@@ -243,7 +243,7 @@ export default function FilmDetailModal({ film, onClose }: FilmDetailModalProps)
                 Main Street Sidewalk Walk of Fame
               </h3>
               <p className="text-xs md:text-sm text-amber-900/90 leading-relaxed mb-2">
-                A solid brass commemorative plaque for <strong>{film.plaque.engravedTitle || film.title}</strong> is set into the brick sidewalk along downtown Main Street.
+                A commemorative plaque for <strong>{film.plaque.engravedTitle || film.title}</strong> is set into the brick sidewalk along downtown Main Street.
               </p>
               {film.plaque.locationDescription && (
                 <p className="text-xs text-amber-800 font-medium">

@@ -69,16 +69,6 @@ export default function FilmsMap({ onShowGrid }: FilmsMapProps) {
             All Sites ({SENOIA_FILM_MAP_PINS.length})
           </button>
           <button
-            onClick={() => setSelectedFilter('public_exterior')}
-            className={`px-3 py-1.5 rounded transition-all font-semibold ${
-              selectedFilter === 'public_exterior'
-                ? 'bg-tan text-white shadow-sm'
-                : 'bg-stone-100 text-charcoal/80 hover:bg-stone-200'
-            }`}
-          >
-            Public Streets &amp; Tracks
-          </button>
-          <button
             onClick={() => setSelectedFilter('commercial')}
             className={`px-3 py-1.5 rounded transition-all font-semibold ${
               selectedFilter === 'commercial'
@@ -99,14 +89,14 @@ export default function FilmsMap({ onShowGrid }: FilmsMapProps) {
             Private Residences
           </button>
           <button
-            onClick={() => setSelectedFilter('studio_private')}
+            onClick={() => setSelectedFilter('historic_site')}
             className={`px-3 py-1.5 rounded transition-all font-semibold ${
-              selectedFilter === 'studio_private'
+              selectedFilter === 'historic_site'
                 ? 'bg-tan text-white shadow-sm'
                 : 'bg-stone-100 text-charcoal/80 hover:bg-stone-200'
             }`}
           >
-            Riverwood Studio Lot
+            Historic Sites
           </button>
         </div>
 

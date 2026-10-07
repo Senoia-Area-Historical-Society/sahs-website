@@ -80,7 +80,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Downtown Main Street (Woodbury Set)',
         address: 'Main Street between Seavy St & Bridge St, Senoia, GA',
-        coordinates: [33.3007, -84.5545],
         accessType: 'public_exterior',
         accessNote: 'Public commercial downtown district. All storefronts are active shops and restaurants.',
         sceneDescription: 'Served as the fortified town of Woodbury throughout Season 3, featuring guarded barricades, town meetings, and street patrols.',
@@ -88,7 +87,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'The Gin Property (Alexandria Safe Zone)',
         address: 'Morgan Street & Pylant Street, Senoia, GA',
-        coordinates: [33.3021, -84.5522],
         accessType: 'private_residence',
         accessNote: 'Private residential neighborhood. Please remain on public streets and respect residents’ privacy.',
         sceneDescription: 'The gated community of Alexandria from Season 5 through Season 11. Custom-built residential houses and windmill encircled by the iconic metal corrugated wall.',
@@ -96,7 +94,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Esco Feed Mill',
         address: 'Crook Road / Barnes St, Senoia, GA',
-        coordinates: [33.3005, -84.5510],
         accessType: 'historic_site',
         accessNote: 'Historic agricultural mill structure. Viewable from public roads.',
         sceneDescription: 'Featured in multiple reconnaissance and confrontation sequences across Seasons 3 through 6.',
@@ -104,7 +101,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Riverwood Studios (AMC Studios Lot)',
         address: '600 Chestlehurst Rd / Luther Bailey Rd, Senoia, GA',
-        coordinates: [33.2845, -84.5611],
         accessType: 'studio_private',
         accessNote: 'Active working film studio lot. Closed to the public.',
         sceneDescription: 'Hosted soundstages, workshop mills, production offices, and backlot sets for the Sanctuary, the Junkyard, and prison interiors.',
@@ -112,7 +108,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Senoia Cemetery',
         address: 'Pylant Street, Senoia, GA',
-        coordinates: [33.3056, -84.5562],
         accessType: 'public_exterior',
         accessNote: 'Historic municipal cemetery. Open to quiet, respectful visitation.',
         sceneDescription: 'Atmospheric backdrop used in survivor transit scenes and outdoor memorial sequences.',
@@ -124,7 +119,7 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       engravedYear: '2012',
       locationDescription: 'Main Street sidewalk in historic downtown Senoia.',
     },
-    studioNote: 'Riverwood Studios served as the continuous production home for all 11 seasons. AMC Studios purchased the 140-acre studio complex outright in 2017.',
+    studioNote: 'From Season 3 (2012) through the series finale, Riverwood Studios served as the production headquarters, soundstage facility, and backlot. AMC Studios purchased the 140-acre studio complex outright in 2017.',
     verifiedBy: ['SAHS Museum Film Exhibition', 'Main Street Walk of Fame Plaque', 'AMC Studios Production Records', 'Coweta County Film Commission'],
     imdbId: 'tt1520211',
   },
@@ -153,7 +148,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Bridge Street Railroad Overpass & Track',
         address: 'Bridge Street at the railroad crossing, Senoia, GA',
-        coordinates: [33.2999, -84.5529],
         accessType: 'public_exterior',
         accessNote: 'Public roadway and active rail corridor. Always remain clear of active railroad tracks.',
         sceneDescription: 'The dramatic railroad scene where young Buddy Threadgoode catches his boot in the track tie as the train approaches.',
@@ -185,7 +179,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Senoia Countryside & Historic Roadways',
         address: 'Historic routes surrounding Senoia, GA',
-        coordinates: [33.3000, -84.5600],
         accessType: 'public_exterior',
         accessNote: 'Public scenic driving routes throughout Coweta County.',
         sceneDescription: 'Mid-century automobile driving sequences showcasing untouched rolling Georgia farmland and tree canopies.',
@@ -211,7 +204,7 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     productionCompany: 'Warner Bros. / New Line Cinema / The Safran Company / Atomic Monster',
     logline: 'Paranormal investigators Ed and Lorraine Warren take on a chilling case of terror, murder, and unknown evil that shocked real-life courtroom history in 1981.',
     senoiaStory:
-      'Thirty years after *Fried Green Tomatoes* filmed at 204 Bridge Street, Warner Bros. and New Line Cinema returned to the historic Travis-McDaniel House in Senoia to serve as the Glatzel family residence. The distinctive Victorian home with its wraparound porch and large corner entryway formed the atmospheric core for the film’s opening exorcism sequence and family investigation scenes.',
+      'Thirty years after Fried Green Tomatoes filmed at 204 Bridge Street, Warner Bros. and New Line Cinema returned to the historic Travis-McDaniel House in Senoia to serve as the Glatzel family residence. The distinctive Victorian home with its wraparound porch and large corner entryway formed the atmospheric core for the film’s opening exorcism sequence and family investigation scenes.',
     locations: [
       {
         name: 'The Travis-McDaniel House (Glatzel Family Home)',
@@ -246,7 +239,7 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Historic Starr’s Mill (Deep South Glass)',
         address: '1152 GA-85, Senoia / Fayetteville area, GA 30215',
-        coordinates: [33.3283, -84.5152],
+        coordinates: [33.3295136, -84.5090313],
         accessType: 'historic_site',
         accessNote: 'Public historic park owned and preserved by Fayette County. Scenic grounds and waterfall viewable during daytime.',
         sceneDescription: 'Jake Perry’s glassblowing workshop where Melanie discovers his successful lightning-struck glass creations.',
@@ -277,7 +270,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Bridge Street Railroad Cut & Trestle',
         address: 'Bridge Street & Seavy Street crossing, Senoia, GA',
-        coordinates: [33.2999, -84.5529],
         accessType: 'public_exterior',
         accessNote: 'Public street perspective. Active railroad corridor.',
         sceneDescription: 'Town tracks and rural paths traversed by Jeff and Drew during their explorations of the town.',
@@ -285,7 +277,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Historic Downtown Streets',
         address: 'Main Street & Seavy Street, Senoia, GA',
-        coordinates: [33.3007, -84.5545],
         accessType: 'public_exterior',
         accessNote: 'Public downtown commercial sidewalks.',
         sceneDescription: 'Town exteriors portraying the sleepy small town of Ludlow.',
@@ -317,7 +308,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Riverwood Studios Soundstages',
         address: '600 Chestlehurst Rd, Senoia, GA',
-        coordinates: [33.2845, -84.5611],
         accessType: 'studio_private',
         accessNote: 'Private studio complex (now AMC Studios). Closed to the public.',
         sceneDescription: 'Interior set builds including the high-tech body transplant laboratory and corporate chambers.',
@@ -344,12 +334,11 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     productionCompany: 'Universal Pictures / Island World',
     logline: 'A Vietnam veteran struggling with PTSD and poverty tries to rebuild a peaceful life for his family in rural Mississippi while his children build an elaborate treehouse.',
     senoiaStory:
-      'Director Jon Avnet returned to Senoia three years after *Fried Green Tomatoes* to base this poignant drama out of Riverwood Studios. The rural woodlands and rustic farmland of the Senoia countryside provided the authentic backdrop for the children’s fort battles and the Simmons family homestead.',
+      'Director Jon Avnet returned to Senoia three years after Fried Green Tomatoes to base this poignant drama out of Riverwood Studios. The rural woodlands and rustic farmland of the Senoia countryside provided the authentic backdrop for the children’s fort battles and the Simmons family homestead.',
     locations: [
       {
         name: 'Riverwood Studios & Senoia Countryside',
         address: 'Senoia, GA 30276',
-        coordinates: [33.2845, -84.5611],
         accessType: 'studio_private',
         accessNote: 'Private studio and surrounding rural properties.',
         sceneDescription: 'Rural home builds and treehouse sequences staged in local woodlands.',
@@ -381,7 +370,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Riverwood Studios Backlot (Stockade Replica)',
         address: 'Chestlehurst Road property, Senoia, GA',
-        coordinates: [33.2845, -84.5611],
         accessType: 'studio_private',
         accessNote: 'Private studio property (now AMC Studios). Closed to the public.',
         sceneDescription: 'Full-scale stockade walls, tents, dead-line boundary, and muddy encampment of the notorious military prison.',
@@ -413,7 +401,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Historic Residential Streets',
         address: 'Johnson St & Bridge St area, Senoia, GA',
-        coordinates: [33.3005, -84.5535],
         accessType: 'public_exterior',
         accessNote: 'Quiet residential streets. Public sidewalks only.',
         sceneDescription: 'Period holiday buggy and walking scenes under the town’s pecan trees.',
@@ -444,7 +431,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Historic Senoia Downtown & Environs',
         address: 'Main Street, Senoia, GA 30276',
-        coordinates: [33.3007, -84.5545],
         accessType: 'public_exterior',
         accessNote: 'Public downtown commercial district.',
         sceneDescription: 'Town exteriors where Darrin reconnects with childhood acquaintances and encounters local characters.',
@@ -475,7 +461,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Historic Main Street Storefronts',
         address: 'Main Street, Senoia, GA 30276',
-        coordinates: [33.3007, -84.5545],
         accessType: 'commercial',
         accessNote: 'Public downtown business district.',
         sceneDescription: 'Downtown main street strolls, local shop visits, and conversations outside small-town storefronts.',
@@ -506,7 +491,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Senoia Area Exteriors & Riverwood Studios',
         address: 'Senoia, GA 30276',
-        coordinates: [33.2845, -84.5611],
         accessType: 'studio_private',
         accessNote: 'Private studio lot and local scenic road corridors.',
         sceneDescription: 'Arrival sequences and local Georgia countryside exteriors.',
@@ -533,12 +517,11 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
     productionCompany: 'Lifetime / Sony Pictures Television',
     logline: 'A shallow aspiring model who dies in a car crash is reincarnated in the body of a brilliant, plus-size attorney who has just passed away.',
     senoiaStory:
-      'For six seasons, *Drop Dead Diva* maintained its primary production offices and interior courtroom and law office soundstages at Riverwood Studios / Raleigh Studios Atlanta in Senoia. The cast and crew were beloved fixtures on Senoia’s Main Street, frequently stepping outside the soundstages to shoot outdoor café and street scenes right in downtown.',
+      'For six seasons, Drop Dead Diva maintained its primary production offices and interior courtroom and law office soundstages at Riverwood Studios / Raleigh Studios Atlanta in Senoia. The cast and crew were beloved fixtures on Senoia’s Main Street, frequently stepping outside the soundstages to shoot outdoor café and street scenes right in downtown.',
     locations: [
       {
         name: 'Riverwood / Raleigh Studios Atlanta Soundstages',
         address: 'Chestlehurst Road, Senoia, GA',
-        coordinates: [33.2845, -84.5611],
         accessType: 'studio_private',
         accessNote: 'Active production studio (now AMC Studios). Closed to the public.',
         sceneDescription: 'Extensive multi-floor sets for the Harrison & Parker law firm, conference rooms, and courtrooms.',
@@ -546,7 +529,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Downtown Main Street Cafés & Sidewalks',
         address: 'Main Street, Senoia, GA 30276',
-        coordinates: [33.3007, -84.5545],
         accessType: 'commercial',
         accessNote: 'Public commercial downtown district.',
         sceneDescription: 'Lunch meetings, sidewalk conversations, and exterior office arrivals filmed around downtown Senoia.',
@@ -578,7 +560,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Senoia Residential Streets',
         address: 'Senoia, GA 30276',
-        coordinates: [33.3015, -84.5530],
         accessType: 'private_residence',
         accessNote: 'Active residential streets. Please observe from sidewalks only.',
         sceneDescription: 'Suburban neighborhood drives and quiet residential street scenes.',
@@ -609,7 +590,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Historic Main Street Architecture',
         address: 'Main Street, Senoia, GA 30276',
-        coordinates: [33.3007, -84.5545],
         accessType: 'public_exterior',
         accessNote: 'Public downtown commercial sidewalks.',
         sceneDescription: 'Town storefronts and streetscapes establishing Bomont’s conservative small-town atmosphere.',
@@ -641,7 +621,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Historic Senoia Town Environs',
         address: 'Senoia, GA 30276',
-        coordinates: [33.3007, -84.5545],
         accessType: 'public_exterior',
         accessNote: 'Public sidewalks and town center.',
         sceneDescription: '1950s period streetscapes, town strolls, and community meetings.',
@@ -672,7 +651,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Coweta County & Senoia Community Settings',
         address: 'Senoia area, GA 30276',
-        coordinates: [33.3010, -84.5535],
         accessType: 'public_exterior',
         accessNote: 'Public town streets and local venues.',
         sceneDescription: 'Community gatherings and small-town choir rehearsal backdrops.',
@@ -701,7 +679,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Senoia Countryside & Woodland Corridors',
         address: 'Rural Senoia, GA 30276',
-        coordinates: [33.2950, -84.5650],
         accessType: 'public_exterior',
         accessNote: 'Scenic rural roads. Please respect adjoining private farmland.',
         sceneDescription: 'Prohibition-era automobile runs through thick forest roads and rural moonshine drop points.',
@@ -730,7 +707,6 @@ export const SENOIA_FILM_CATALOG: FilmProduction[] = [
       {
         name: 'Riverwood Studios (AMC Studios Lot)',
         address: '600 Chestlehurst Rd, Senoia, GA 30276',
-        coordinates: [33.2845, -84.5611],
         accessType: 'studio_private',
         accessNote: 'Private studio facility. Strictly closed to the public.',
         sceneDescription: 'Soundstage race shop builds, technical garages, and interior drama sets.',
@@ -769,31 +745,10 @@ export const SENOIA_FILM_MAP_PINS: FilmMapPin[] = [
     ],
   },
   {
-    id: 'pin-bridge-st-railroad',
-    title: 'Bridge Street Railroad Overpass & Cut',
-    address: 'Bridge Street at railroad corridor, Senoia, GA 30276',
-    coordinates: [33.2999, -84.5529],
-    accessType: 'public_exterior',
-    accessLabel: 'Public Roadway — keep clear of active tracks',
-    description: 'The historic railroad cut on Bridge Street just steps from the Travis House. Site of key dramatic moments across decades of cinema.',
-    productions: [
-      {
-        title: 'Fried Green Tomatoes',
-        releaseYear: 1991,
-        sceneNote: 'Buddy Threadgoode’s fatal shoe-caught-in-tracks sequence.',
-      },
-      {
-        title: 'Pet Sematary II',
-        releaseYear: 1992,
-        sceneNote: 'Ludlow tracks and bicycle transit sequences.',
-      },
-    ],
-  },
-  {
     id: 'pin-main-street-woodbury',
     title: 'Downtown Main Street (Woodbury Set)',
     address: 'Main Street between Seavy St & Bridge St, Senoia, GA 30276',
-    coordinates: [33.3007, -84.5545],
+    coordinates: [33.3009, -84.5541],
     accessType: 'commercial',
     accessLabel: 'Public Downtown Commercial District',
     description: 'The historic heart of Senoia. Served as Woodbury in The Walking Dead, Bomont in Footloose, and the backdrop for Drop Dead Diva, Broken Bridges, and Pet Sematary II. Sidewalk plaques line this street.',
@@ -822,78 +777,10 @@ export const SENOIA_FILM_MAP_PINS: FilmMapPin[] = [
     ],
   },
   {
-    id: 'pin-the-gin-alexandria',
-    title: 'The Gin Property (Alexandria Safe Zone)',
-    address: 'Morgan Street & Pylant Street, Senoia, GA 30276',
-    coordinates: [33.3021, -84.5522],
-    accessType: 'private_residence',
-    accessLabel: 'Private Residential Neighborhood — view from street only',
-    description: 'Historic cotton gin property redeveloped as a residential neighborhood, enclosed by the famous Alexandria corrugated steel walls from Season 5 through Season 11 of The Walking Dead.',
-    productions: [
-      {
-        title: 'The Walking Dead',
-        releaseYear: 2010,
-        sceneNote: 'The Alexandria Safe Zone community, streets, and windmill.',
-      },
-    ],
-  },
-  {
-    id: 'pin-esco-feed-mill',
-    title: 'Esco Feed Mill',
-    address: 'Crook Road / Barnes St, Senoia, GA 30276',
-    coordinates: [33.3005, -84.5510],
-    accessType: 'historic_site',
-    accessLabel: 'Historic Mill Structure — viewable from public road',
-    description: 'Historic agricultural processing facility that provided weathered rustic industrial backdrops for survivor encounters in The Walking Dead.',
-    productions: [
-      {
-        title: 'The Walking Dead',
-        releaseYear: 2010,
-        sceneNote: 'Survivor recon and perimeter confrontation scenes.',
-      },
-    ],
-  },
-  {
-    id: 'pin-riverwood-studios',
-    title: 'Riverwood Studios (AMC Studios Lot)',
-    address: '600 Chestlehurst Rd / Luther Bailey Rd, Senoia, GA 30276',
-    coordinates: [33.2845, -84.5611],
-    accessType: 'studio_private',
-    accessLabel: 'Private Working Studio Lot — strictly closed to public',
-    description: 'Founded in 1989 by Paul Lombardi and Scott Tigchelaar; later branded Raleigh Studios Atlanta and acquired in 2017 by AMC. The production engine behind Senoia’s screen industry.',
-    productions: [
-      {
-        title: 'The Walking Dead',
-        releaseYear: 2010,
-        sceneNote: 'Sanctuary, Junkyard, soundstages, and production base.',
-      },
-      {
-        title: 'Andersonville',
-        releaseYear: 1996,
-        sceneNote: 'Full-scale replica Civil War stockade camp backlot.',
-      },
-      {
-        title: 'Drop Dead Diva',
-        releaseYear: 2009,
-        sceneNote: 'Six seasons of courtroom and law firm soundstage sets.',
-      },
-      {
-        title: 'Freejack',
-        releaseYear: 1992,
-        sceneNote: 'Sci-fi futuristic laboratory and corporate chamber sets.',
-      },
-      {
-        title: 'Thunder Road',
-        releaseYear: 2026,
-        sceneNote: 'AMC racing series soundstage construction and filming.',
-      },
-    ],
-  },
-  {
     id: 'pin-starrs-mill',
     title: 'Historic Starr’s Mill (Deep South Glass)',
     address: '1152 GA-85, Senoia / Fayetteville area, GA 30215',
-    coordinates: [33.3283, -84.5152],
+    coordinates: [33.3295136, -84.5090313],
     accessType: 'historic_site',
     accessLabel: 'Public Historic County Park',
     description: 'Picturesque 1907 grist mill and waterfall along Whitewater Creek just 3 miles outside Senoia. Portrayed Jake Perry’s glassblowing studio in Sweet Home Alabama.',

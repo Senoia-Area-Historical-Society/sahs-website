@@ -32,7 +32,7 @@ export default function WalkOfFameGuide({ plaqueFilms, onSelectFilm }: WalkOfFam
             Where to Find Them
           </h3>
           <p>
-            Cast bronze plaques are embedded into the red brick sidewalks lining downtown Main Street, primarily extending between Seavy Street and Bridge Street.
+            Commemorative plaques are embedded into the red brick sidewalks lining downtown Main Street, primarily extending between Seavy Street and Bridge Street.
           </p>
         </div>
 

@@ -81,8 +81,8 @@ describe('Senoia Film Catalog Data Integrity', () => {
 });
 
 describe('Senoia Film Map Pins Data Integrity', () => {
-  it('contains verified map pins with unique IDs', () => {
-    expect(SENOIA_FILM_MAP_PINS.length).toBeGreaterThanOrEqual(6);
+  it('contains map pins with unique IDs', () => {
+    expect(SENOIA_FILM_MAP_PINS.length).toBeGreaterThanOrEqual(3);
     const pinIds = SENOIA_FILM_MAP_PINS.map(p => p.id);
     expect(new Set(pinIds).size).toBe(pinIds.length);
   });
@@ -102,6 +102,32 @@ describe('Senoia Film Map Pins Data Integrity', () => {
       expect(pin.productions.length).toBeGreaterThan(0);
       expect(pin.accessLabel).toBeDefined();
       expect(pin.description.length).toBeGreaterThan(15);
+    }
+  });
+
+  it('only lists productions that exist in the catalog', () => {
+    const titles = new Set(SENOIA_FILM_CATALOG.map(f => f.title));
+    for (const pin of SENOIA_FILM_MAP_PINS) {
+      for (const prod of pin.productions) {
+        if (prod.title === 'Main Street Walk of Fame') continue; // not a production
+        expect(titles, `${pin.id}: ${prod.title}`).toContain(prod.title);
+      }
+    }
+  });
+
+  it('has no two distinct pins at the same coordinates', () => {
+    const keys = SENOIA_FILM_MAP_PINS.map(p => p.coordinates.join(','));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('keeps catalog coordinates in agreement with a map pin (no placeholder points)', () => {
+    const pinKeys = new Set(SENOIA_FILM_MAP_PINS.map(p => p.coordinates.join(',')));
+    for (const film of SENOIA_FILM_CATALOG) {
+      for (const loc of film.locations) {
+        if (loc.coordinates) {
+          expect(pinKeys, `${film.title}: ${loc.name}`).toContain(loc.coordinates.join(','));
+        }
+      }
     }
   });
 

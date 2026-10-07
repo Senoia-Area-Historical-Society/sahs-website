@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import Seo from '../components/Seo';
 import ErrorBoundary from '../components/ErrorBoundary';
-import { SENOIA_FILM_CATALOG } from '../data/senoiaFilms';
+import { SENOIA_FILM_CATALOG, SENOIA_FILM_MAP_PINS } from '../data/senoiaFilms';
 import type {
   FilmProduction,
   ProductionType,
@@ -217,7 +217,7 @@ export default function FilmingInSenoia() {
 
           <div className="bg-white p-5 rounded-lg border border-tan/20 shadow-sm text-center">
             <span className="block text-3xl font-bold text-tan-dark font-serif">
-              8
+              {SENOIA_FILM_MAP_PINS.length}
             </span>
             <span className="text-xs text-charcoal/70 font-semibold uppercase tracking-wider mt-1 block">
               Cataloged Local Landmarks
@@ -513,7 +513,7 @@ export default function FilmingInSenoia() {
               champion the landmark <strong>2008 Georgia Film Tax Credit</strong>, which transformed the
               state into one of the world's leading production centers. Under a management agreement,
               the facility operated for several years as <strong>Raleigh Studios Atlanta</strong>, hosting
-              six seasons of Lifetime's <em>Drop Dead Diva</em> before welcoming AMC's <em>The Walking Dead</em> in 2012.
+              Lifetime's <em>Drop Dead Diva</em> and, from 2012, AMC's <em>The Walking Dead</em>.
             </p>
             <p>
               In 2017, AMC Studios purchased the Riverwood facility outright. The decade of continuous filming
