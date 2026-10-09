@@ -1,0 +1,79 @@
+name: Claude Review
+
+# AI code review on pull requests, replacing CodeRabbit.
+#
+# `pull_request` (not `pull_request_target`) on purpose: PRs from forks get no
+# repository secrets and a read-only token, so a stranger's PR can neither read
+# ANTHROPIC_API_KEY nor make this workflow do anything with write access. The
+# repo is public, so that matters. Fork PRs simply skip review.
+on:
+  # No `synchronize`: reviewing every push multiplies cost. Comment `@claude
+  # review` (see claude.yml) to request another pass after follow-up commits.
+  pull_request:
+    types: [opened, ready_for_review]
+    paths-ignore:
+      - '**/*.md'
+      - '.artwork/**'
+      - 'public/**-art/**'
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Skip drafts, Dependabot (no secret access) and fork PRs (no secret access).
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. Read CLAUDE.md first: it documents
+            hazards specific to this repo, and violations of those are the
+            findings that matter most. Merging to main deploys to production.
+
+            Prioritise, in order:
+            1. Correctness bugs and anything that could blank a page or lose
+               data (e.g. `.toDate()` on Firestore values instead of
+               src/lib/firestoreDates.ts, `undefined` written to Firestore,
+               `limit()` without `orderBy`).
+            2. Security: firestore.rules / storage.rules changes (is there a
+               test in test/rules/?), Cloud Functions without requireStaff,
+               amounts taken from the request body, secrets not declared in a
+               function's `secrets` array, hardcoded keys.
+            3. Deploy-breaking changes: a site test importing a functions/src
+               module that has imports; scripts naming the shared Storage
+               bucket; firebase.json storage no longer scoped to the
+               website-media target.
+            4. Scripts that write to production (`--prod`, ticketsSold,
+               Storage in emulator mode, Calendar writes).
+            5. Missing tests for changed logic.
+
+            Do not comment on style, formatting or things ESLint and tsc
+            already catch. Do not restate the diff. Be concise: use inline
+            comments for specific issues and one short top-level summary with
+            a verdict. If there is nothing worth flagging, say so in one line.
+
+            Use the inline-comment and `gh pr` tools to post feedback.
+          claude_args: |
+            --max-turns 20
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
