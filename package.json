@@ -67,7 +67,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.0.10",
-    "vitest": "^4.1.8"
+    "vitest": "^5.0.3"
   },
   "overrides": {
     "protobufjs": "8.7.2",
