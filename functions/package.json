@@ -24,7 +24,7 @@
     "react": "^19.2.7",
     "react-email": "^6.5.0",
     "resend": "^6.12.4",
-    "stripe": "^15.8.0"
+    "stripe": "^23.0.0"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.5",
