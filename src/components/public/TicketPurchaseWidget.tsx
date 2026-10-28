@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { startTicketCheckout } from '../../lib/ticketCheckout';
 import type { Post } from '../../types';
-import { Ticket, Loader2, User, Mail, Minus, Plus, AlertCircle } from 'lucide-react';
+import { maxOrderQuantity } from '../../lib/ticketQuantity';
+import TicketQuantityPicker from './TicketQuantityPicker';
+import { Ticket, Loader2, User, Mail, AlertCircle } from 'lucide-react';
 
 interface TicketPurchaseWidgetProps {
   post: Post;
@@ -18,7 +20,7 @@ export default function TicketPurchaseWidget({ post, user }: TicketPurchaseWidge
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const maxQty = Math.min(10, isFinite(remaining) ? remaining : 10);
+  const maxQty = maxOrderQuantity(post.capacity, post.ticketsSold);
 
   const handleBuy = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,25 +96,27 @@ export default function TicketPurchaseWidget({ post, user }: TicketPurchaseWidge
                 />
               </div>
             </div>
-            <div className="flex items-center gap-6">
-              <div>
-                <label className="block text-xs font-bold text-charcoal/60 uppercase tracking-wider mb-1">Quantity</label>
-                <div className="flex items-center gap-3 bg-cream/50 p-2 rounded-lg border border-tan/10">
-                  <button type="button" onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-1 rounded-full hover:bg-tan/10 text-tan transition-colors"><Minus size={18} /></button>
-                  <span className="font-bold text-lg w-6 text-center">{quantity}</span>
-                  <button type="button" onClick={() => setQuantity(q => Math.min(maxQty, q + 1))} className="p-1 rounded-full hover:bg-tan/10 text-tan transition-colors"><Plus size={18} /></button>
-                </div>
-              </div>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
+              <TicketQuantityPicker
+                id={`ticket-qty-${post.id}`}
+                label="Number of tickets"
+                value={quantity}
+                max={maxQty}
+                onChange={setQuantity}
+              />
               <button
                 type="submit"
                 disabled={isProcessing}
-                className="mt-5 flex-1 bg-charcoal text-white px-6 py-3 rounded uppercase font-bold tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 shadow-md"
+                className="flex-1 bg-charcoal text-white px-6 py-3 rounded uppercase font-bold tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 shadow-md"
               >
                 {isProcessing ? <Loader2 className="animate-spin" size={20} /> : (
-                  <><Ticket size={18} className="text-tan" /> Buy — ${((post.ticketPrice! * quantity) / 100).toFixed(2)}</>
+                  <><Ticket size={18} className="text-tan" /> Buy {quantity} — ${((post.ticketPrice! * quantity) / 100).toFixed(2)}</>
                 )}
               </button>
             </div>
+            <p className="text-xs text-charcoal/50 font-sans">
+              Buying for a group? Choose how many tickets here — the number can't be changed on the payment page.
+            </p>
           </form>
         )}
       </div>

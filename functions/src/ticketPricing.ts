@@ -18,12 +18,13 @@
  */
 
 /**
- * Matches the cap on both buying surfaces — `maxQty` in `TicketPurchaseWidget` and
- * `MAX_QTY` in `EmbedTickets` — so no quantity the UI offers is refused here. This
- * bound exists to stop absurd values, not to express a per-order sales policy: if a
- * surface ever raises its cap, raise this to match rather than letting it 400.
+ * Matches `MAX_TICKETS_PER_ORDER` in `src/lib/ticketQuantity.ts`, the cap both buying
+ * surfaces offer — so no quantity the UI offers is refused here, and
+ * `src/test/ticketQuantity.test.ts` fails if the two drift. This bound exists to stop
+ * absurd values, not to express a per-order sales policy: raised from 10 to 50 so a
+ * buyer can order for a whole group in one checkout.
  */
-export const MAX_TICKET_QUANTITY = 10;
+export const MAX_TICKET_QUANTITY = 50;
 
 export type TicketOrderRejection =
     | 'event_not_found'
