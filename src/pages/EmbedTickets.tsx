@@ -5,9 +5,9 @@ import { format } from 'date-fns';
 import { db } from '../lib/firebase';
 import { reserveCheckoutTab, startTicketCheckout } from '../lib/ticketCheckout';
 import type { Post } from '../types';
-import { Ticket, Loader2, Minus, Plus, AlertCircle, Lock, ExternalLink } from 'lucide-react';
-
-const MAX_QTY = 10;
+import { maxOrderQuantity } from '../lib/ticketQuantity';
+import TicketQuantityPicker from '../components/public/TicketQuantityPicker';
+import { Ticket, Loader2, AlertCircle, Lock, ExternalLink } from 'lucide-react';
 
 /**
  * Standalone ticket widget for embedding on partner sites via <iframe>
@@ -163,7 +163,7 @@ export default function EmbedTickets() {
 
   const remaining = post.capacity ? post.capacity - (post.ticketsSold || 0) : Infinity;
   const isSoldOut = post.capacity ? remaining <= 0 : false;
-  const maxQty = Math.min(MAX_QTY, isFinite(remaining) ? remaining : MAX_QTY);
+  const maxQty = maxOrderQuantity(post.capacity, post.ticketsSold);
   const total = ((post.ticketPrice * quantity) / 100).toFixed(2);
   const eventDay = post.eventDate?.toDate();
 
@@ -260,34 +260,14 @@ export default function EmbedTickets() {
               </div>
 
               <div className="flex items-end gap-3">
-                <div>
-                  <span id="embed-qty-label" className="block text-[11px] font-bold uppercase tracking-wider text-charcoal/60 mb-1">
-                    Entries
-                  </span>
-                  <div className="flex items-center gap-2 bg-cream border border-tan/20 rounded-md px-2 py-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                      disabled={quantity <= 1}
-                      aria-label="Decrease quantity"
-                      className="p-1 rounded-full text-tan hover:bg-tan/10 disabled:opacity-30 transition-colors"
-                    >
-                      <Minus size={16} aria-hidden="true" />
-                    </button>
-                    <output aria-labelledby="embed-qty-label" className="font-bold w-5 text-center tabular-nums">
-                      {quantity}
-                    </output>
-                    <button
-                      type="button"
-                      onClick={() => setQuantity(q => Math.min(maxQty, q + 1))}
-                      disabled={quantity >= maxQty}
-                      aria-label="Increase quantity"
-                      className="p-1 rounded-full text-tan hover:bg-tan/10 disabled:opacity-30 transition-colors"
-                    >
-                      <Plus size={16} aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
+                <TicketQuantityPicker
+                  id="embed-qty"
+                  label="Entries"
+                  value={quantity}
+                  max={maxQty}
+                  onChange={setQuantity}
+                  compact
+                />
 
                 <button
                   type="submit"

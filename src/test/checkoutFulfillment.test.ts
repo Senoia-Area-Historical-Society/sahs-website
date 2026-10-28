@@ -5,6 +5,7 @@ import {
   parseMembershipOrder,
   type CheckoutSessionLike,
 } from '../../functions/src/checkoutFulfillment';
+import { MAX_TICKET_QUANTITY } from '../../functions/src/ticketPricing';
 
 /**
  * The outage these guard: `stripeWebhook` wrapped each fulfillment path in a `catch`
@@ -180,8 +181,9 @@ describe('parseTicketOrder', () => {
    * handler exists to save.
    */
   it('records a paid quantity above the purchase-time cap instead of rejecting it', () => {
-    const result = ticket({ ...complete, quantity: '25' });
-    expect(result.ok && result.value.quantity).toBe(25);
+    const aboveCap = MAX_TICKET_QUANTITY + 25;
+    const result = ticket({ ...complete, quantity: String(aboveCap) });
+    expect(result.ok && result.value.quantity).toBe(aboveCap);
   });
 
   it('defaults a missing amount_total to 0 rather than writing undefined', () => {
