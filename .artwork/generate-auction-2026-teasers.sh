@@ -8,6 +8,10 @@
 # Inspect the lettering on every master, then run:
 #   ./.artwork/derive-sizes.sh auction-2026-teasers
 #   ./.artwork/generate-auction-2026-teasers.sh square_top
+#
+# The bordeaux, chicken and distillery banner and card files had a flag added to the 1
+# in "14" by hand, because the model drew it like a capital I. The masters still have
+# the flagless 1, so deriving those lots again brings it back.
 set -uo pipefail
 
 export SSL_CERT_FILE="${SSL_CERT_FILE:-$(python3 -c 'import certifi;print(certifi.where())')}"
