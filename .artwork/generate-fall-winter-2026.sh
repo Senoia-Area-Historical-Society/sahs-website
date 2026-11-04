@@ -188,7 +188,7 @@ Eyebrow: SENOIA AREA HISTORICAL SOCIETY
 Script line: Annual Business Meeting
 Headline, on two lines: MEMBERSHIP / UPDATE
 Date line: THURSDAY, NOVEMBER 12, 2026
-Detail line: Finances and board - 7:00 PM'
+Detail line: Finances, board and auction preview - 7:00 PM'
 }
 
 business_meeting_square () {
@@ -199,7 +199,7 @@ Eyebrow: SENOIA AREA HISTORICAL SOCIETY
 Script line: Annual Business Meeting
 Headline, on two lines: MEMBERSHIP / UPDATE
 Date line: THURSDAY, NOVEMBER 12, 2026
-Detail line: Finances and board - 7:00 PM'
+Detail line: Finances, board and auction preview - 7:00 PM'
 }
 
 # oct_program is deliberately absent: the live October art is cropped from Susan
