@@ -242,6 +242,37 @@ ${PROGRAM_FOOTER}
 `,
   },
   {
+    key: 'business-meeting',
+    slug: 'november-2026-annual-business-meeting',
+    // Published: a published post is a real Membership Calendar entry (onPostWritten).
+    status: 'published',
+    title: '2026 Annual Business Meeting & Auction Preview',
+    // 7:00 PM, the standard Thursday program start. November 12 is after DST ends, so EST (-05:00).
+    // The second Thursday, matching the monthly program cadence and the week before the auction.
+    eventDate: '2026-11-12T19:00:00-05:00',
+    location: MUSEUM,
+    art: {
+      // -v2: the auction-preview detail line. Storage objects are cached for a year
+      // under their path, so a changed image needs a new filename to reach readers.
+      bannerImage: 'business-meeting-banner-1920x1080-v2.jpg',
+      mainImage: 'business-meeting-card-1200x675-v2.jpg',
+      squareImage: 'business-meeting-square-1200x1200-v2.jpg',
+    },
+    excerpt:
+      'Our annual business meeting on Thursday, November 12 at 7:00 PM: the society’s finances, board membership and what is ahead for members, with a preview of the Annual Charity Auction.',
+    content: `
+<h3>Annual Business Meeting</h3>
+<p>Every year we set aside an evening to report to our members on the health of the Senoia Area Historical Society. Join us for the <strong>2026 Annual Business Meeting</strong> on <strong>Thursday, November 12</strong>.</p>
+<p>We will review the year&rsquo;s finances, present the board of directors and any changes to its membership, and share what the society has accomplished and what comes next.</p>
+
+<h3>Auction Preview</h3>
+<p>The meeting is also a chance to preview the items for our <strong>Annual Charity Auction</strong> on Saturday, November 14. Come see what is on offer before the bidding begins.</p>
+
+<h3>Details</h3>
+<p>Doors open at 6:30 PM for light refreshments. The meeting begins at 7:00 PM at the Senoia Area Historical Society &amp; Museum, 6 Couch Street. Members are invited to attend.</p>
+`,
+  },
+  {
     key: 'christmas',
     slug: '2026-holiday-party',
     title: '2026 Christmas Party — Save the Date',
@@ -330,7 +361,8 @@ async function seed(ev) {
   const now = Timestamp.fromDate(new Date());
   const data = {
     type: 'event',
-    status: 'published',
+    // 'draft' keeps a post off the site and out of onPostWritten's calendar insert.
+    status: ev.status ?? 'published',
     title: ev.title,
     slug: ev.slug,
     eventDate: Timestamp.fromDate(new Date(ev.eventDate)),
