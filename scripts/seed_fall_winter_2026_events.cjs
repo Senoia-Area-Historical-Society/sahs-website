@@ -68,8 +68,8 @@ function tokenFor(objectPath) {
  * getDownloadURL() produces, so admin-uploaded and script-uploaded images are
  * indistinguishable to the app.
  */
-async function uploadArtwork(slug, file) {
-  const localPath = path.join(ART_DIR, file);
+async function uploadArtwork(slug, file, dir = ART_DIR) {
+  const localPath = path.join(dir, file);
   if (!fs.existsSync(localPath)) throw new Error(`Missing artwork: ${localPath}`);
   const objectPath = `content_images/${slug}_${file}`;
   // Deterministic, not random: re-uploading must not invalidate URLs already
@@ -208,12 +208,34 @@ ${PROGRAM_FOOTER}
       squareImage: 'auction-square-1200x1200.jpg',
     },
     ticketPrice: 3000, // $30.00, in cents
+    // Set on the live post after seeding. seed() writes `capacity ?? null`, so leaving
+    // this out of the script would remove the remaining-tickets limit on the next run.
+    capacity: 100,
+    // Rendered in place of <!-- LOTS --> below. Each image is uploaded next to the
+    // post's own art, and each description is its caption from
+    // .artwork/auction-2026-teasers/teasers.md without the ticket line, since the
+    // page already carries the date, the price and the ticket form.
+    lots: [
+      ['A Week in Bordeaux', 'auction-2026-teasers/bordeaux-card-1200x675.jpg', 'A week in Bordeaux, France, could be yours (airfare not included).'],
+      ['A Visit from Santa', 'auction-2026-teasers/santa-card-1200x675.jpg', 'An hour with Santa, and you make the guest list. Invite your friends, kids and grandkids.'],
+      ['Pedal and Picnic', 'auction-2026-teasers/ebikes-card-1200x675.jpg', 'Two e-bike rentals and a picnic from Senoia Bicycle. Grab someone you like and make a day of it.'],
+      ['A Taste of Napa', 'auction-2026-teasers/napa-card-1200x675.jpg', 'Napa wine tasting and food pairings for six. Gather your favorite people, pour something good and let the pairings do the talking.'],
+      ['Six Months of Blooms', 'auction-2026-teasers/flowers-card-1200x675.jpg', 'Six months of flower arrangements from The Pioneer Flower Farmer. Fresh flowers for your table, long after the auction is over.'],
+      ['A Spirited Tour', 'auction-2026-teasers/distillery-card-1200x675.jpg', 'Go behind the scenes with a tour of Doc Brown Distillery Farm.'],
+      ['Do Not Try This at Home', 'auction-2026-teasers/stunt-card-1200x675.jpg', 'Two hours with a professional stunt man. We can&rsquo;t think of another auction lot quite like it.'],
+      ['Pass the Fried Chicken', 'auction-2026-teasers/chicken-card-1200x675.jpg', 'George and Betty&rsquo;s fried chicken dinner for eight, plus all the Southern fixins of your choice. Bring seven friends and your appetite.'],
+      ['Your Business on the Map', 'auction-digital-services/digital-services-card-1200x675.jpg', 'Is your business hard to find online? Here&rsquo;s a way to fix that and support local history at the same time: a custom website and digital marketing package, with SEO and Google Business setup included, from Jeremy Warren.'],
+    ],
     excerpt:
       'Our annual charity auction returns on Saturday, November 14 — an evening of food, bidding and good company, and the single biggest fundraiser of the SAHS year. Tickets are $30. Full details to come.',
     content: `
 <h3>A November to Remember</h3>
 <p>Our <strong>Annual Charity Auction</strong> returns on <strong>Saturday, November 14, 2026</strong> at the SAHS History Museum. It is the largest fundraiser of our year, and the one that does the most to keep the Historical Society&rsquo;s work going &mdash; the museum, the archives, and the preservation of Senoia&rsquo;s history.</p>
 <p>Expect an evening of good food, spirited bidding and better company. Tickets are <strong>$30</strong> and include food, admission to the auction, and a cash bar.</p>
+
+<h3>A First Look at This Year&rsquo;s Lots</h3>
+<p>Here are a few of the items and experiences up for bid.</p>
+<!-- LOTS -->
 
 <h3>More Details to Come</h3>
 <p>The full lot list, the evening&rsquo;s schedule and this year&rsquo;s caterer are still being confirmed. We will update this page as those details are settled &mdash; and if you have an item or a service you would like to donate to the auction, we would love to hear from you at <a href="mailto:info@senoiahistory.com">info@senoiahistory.com</a>.</p>
@@ -319,6 +341,23 @@ async function seed(ev) {
     }
   }
 
+  // A lot's artwork lives under .artwork/, one directory up from ART_DIR's event folder.
+  let lotsHtml = '';
+  for (const [name, artPath, description] of ev.lots ?? []) {
+    const dir = path.join(__dirname, '../.artwork', path.dirname(artPath));
+    const file = path.basename(artPath);
+    let src;
+    if (PROD) {
+      src = await uploadArtwork(ev.slug, file, dir);
+    } else {
+      const publicDir = path.join(__dirname, '../public/fw2026-art');
+      fs.mkdirSync(publicDir, { recursive: true });
+      fs.copyFileSync(path.join(dir, file), path.join(publicDir, file));
+      src = `/fw2026-art/${file}`;
+    }
+    lotsHtml += `<h4>${name}</h4>\n<img src="${src}" alt="${name} auction poster">\n<p>${description}</p>\n`;
+  }
+
   const now = Timestamp.fromDate(new Date());
   const data = {
     type: 'event',
@@ -328,7 +367,7 @@ async function seed(ev) {
     slug: ev.slug,
     eventDate: Timestamp.fromDate(new Date(ev.eventDate)),
     publishDate: now,
-    content: ev.content.trim(),
+    content: ev.content.replace('<!-- LOTS -->', lotsHtml.trim()).trim(),
     excerpt: ev.excerpt,
     location: ev.location,
     galleryImages: [],
