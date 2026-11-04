@@ -17,7 +17,7 @@ A week in Bordeaux, France, could be yours (airfare not included). Bid on it at 
 
 ## Six Months of Blooms
 
-Six months of flower arrangements from The Pioneer Flower Farmer, a [$550] value. Fresh flowers for your table, long after the auction is over. It's up for bid on Saturday, November 14. Tickets are $30.
+Six months of flower arrangements from The Pioneer Flower Farmer. Fresh flowers for your table, long after the auction is over. It's up for bid on Saturday, November 14. Tickets are $30.
 
 Details to confirm: [how often arrangements come, pickup or delivery, start date]
 
