@@ -224,15 +224,17 @@ ${PROGRAM_FOOTER}
     slug: 'november-2026-annual-business-meeting',
     // Published: a published post is a real Membership Calendar entry (onPostWritten).
     status: 'published',
-    title: '2026 Annual Business Meeting: Membership Update',
+    title: '2026 Annual Business Meeting & Auction Preview',
     // 7:00 PM, the standard Thursday program start. November 12 is after DST ends, so EST (-05:00).
     // The second Thursday, matching the monthly program cadence and the week before the auction.
     eventDate: '2026-11-12T19:00:00-05:00',
     location: MUSEUM,
     art: {
-      bannerImage: 'business-meeting-banner-1920x1080.jpg',
-      mainImage: 'business-meeting-card-1200x675.jpg',
-      squareImage: 'business-meeting-square-1200x1200.jpg',
+      // -v2: the auction-preview detail line. Storage objects are cached for a year
+      // under their path, so a changed image needs a new filename to reach readers.
+      bannerImage: 'business-meeting-banner-1920x1080-v2.jpg',
+      mainImage: 'business-meeting-card-1200x675-v2.jpg',
+      squareImage: 'business-meeting-square-1200x1200-v2.jpg',
     },
     excerpt:
       'Our annual business meeting on Thursday, November 12 at 7:00 PM: the society’s finances, board membership and what is ahead for members, with a preview of the Annual Charity Auction.',
