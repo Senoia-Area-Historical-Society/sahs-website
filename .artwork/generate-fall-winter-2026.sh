@@ -180,9 +180,33 @@ Date line: DECEMBER 2026
 Detail line: Date to be confirmed'
 }
 
+business_meeting () {
+  gen business-meeting-wide 16:9 'Illustration: a 19th-century Georgia town hall interior rendered as flat shapes — a long wooden table with a green baize cloth, a row of empty ladder-back chairs, a tall window with warm daylight, a brass ceiling lamp, and a rolled ledger and folded ledger sheets in the foreground. Warm lamplight and a large antique-gold ceiling medallion, with concentric flat bands. Dignified and welcoming, not formal or austere. Nothing on the table or walls may carry writing.
+
+Text, exactly:
+Eyebrow: SENOIA AREA HISTORICAL SOCIETY
+Script line: Annual Business Meeting
+Headline, on two lines: MEMBERSHIP / UPDATE
+Date line: THURSDAY, NOVEMBER 12, 2026
+Detail line: Finances, board and auction preview - 7:00 PM'
+}
+
+business_meeting_square () {
+  gen_square business-meeting-square 'Illustration: a 19th-century Georgia town hall interior, centred and seen head-on — a long wooden table with a green baize cloth, a row of ladder-back chairs, a tall window with warm daylight behind, a brass ceiling lamp, and a rolled ledger in the foreground. Warm lamplight in concentric flat bands. Nothing on the table or walls may carry writing.
+
+Text, exactly:
+Eyebrow: SENOIA AREA HISTORICAL SOCIETY
+Script line: Annual Business Meeting
+Headline, on two lines: MEMBERSHIP / UPDATE
+Date line: THURSDAY, NOVEMBER 12, 2026
+Detail line: Finances, board and auction preview - 7:00 PM'
+}
+
 # oct_program is deliberately absent: the live October art is cropped from Susan
 # Stitt's hand-designed flyer (oct-program-flyer-source.pdf), so running it here
 # would overwrite the real artwork with an unrelated placeholder.
+# business_meeting is also absent from ALL: run it explicitly, e.g.
+#   ./.artwork/generate-fall-winter-2026.sh business_meeting business_meeting_square
 ALL=(sept_program volunteers auction christmas hotchocolate
      volunteers_square auction_square christmas_square)
 
