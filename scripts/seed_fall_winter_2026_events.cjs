@@ -199,7 +199,8 @@ ${PROGRAM_FOOTER}
     key: 'auction',
     slug: 'november-auction-2026',
     title: '2026 Annual Charity Auction',
-    // 6:00 PM, matching recent years. November 14 falls after DST ends, so EST (-05:00).
+    // 6:00 PM doors open (confirmed by Shelley Kiley, Nov 2026). November 14 falls after
+    // DST ends, so EST (-05:00).
     eventDate: '2026-11-14T18:00:00-05:00',
     location: MUSEUM,
     art: {
@@ -227,18 +228,26 @@ ${PROGRAM_FOOTER}
       ['Your Business on the Map', 'auction-digital-services/digital-services-card-1200x675.jpg', 'Is your business hard to find online? Here&rsquo;s a way to fix that and support local history at the same time: a custom website and digital marketing package, with SEO and Google Business setup included, from Jeremy Warren.'],
     ],
     excerpt:
-      'Our annual charity auction returns on Saturday, November 14 — an evening of food, bidding and good company, and the single biggest fundraiser of the SAHS year. Tickets are $30. Full details to come.',
+      'Our annual charity auction returns on Saturday, November 14 — an evening of food, bidding and good company, and the single biggest fundraiser of the SAHS year. Doors open at 6:00 PM, with the silent auction from 6:00 to 7:00 and the live auction at 7:15. Tickets are $30 and include heavy appetizers.',
     content: `
 <h3>A November to Remember</h3>
 <p>Our <strong>Annual Charity Auction</strong> returns on <strong>Saturday, November 14, 2026</strong> at the SAHS History Museum. It is the largest fundraiser of our year, and the one that does the most to keep the Historical Society&rsquo;s work going &mdash; the museum, the archives, and the preservation of Senoia&rsquo;s history.</p>
-<p>Expect an evening of good food, spirited bidding and better company. Tickets are <strong>$30</strong> and include food, admission to the auction, and a cash bar.</p>
+<p>Expect an evening of good food, spirited bidding and better company. Tickets are <strong>$30</strong> and include heavy appetizers, admission to the auction, and a cash bar.</p>
+
+<h3>The Evening&rsquo;s Schedule</h3>
+<ul>
+<li><strong>6:00 PM</strong> &mdash; Doors open</li>
+<li><strong>6:00&ndash;7:00 PM</strong> &mdash; Silent auction</li>
+<li><strong>7:15 PM</strong> &mdash; Live auction</li>
+</ul>
+<p>Heavy appetizers will be served throughout the evening, and a cash bar will be open.</p>
 
 <h3>A First Look at This Year&rsquo;s Lots</h3>
 <p>Here are a few of the items and experiences up for bid.</p>
 <!-- LOTS -->
 
-<h3>More Details to Come</h3>
-<p>The full lot list, the evening&rsquo;s schedule and this year&rsquo;s caterer are still being confirmed. We will update this page as those details are settled &mdash; and if you have an item or a service you would like to donate to the auction, we would love to hear from you at <a href="mailto:info@senoiahistory.com">info@senoiahistory.com</a>.</p>
+<h3>Donate to the Auction</h3>
+<p>More lots are still being added. If you have an item or a service you would like to donate to the auction, we would love to hear from you at <a href="mailto:info@senoiahistory.com">info@senoiahistory.com</a>.</p>
 `,
   },
   {
