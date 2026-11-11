@@ -228,15 +228,15 @@ ${PROGRAM_FOOTER}
       ['Your Business on the Map', 'auction-digital-services/digital-services-card-1200x675.jpg', 'Is your business hard to find online? Here&rsquo;s a way to fix that and support local history at the same time: a custom website and digital marketing package, with SEO and Google Business setup included, from Jeremy Warren.'],
     ],
     excerpt:
-      'Our annual charity auction returns on Saturday, November 14 — an evening of food, bidding and good company, and the single biggest fundraiser of the SAHS year. Doors open at 6:00 PM, with the silent auction from 6:00 to 7:00 and the live auction at 7:15. Tickets are $30 and include heavy appetizers.',
+      'Our annual charity auction returns on Saturday, November 14 — an evening of food, bidding and good company, and the single biggest fundraiser of the SAHS year. The evening starts at 6:00 PM, with the silent auction from 6:00 to 7:00 and the live auction at 7:15. Tickets are $30 and include heavy appetizers.',
     content: `
 <h3>A November to Remember</h3>
-<p>Our <strong>Annual Charity Auction</strong> returns on <strong>Saturday, November 14, 2026</strong> at the SAHS History Museum. It is the largest fundraiser of our year, and the one that does the most to keep the Historical Society&rsquo;s work going &mdash; the museum, the archives, and the preservation of Senoia&rsquo;s history.</p>
+<p>Our <strong>Annual Charity Auction</strong> returns on <strong>Saturday, November 14, 2026</strong>, starting at <strong>6:00 PM</strong> at the SAHS History Museum. It is the largest fundraiser of our year, and the one that does the most to keep the Historical Society&rsquo;s work going &mdash; the museum, the archives, and the preservation of Senoia&rsquo;s history.</p>
 <p>Expect an evening of good food, spirited bidding and better company. Tickets are <strong>$30</strong> and include heavy appetizers, admission to the auction, and a cash bar.</p>
 
 <h3>The Evening&rsquo;s Schedule</h3>
 <ul>
-<li><strong>6:00 PM</strong> &mdash; Doors open</li>
+<li><strong>6:00 PM</strong> &mdash; Auction starts and doors open</li>
 <li><strong>6:00&ndash;7:00 PM</strong> &mdash; Silent auction</li>
 <li><strong>7:15 PM</strong> &mdash; Live auction</li>
 </ul>
