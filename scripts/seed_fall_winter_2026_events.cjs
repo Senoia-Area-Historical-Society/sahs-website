@@ -218,7 +218,10 @@ ${PROGRAM_FOOTER}
     // page already carries the date, the price and the ticket form.
     lots: [
       ['A Week in Bordeaux', 'auction-2026-teasers/bordeaux-card-1200x675.jpg', 'A week in Bordeaux, France, could be yours (airfare not included).'],
-      ['A Visit from Santa', 'auction-2026-teasers/santa-card-1200x675.jpg', 'An hour with Santa, and you make the guest list. Invite your friends, kids and grandkids.'],
+      // Revised Nov 2026 (Susan Stitt): now two separate lots, each a 30-minute visit
+      // from Santa and Mrs. Claus. No image: santa-card bakes "One Hour" into the
+      // pixels, so showing it would contradict this caption.
+      ['Visits from Santa and Mrs. Claus', null, 'Santa and Mrs. Claus are coming to visit, and you make the guest list. This year it&rsquo;s two separate lots, each a 30-minute visit. Invite your friends, kids and grandkids.'],
       ['Pedal and Picnic', 'auction-2026-teasers/ebikes-card-1200x675.jpg', 'Two e-bike rentals and a picnic from Senoia Bicycle. Grab someone you like and make a day of it.'],
       ['A Taste of Napa', 'auction-2026-teasers/napa-card-1200x675.jpg', 'Napa wine tasting and food pairings for six. Gather your favorite people, pour something good and let the pairings do the talking.'],
       ['Six Months of Blooms', 'auction-2026-teasers/flowers-card-1200x675.jpg', 'Six months of flower arrangements from The Pioneer Flower Farmer. Fresh flowers for your table, long after the auction is over.'],
@@ -228,15 +231,15 @@ ${PROGRAM_FOOTER}
       ['Your Business on the Map', 'auction-digital-services/digital-services-card-1200x675.jpg', 'Is your business hard to find online? Here&rsquo;s a way to fix that and support local history at the same time: a custom website and digital marketing package, with SEO and Google Business setup included, from Jeremy Warren.'],
     ],
     excerpt:
-      'Our annual charity auction returns on Saturday, November 14 — an evening of food, bidding and good company, and the single biggest fundraiser of the SAHS year. Doors open at 6:00 PM, with the silent auction from 6:00 to 7:00 and the live auction at 7:15. Tickets are $30 and include heavy appetizers.',
+      'Our annual charity auction returns on Saturday, November 14 — an evening of food, bidding and good company, and the single biggest fundraiser of the SAHS year. The evening starts at 6:00 PM, with the silent auction from 6:00 to 7:00 and the live auction at 7:15. Tickets are $30 and include heavy appetizers.',
     content: `
 <h3>A November to Remember</h3>
-<p>Our <strong>Annual Charity Auction</strong> returns on <strong>Saturday, November 14, 2026</strong> at the SAHS History Museum. It is the largest fundraiser of our year, and the one that does the most to keep the Historical Society&rsquo;s work going &mdash; the museum, the archives, and the preservation of Senoia&rsquo;s history.</p>
+<p>Our <strong>Annual Charity Auction</strong> returns on <strong>Saturday, November 14, 2026</strong>, starting at <strong>6:00 PM</strong> at the SAHS History Museum. It is the largest fundraiser of our year, and the one that does the most to keep the Historical Society&rsquo;s work going &mdash; the museum, the archives, and the preservation of Senoia&rsquo;s history.</p>
 <p>Expect an evening of good food, spirited bidding and better company. Tickets are <strong>$30</strong> and include heavy appetizers, admission to the auction, and a cash bar.</p>
 
 <h3>The Evening&rsquo;s Schedule</h3>
 <ul>
-<li><strong>6:00 PM</strong> &mdash; Doors open</li>
+<li><strong>6:00 PM</strong> &mdash; Auction starts and doors open</li>
 <li><strong>6:00&ndash;7:00 PM</strong> &mdash; Silent auction</li>
 <li><strong>7:15 PM</strong> &mdash; Live auction</li>
 </ul>
@@ -353,6 +356,11 @@ async function seed(ev) {
   // A lot's artwork lives under .artwork/, one directory up from ART_DIR's event folder.
   let lotsHtml = '';
   for (const [name, artPath, description] of ev.lots ?? []) {
+    // A lot may have no artwork (null), e.g. when its poster has gone stale.
+    if (!artPath) {
+      lotsHtml += `<h4>${name}</h4>\n<p>${description}</p>\n`;
+      continue;
+    }
     const dir = path.join(__dirname, '../.artwork', path.dirname(artPath));
     const file = path.basename(artPath);
     let src;
